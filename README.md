@@ -1,2 +1,2 @@
 # Projects
-This is a respository with different files related to different Machine Learning Projects especially focused on Regression (Forecasting), Classification (Imbalance Dataset) and Neural Language Process
+In this repository there are projects made "just for fun", they contain different types of approaches mainly focused on forecasting and classification both supervised and unsupervised.
