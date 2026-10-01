@@ -24,7 +24,22 @@ const RISK_KEYWORDS = [
   "avena",
 ];
 
-const SAFE_QUALIFIERS = ["senza glutine", "gluten free", "certificat"];
+// Qualificatori che rendono sicuro un ingrediente altrimenti a rischio
+// (es. "pasta di riso", "farina di mais" non contengono glutine nonostante
+// il match su "pasta"/"farina").
+const SAFE_QUALIFIERS = [
+  "senza glutine",
+  "gluten free",
+  "certificat",
+  "di riso",
+  "di mais",
+  "di grano saraceno",
+  "di ceci",
+  "di lenticchie",
+  "di quinoa",
+  "di mandorle",
+  "di canapa",
+];
 
 export function isIngredienteARischio(ingrediente: string): boolean {
   const lower = ingrediente.toLowerCase();
