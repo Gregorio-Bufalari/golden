@@ -111,6 +111,42 @@ export async function generateMealPlan(profilo: ProfiloPerPiano): Promise<MealPl
   return response.parsed_output;
 }
 
+export async function modificaPiano(
+  profilo: ProfiloPerPiano,
+  giorniAttuali: Giorno[],
+  messaggioUtente: string,
+): Promise<MealPlan> {
+  const response = await client.messages.parse({
+    model: MODEL,
+    max_tokens: 8000,
+    system:
+      "Sei un assistente che modifica un piano settimanale di pasti già esistente, in base a una richiesta " +
+      "dell'utente in linguaggio naturale, in italiano. Applica SOLO la modifica richiesta, lasciando invariato " +
+      "il resto del piano quando possibile. Le restrizioni alimentari restano un vincolo rigido e non negoziabile " +
+      "anche dopo la modifica: non includere MAI un ingrediente incompatibile. " +
+      ISTRUZIONI_INGREDIENTI,
+    messages: [
+      {
+        role: "user",
+        content:
+          `Profilo:\n${buildContestoProfilo(profilo)}\n\n` +
+          `Piano attuale (JSON):\n${JSON.stringify({ giorni: giorniAttuali })}\n\n` +
+          `Richiesta dell'utente: "${messaggioUtente}"\n\n` +
+          "Restituisci il piano completo aggiornato (tutti i 7 giorni), applicando la modifica richiesta e lasciando invariato il resto.",
+      },
+    ],
+    output_config: {
+      format: zodOutputFormat(MealPlanSchema),
+    },
+  });
+
+  if (!response.parsed_output) {
+    throw new Error("Claude non ha restituito un piano valido.");
+  }
+
+  return response.parsed_output;
+}
+
 export async function regeneratePasto(
   profilo: ProfiloPerPiano,
   giorno: string,
