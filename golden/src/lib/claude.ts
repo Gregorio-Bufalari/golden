@@ -41,11 +41,11 @@ const GiornoSchema = z.object({
     "Sabato",
     "Domenica",
   ]),
-  pasti: z.array(PastoSchema),
+  pasti: z.array(PastoSchema).length(2),
 });
 
 const MealPlanSchema = z.object({
-  giorni: z.array(GiornoSchema),
+  giorni: z.array(GiornoSchema).length(7),
 });
 
 export type Ingrediente = z.infer<typeof IngredienteSchema>;
