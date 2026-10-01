@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateMealPlan, regeneratePasto, type Pasto } from "@/lib/claude";
 import { ingredientiARischio } from "@/lib/glutine-check";
+import { buildGroceryList, type GroceryList } from "@/lib/grocery";
 
 const MAX_RIGENERAZIONI = 2;
 
@@ -23,6 +24,7 @@ type ProfiloRow = {
   tempo_max_cucina: number | null;
   household_size: number | null;
   modalita: "routine" | "scoperta";
+  supermercato: string | null;
 };
 
 function mondayOfThisWeek(d = new Date()): string {
@@ -53,7 +55,7 @@ async function generaPianoValidato(profile: ProfiloRow): Promise<GiornoValidato[
       let pastoCorrente: PastoValidato = pasto;
 
       if (richiedeControlloGlutine) {
-        let rischi = ingredientiARischio(pastoCorrente.ingredienti);
+        let rischi = ingredientiARischio(pastoCorrente.ingredienti.map((i) => i.nome));
         let tentativi = 0;
 
         while (rischi.length > 0 && tentativi < MAX_RIGENERAZIONI) {
@@ -71,7 +73,7 @@ async function generaPianoValidato(profile: ProfiloRow): Promise<GiornoValidato[
               pastoCorrente,
               rischi,
             );
-            rischi = ingredientiARischio(pastoCorrente.ingredienti);
+            rischi = ingredientiARischio(pastoCorrente.ingredienti.map((i) => i.nome));
           } catch (err) {
             console.error("regeneratePasto error:", err);
             break;
@@ -104,7 +106,7 @@ export async function POST(request: Request) {
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select(
-      "id, restrizioni, obiettivo, preferenze, tempo_max_cucina, household_size, modalita",
+      "id, restrizioni, obiettivo, preferenze, tempo_max_cucina, household_size, modalita, supermercato",
     )
     .eq("link_token", token)
     .single();
@@ -114,13 +116,13 @@ export async function POST(request: Request) {
   }
 
   let giorniValidati: GiornoValidato[];
-  let budgetStimato: number | null = null;
+  let groceryList: GroceryList;
   let riusato = false;
 
   if (profile.modalita === "routine") {
     const { data: ultimoPiano } = await supabase
       .from("weekly_plans")
-      .select("meal_plan, budget_stimato")
+      .select("meal_plan, grocery_list")
       .eq("profile_id", profile.id)
       .order("settimana", { ascending: false })
       .limit(1)
@@ -128,7 +130,7 @@ export async function POST(request: Request) {
 
     if (ultimoPiano?.meal_plan?.giorni) {
       giorniValidati = ultimoPiano.meal_plan.giorni;
-      budgetStimato = ultimoPiano.budget_stimato;
+      groceryList = ultimoPiano.grocery_list as GroceryList;
       riusato = true;
     } else {
       try {
@@ -140,6 +142,7 @@ export async function POST(request: Request) {
           { status: 502 },
         );
       }
+      groceryList = buildGroceryList(giorniValidati, profile.supermercato);
     }
   } else {
     try {
@@ -151,6 +154,7 @@ export async function POST(request: Request) {
         { status: 502 },
       );
     }
+    groceryList = buildGroceryList(giorniValidati, profile.supermercato);
   }
 
   const settimana = mondayOfThisWeek();
@@ -162,7 +166,8 @@ export async function POST(request: Request) {
       settimana,
       meal_plan: { giorni: giorniValidati },
       modalita_usata: profile.modalita,
-      budget_stimato: budgetStimato,
+      budget_stimato: groceryList.totale_stimato,
+      grocery_list: groceryList,
     })
     .select("id, settimana")
     .single();
@@ -179,6 +184,7 @@ export async function POST(request: Request) {
     weekly_plan_id: weeklyPlan.id,
     settimana: weeklyPlan.settimana,
     giorni: giorniValidati,
+    grocery_list: groceryList,
     riusato,
   });
 }

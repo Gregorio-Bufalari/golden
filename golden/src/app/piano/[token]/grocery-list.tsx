@@ -1,0 +1,120 @@
+"use client";
+
+type GroceryItem = {
+  nome: string;
+  quantita: number;
+  unita: "g" | "kg" | "ml" | "l" | "pz" | "confezione";
+  prezzo_stimato: number;
+};
+
+type GroceryReparto = {
+  reparto: string;
+  items: GroceryItem[];
+  subtotale: number;
+};
+
+type GroceryListData = {
+  reparti: GroceryReparto[];
+  totale_stimato: number;
+  fascia: "discount" | "media" | "premium";
+};
+
+function formatQuantita(quantita: number, unita: GroceryItem["unita"]): string {
+  if (unita === "g" && quantita >= 1000) {
+    return `${(quantita / 1000).toFixed(quantita % 1000 === 0 ? 0 : 1)} kg`;
+  }
+  if (unita === "ml" && quantita >= 1000) {
+    return `${(quantita / 1000).toFixed(quantita % 1000 === 0 ? 0 : 1)} l`;
+  }
+  const arrotondata = Math.round(quantita * 10) / 10;
+  return `${arrotondata} ${unita}`;
+}
+
+function buildTestoWhatsApp(data: GroceryListData, settimana: string): string {
+  const righe = [`*Lista della spesa* — settimana del ${settimana}`, ""];
+
+  for (const reparto of data.reparti) {
+    righe.push(`*${reparto.reparto}*`);
+    for (const item of reparto.items) {
+      righe.push(
+        `- ${item.nome}: ${formatQuantita(item.quantita, item.unita)} (~€${item.prezzo_stimato.toFixed(2)})`,
+      );
+    }
+    righe.push("");
+  }
+
+  righe.push(`Totale stimato: ~€${data.totale_stimato.toFixed(2)}`);
+  return righe.join("\n");
+}
+
+export function GroceryList({
+  data,
+  settimana,
+}: {
+  data: GroceryListData;
+  settimana: string;
+}) {
+  function handleWhatsApp() {
+    const testo = buildTestoWhatsApp(data, settimana);
+    window.open(`https://wa.me/?text=${encodeURIComponent(testo)}`, "_blank");
+  }
+
+  function handlePrint() {
+    window.print();
+  }
+
+  return (
+    <div className="mt-8 rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+          Lista della spesa
+        </h3>
+        <div className="flex gap-2 print:hidden">
+          <button
+            onClick={handleWhatsApp}
+            className="rounded-full border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
+          >
+            Condividi su WhatsApp
+          </button>
+          <button
+            onClick={handlePrint}
+            className="rounded-full border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
+          >
+            Esporta PDF
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {data.reparti.map((reparto) => (
+          <div key={reparto.reparto}>
+            <h4 className="mb-1 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+              {reparto.reparto}
+            </h4>
+            <ul className="flex flex-col gap-1">
+              {reparto.items.map((item) => (
+                <li
+                  key={item.nome}
+                  className="flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400"
+                >
+                  <span>
+                    {item.nome} — {formatQuantita(item.quantita, item.unita)}
+                  </span>
+                  <span className="text-zinc-400">~€{item.prezzo_stimato.toFixed(2)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 flex items-center justify-between border-t border-zinc-200 pt-3 text-sm font-medium dark:border-zinc-800">
+        <span>Totale stimato</span>
+        <span>~€{data.totale_stimato.toFixed(2)}</span>
+      </div>
+      <p className="mt-1 text-xs text-zinc-400">
+        Prezzo stimato sulla fascia {data.fascia === "discount" ? "discount" : data.fascia === "premium" ? "premium" : "media"} — non è il prezzo reale del tuo supermercato.
+      </p>
+    </div>
+  );
+}
