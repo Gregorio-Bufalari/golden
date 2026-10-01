@@ -54,7 +54,9 @@ export async function POST(request: Request) {
       .limit(1)
       .maybeSingle();
 
-    if (ultimoPiano?.meal_plan?.giorni) {
+    const groceryListRiusabile = (ultimoPiano?.grocery_list as GroceryList | null)?.reparti;
+
+    if (ultimoPiano?.meal_plan?.giorni && groceryListRiusabile) {
       giorniValidati = ultimoPiano.meal_plan.giorni;
       groceryList = ultimoPiano.grocery_list as GroceryList;
       riusato = true;
