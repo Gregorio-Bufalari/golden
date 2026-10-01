@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
 async function getSupabaseStatus() {
@@ -47,6 +48,12 @@ export default async function Home() {
           />
           {status.message}
         </div>
+        <Link
+          href="/onboarding"
+          className="rounded-full bg-black px-6 py-2.5 text-sm font-medium text-white dark:bg-white dark:text-black"
+        >
+          Inizia l&apos;onboarding
+        </Link>
       </main>
     </div>
   );
