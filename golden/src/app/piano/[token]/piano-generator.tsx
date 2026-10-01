@@ -16,10 +16,16 @@ type Giorno = {
   pasti: Pasto[];
 };
 
+function isDomenicaSera(): boolean {
+  const now = new Date();
+  return now.getDay() === 0 && now.getHours() >= 18;
+}
+
 export function PianoGenerator({ token }: { token: string }) {
   const [giorni, setGiorni] = useState<Giorno[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [riusato, setRiusato] = useState(false);
 
   async function handleGenerate() {
     setLoading(true);
@@ -39,6 +45,7 @@ export function PianoGenerator({ token }: { token: string }) {
       }
 
       setGiorni(data.giorni);
+      setRiusato(Boolean(data.riusato));
     } catch {
       setError("Qualcosa è andato storto. Riprova.");
     } finally {
@@ -50,6 +57,11 @@ export function PianoGenerator({ token }: { token: string }) {
     <div className="mt-10 w-full max-w-2xl">
       {!giorni && (
         <div className="flex flex-col items-center gap-3">
+          {isDomenicaSera() && (
+            <div className="mb-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
+              È domenica sera — pronto per confermare il piano della prossima settimana?
+            </div>
+          )}
           <button
             onClick={handleGenerate}
             disabled={loading}
@@ -63,6 +75,12 @@ export function PianoGenerator({ token }: { token: string }) {
 
       {giorni && (
         <div className="flex flex-col gap-6 text-left">
+          {riusato && (
+            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+              Piano ripreso dalla settimana scorsa (modalità routine) — prezzi e quantità
+              da ricalcolare in futuro.
+            </p>
+          )}
           {giorni.map((giorno) => (
             <div
               key={giorno.giorno}

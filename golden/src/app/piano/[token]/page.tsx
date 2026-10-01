@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PianoGenerator } from "./piano-generator";
+import { ModalitaToggle } from "./modalita-toggle";
 
 export default async function PianoPage({
   params,
@@ -12,7 +13,7 @@ export default async function PianoPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("nome, restrizioni, obiettivo, link_token")
+    .select("nome, restrizioni, obiettivo, link_token, modalita")
     .eq("link_token", token)
     .single();
 
@@ -33,6 +34,11 @@ export default async function PianoPage({
           Restrizioni registrate: {profile.restrizioni.join(", ")}
         </p>
       )}
+
+      <ModalitaToggle
+        token={profile.link_token}
+        initialModalita={profile.modalita as "routine" | "scoperta"}
+      />
 
       <PianoGenerator token={profile.link_token} />
     </div>
