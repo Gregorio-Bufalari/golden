@@ -1,0 +1,5 @@
+# Backlog — idee future (non ancora implementate)
+
+- **Database ricette di riferimento (RAG)**: invece di far inventare le ricette a Claude da zero, creare una tabella Supabase con ricette curate e passarle come contesto alla generazione del piano, così il modello sceglie/adatta tra ricette reali invece di inventarle. Aumenta fiducia e controllo qualità/sicurezza, richiede di popolare e mantenere il database.
+- **Ricalcolo prezzi/quantità in modalità routine**: oggi la modalità routine ricopia il meal_plan dell'ultima settimana così com'è (nessuna chiamata a Claude), senza ricalcolare prezzi o quantità come descritto nel documento di prodotto — perché non esiste ancora la lista della spesa/stima prezzi (sezione 4). Da implementare quando quella parte sarà pronta.
+- **Reminder domenica sera**: per ora è solo un banner mostrato quando l'utente apre `/piano/[token]` di domenica sera — non c'è un vero promemoria proattivo (email/notifica) che raggiunge l'utente se non apre l'app. Le notifiche push vere sono previste in una fase successiva.
