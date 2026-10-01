@@ -1,11 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { GroceryList } from "./grocery-list";
+
+type Ingrediente = {
+  nome: string;
+  quantita: number;
+  unita: "g" | "kg" | "ml" | "l" | "pz" | "confezione";
+  reparto: string;
+};
 
 type Pasto = {
   tipo: "pranzo" | "cena";
   nome: string;
-  ingredienti: string[];
+  ingredienti: Ingrediente[];
   tempo_preparazione_min: number;
   verificare?: boolean;
   ingredienti_a_rischio?: string[];
@@ -16,6 +24,18 @@ type Giorno = {
   pasti: Pasto[];
 };
 
+type GroceryReparto = {
+  reparto: string;
+  items: { nome: string; quantita: number; unita: Ingrediente["unita"]; prezzo_stimato: number }[];
+  subtotale: number;
+};
+
+type GroceryListData = {
+  reparti: GroceryReparto[];
+  totale_stimato: number;
+  fascia: "discount" | "media" | "premium";
+};
+
 function isDomenicaSera(): boolean {
   const now = new Date();
   return now.getDay() === 0 && now.getHours() >= 18;
@@ -23,6 +43,8 @@ function isDomenicaSera(): boolean {
 
 export function PianoGenerator({ token }: { token: string }) {
   const [giorni, setGiorni] = useState<Giorno[] | null>(null);
+  const [groceryList, setGroceryList] = useState<GroceryListData | null>(null);
+  const [settimana, setSettimana] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [riusato, setRiusato] = useState(false);
@@ -45,6 +67,8 @@ export function PianoGenerator({ token }: { token: string }) {
       }
 
       setGiorni(data.giorni);
+      setGroceryList(data.grocery_list);
+      setSettimana(data.settimana);
       setRiusato(Boolean(data.riusato));
     } catch {
       setError("Qualcosa è andato storto. Riprova.");
@@ -76,7 +100,7 @@ export function PianoGenerator({ token }: { token: string }) {
       {giorni && (
         <div className="flex flex-col gap-6 text-left">
           {riusato && (
-            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 print:hidden">
               Piano ripreso dalla settimana scorsa (modalità routine) — prezzi e quantità
               da ricalcolare in futuro.
             </p>
@@ -104,7 +128,7 @@ export function PianoGenerator({ token }: { token: string }) {
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                      {pasto.ingredienti.join(", ")}
+                      {pasto.ingredienti.map((ing) => ing.nome).join(", ")}
                     </p>
                     {pasto.verificare && (
                       <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
@@ -118,6 +142,8 @@ export function PianoGenerator({ token }: { token: string }) {
               </div>
             </div>
           ))}
+
+          {groceryList && <GroceryList data={groceryList} settimana={settimana} />}
         </div>
       )}
     </div>
