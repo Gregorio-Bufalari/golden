@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { GroceryList } from "./grocery-list";
+import { CheckinForm } from "./checkin-form";
 
 type Ingrediente = {
   nome: string;
@@ -49,6 +50,10 @@ export function PianoGenerator({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   const [riusato, setRiusato] = useState(false);
 
+  const [messaggio, setMessaggio] = useState("");
+  const [modificando, setModificando] = useState(false);
+  const [erroreModifica, setErroreModifica] = useState<string | null>(null);
+
   async function handleGenerate() {
     setLoading(true);
     setError(null);
@@ -74,6 +79,34 @@ export function PianoGenerator({ token }: { token: string }) {
       setError("Qualcosa è andato storto. Riprova.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleModifica() {
+    if (!messaggio.trim()) return;
+    setModificando(true);
+    setErroreModifica(null);
+
+    try {
+      const res = await fetch("/api/piano/modifica", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, messaggio }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErroreModifica(data.error || "Qualcosa è andato storto.");
+        return;
+      }
+
+      setGiorni(data.giorni);
+      setGroceryList(data.grocery_list);
+      setMessaggio("");
+    } catch {
+      setErroreModifica("Qualcosa è andato storto. Riprova.");
+    } finally {
+      setModificando(false);
     }
   }
 
@@ -144,6 +177,35 @@ export function PianoGenerator({ token }: { token: string }) {
           ))}
 
           {groceryList && <GroceryList data={groceryList} settimana={settimana} />}
+
+          <div className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800 print:hidden">
+            <h3 className="mb-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+              Modifica il piano
+            </h3>
+            <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+              Es. &quot;giovedì mangio fuori&quot;, &quot;ho già comprato il pollo&quot;,
+              &quot;spendi meno questa settimana&quot;.
+            </p>
+            <textarea
+              value={messaggio}
+              onChange={(e) => setMessaggio(e.target.value)}
+              rows={2}
+              placeholder="Scrivi qui la modifica..."
+              className="w-full rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-sm placeholder:text-zinc-400 focus:border-black focus:outline-none dark:border-zinc-700 dark:focus:border-white"
+            />
+            {erroreModifica && (
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400">{erroreModifica}</p>
+            )}
+            <button
+              onClick={handleModifica}
+              disabled={modificando || !messaggio.trim()}
+              className="mt-3 rounded-full bg-black px-5 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black"
+            >
+              {modificando ? "Applico la modifica..." : "Applica modifica"}
+            </button>
+          </div>
+
+          <CheckinForm token={token} />
         </div>
       )}
     </div>

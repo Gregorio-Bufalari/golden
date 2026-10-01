@@ -1,31 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateMealPlan, regeneratePasto, type Pasto } from "@/lib/claude";
-import { ingredientiARischio } from "@/lib/glutine-check";
+import { generateMealPlan, type ProfiloPerPiano } from "@/lib/claude";
+import { validaGiorni, type GiornoValidato } from "@/lib/piano-validazione";
 import { buildGroceryList, type GroceryList } from "@/lib/grocery";
-
-const MAX_RIGENERAZIONI = 2;
-
-type PastoValidato = Pasto & {
-  verificare?: boolean;
-  ingredienti_a_rischio?: string[];
-};
-
-type GiornoValidato = {
-  giorno: string;
-  pasti: PastoValidato[];
-};
-
-type ProfiloRow = {
-  id: string;
-  restrizioni: string[];
-  obiettivo: string | null;
-  preferenze: { cucina?: string[]; graditi?: string; non_graditi?: string } | null;
-  tempo_max_cucina: number | null;
-  household_size: number | null;
-  modalita: "routine" | "scoperta";
-  supermercato: string | null;
-};
 
 function mondayOfThisWeek(d = new Date()): string {
   const day = d.getDay();
@@ -33,65 +10,6 @@ function mondayOfThisWeek(d = new Date()): string {
   const monday = new Date(d);
   monday.setDate(d.getDate() + diffToMonday);
   return monday.toISOString().slice(0, 10);
-}
-
-async function generaPianoValidato(profile: ProfiloRow): Promise<GiornoValidato[]> {
-  const richiedeControlloGlutine = profile.restrizioni?.includes("Glutine (celiachia)");
-
-  const plan = await generateMealPlan({
-    restrizioni: profile.restrizioni || [],
-    obiettivo: profile.obiettivo,
-    preferenze: profile.preferenze,
-    tempo_max_cucina: profile.tempo_max_cucina,
-    household_size: profile.household_size,
-  });
-
-  const giorniValidati: GiornoValidato[] = [];
-
-  for (const giorno of plan.giorni) {
-    const pastiValidati: PastoValidato[] = [];
-
-    for (const pasto of giorno.pasti) {
-      let pastoCorrente: PastoValidato = pasto;
-
-      if (richiedeControlloGlutine) {
-        let rischi = ingredientiARischio(pastoCorrente.ingredienti.map((i) => i.nome));
-        let tentativi = 0;
-
-        while (rischi.length > 0 && tentativi < MAX_RIGENERAZIONI) {
-          tentativi += 1;
-          try {
-            pastoCorrente = await regeneratePasto(
-              {
-                restrizioni: profile.restrizioni || [],
-                obiettivo: profile.obiettivo,
-                preferenze: profile.preferenze,
-                tempo_max_cucina: profile.tempo_max_cucina,
-                household_size: profile.household_size,
-              },
-              giorno.giorno,
-              pastoCorrente,
-              rischi,
-            );
-            rischi = ingredientiARischio(pastoCorrente.ingredienti.map((i) => i.nome));
-          } catch (err) {
-            console.error("regeneratePasto error:", err);
-            break;
-          }
-        }
-
-        if (rischi.length > 0) {
-          pastoCorrente = { ...pastoCorrente, verificare: true, ingredienti_a_rischio: rischi };
-        }
-      }
-
-      pastiValidati.push(pastoCorrente);
-    }
-
-    giorniValidati.push({ giorno: giorno.giorno, pasti: pastiValidati });
-  }
-
-  return giorniValidati;
 }
 
 export async function POST(request: Request) {
@@ -115,6 +33,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Profilo non trovato." }, { status: 404 });
   }
 
+  const profiloInput: ProfiloPerPiano = {
+    restrizioni: profile.restrizioni || [],
+    obiettivo: profile.obiettivo,
+    preferenze: profile.preferenze,
+    tempo_max_cucina: profile.tempo_max_cucina,
+    household_size: profile.household_size,
+  };
+
   let giorniValidati: GiornoValidato[];
   let groceryList: GroceryList;
   let riusato = false;
@@ -134,7 +60,8 @@ export async function POST(request: Request) {
       riusato = true;
     } else {
       try {
-        giorniValidati = await generaPianoValidato(profile);
+        const plan = await generateMealPlan(profiloInput);
+        giorniValidati = await validaGiorni(profiloInput, plan.giorni);
       } catch (err) {
         console.error("generateMealPlan error:", err);
         return NextResponse.json(
@@ -146,7 +73,8 @@ export async function POST(request: Request) {
     }
   } else {
     try {
-      giorniValidati = await generaPianoValidato(profile);
+      const plan = await generateMealPlan(profiloInput);
+      giorniValidati = await validaGiorni(profiloInput, plan.giorni);
     } catch (err) {
       console.error("generateMealPlan error:", err);
       return NextResponse.json(
