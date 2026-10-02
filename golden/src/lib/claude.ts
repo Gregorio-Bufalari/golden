@@ -30,6 +30,7 @@ const NutrizioneSchema = z.object({
   proteine_g: z.number(),
   carboidrati_g: z.number(),
   grassi_g: z.number(),
+  fibre_g: z.number(),
 });
 
 const PastoSchema = z.object({
@@ -114,7 +115,7 @@ const ISTRUZIONI_INGREDIENTI =
 
 const ISTRUZIONI_NUTRIZIONE =
   "Per ogni pasto (non per singolo ingrediente) indica anche il campo nutrizione: calorie totali del piatto (kcal), " +
-  "proteine_g, carboidrati_g e grassi_g (grammi), per la porzione così come preparata (per persona, non per l'intera pentola). " +
+  "proteine_g, carboidrati_g, grassi_g e fibre_g (grammi), per la porzione così come preparata (per persona, non per l'intera pentola). " +
   "Sono valori stimati con buon senso nutrizionale, non da un database ufficiale — va bene un'approssimazione ragionevole.";
 
 const ISTRUZIONI_PREPARAZIONE =

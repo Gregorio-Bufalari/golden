@@ -11,7 +11,9 @@ export default async function MenuPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, nome, restrizioni, modalita, budget_settimanale")
+    .select(
+      "id, nome, restrizioni, modalita, budget_settimanale, sesso, eta, peso_kg, altezza_cm, livello_attivita",
+    )
     .eq("link_token", token)
     .single();
 
@@ -45,6 +47,17 @@ export default async function MenuPage({
         initialSettimana={ultimoPiano?.settimana || ""}
         budgetSettimanale={profile.budget_settimanale}
         budgetStimatoIniziale={ultimoPiano?.budget_stimato ?? null}
+        datiBiometrici={
+          profile.sesso && profile.eta && profile.peso_kg && profile.altezza_cm && profile.livello_attivita
+            ? {
+                sesso: profile.sesso as "M" | "F",
+                eta: profile.eta,
+                peso_kg: Number(profile.peso_kg),
+                altezza_cm: Number(profile.altezza_cm),
+                livello_attivita: profile.livello_attivita as "sedentario" | "moderato" | "attivo",
+              }
+            : null
+        }
       />
     </div>
   );

@@ -19,7 +19,18 @@ type ProfileData = {
   tempo_max_cucina: number | null;
   budget_settimanale: number | null;
   supermercato: string | null;
+  sesso: "M" | "F" | null;
+  eta: number | null;
+  peso_kg: number | null;
+  altezza_cm: number | null;
+  livello_attivita: "sedentario" | "moderato" | "attivo" | null;
 };
+
+const LIVELLO_ATTIVITA_OPTIONS: { value: "sedentario" | "moderato" | "attivo"; label: string }[] = [
+  { value: "sedentario", label: "Sedentario" },
+  { value: "moderato", label: "Moderato" },
+  { value: "attivo", label: "Attivo" },
+];
 
 function toggleInArray(list: string[], value: string): string[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -40,6 +51,13 @@ export function ImpostazioniForm({ token, profile }: { token: string; profile: P
     profile.budget_settimanale ? String(profile.budget_settimanale) : "",
   );
   const [supermercato, setSupermercato] = useState(profile.supermercato || "");
+  const [sesso, setSesso] = useState<"M" | "F" | "">(profile.sesso || "");
+  const [eta, setEta] = useState(profile.eta ? String(profile.eta) : "");
+  const [pesoKg, setPesoKg] = useState(profile.peso_kg ? String(profile.peso_kg) : "");
+  const [altezzaCm, setAltezzaCm] = useState(profile.altezza_cm ? String(profile.altezza_cm) : "");
+  const [livelloAttivita, setLivelloAttivita] = useState<
+    "sedentario" | "moderato" | "attivo" | ""
+  >(profile.livello_attivita || "");
 
   const [salvando, setSalvando] = useState(false);
   const [errore, setErrore] = useState<string | null>(null);
@@ -69,6 +87,11 @@ export function ImpostazioniForm({ token, profile }: { token: string; profile: P
       tempo_max_cucina: tempoMaxCucina,
       budget_settimanale: budgetSettimanale ? Number(budgetSettimanale) : null,
       supermercato,
+      sesso: sesso || null,
+      eta: eta ? Number(eta) : null,
+      peso_kg: pesoKg ? Number(pesoKg) : null,
+      altezza_cm: altezzaCm ? Number(altezzaCm) : null,
+      livello_attivita: livelloAttivita || null,
     });
 
     if ("error" in result) {
@@ -255,6 +278,106 @@ export function ImpostazioniForm({ token, profile }: { token: string; profile: P
               {opt}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="border-t border-zinc-200 pt-6 dark:border-zinc-800">
+        <h3 className="mb-1 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+          Dati biometrici (opzionali)
+        </h3>
+        <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">
+          Servono solo per mostrarti, nella sezione Menu, un confronto indicativo tra il piano e i
+          valori di riferimento nutrizionali generali. Nessun dato viene usato per generare il
+          piano.
+        </p>
+
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Sesso
+            </label>
+            <div className="flex gap-2">
+              {(["M", "F"] as const).map((opt) => (
+                <button
+                  type="button"
+                  key={opt}
+                  onClick={() => setSesso(sesso === opt ? "" : opt)}
+                  className={`rounded-full border px-4 py-1.5 text-sm ${
+                    sesso === opt
+                      ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
+                      : "border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
+                  }`}
+                >
+                  {opt === "M" ? "Maschio" : "Femmina"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Età
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={eta}
+              onChange={(e) => setEta(e.target.value)}
+              className="w-full rounded-lg border border-zinc-300 bg-transparent px-4 py-2.5 text-sm focus:border-black focus:outline-none dark:border-zinc-700 dark:focus:border-white"
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Peso (kg)
+              </label>
+              <input
+                type="number"
+                min={1}
+                step="0.1"
+                value={pesoKg}
+                onChange={(e) => setPesoKg(e.target.value)}
+                className="w-full rounded-lg border border-zinc-300 bg-transparent px-4 py-2.5 text-sm focus:border-black focus:outline-none dark:border-zinc-700 dark:focus:border-white"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Altezza (cm)
+              </label>
+              <input
+                type="number"
+                min={1}
+                step="0.5"
+                value={altezzaCm}
+                onChange={(e) => setAltezzaCm(e.target.value)}
+                className="w-full rounded-lg border border-zinc-300 bg-transparent px-4 py-2.5 text-sm focus:border-black focus:outline-none dark:border-zinc-700 dark:focus:border-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Livello di attività fisica
+            </label>
+            <div className="flex flex-col gap-2">
+              {LIVELLO_ATTIVITA_OPTIONS.map((opt) => (
+                <label
+                  key={opt.value}
+                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-zinc-200 px-4 py-2.5 text-sm hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+                >
+                  <input
+                    type="radio"
+                    name="livello_attivita"
+                    checked={livelloAttivita === opt.value}
+                    onChange={() => setLivelloAttivita(opt.value)}
+                    className="h-4 w-4"
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 

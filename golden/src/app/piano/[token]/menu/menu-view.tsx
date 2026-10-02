@@ -1,8 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ModalitaToggle } from "../modalita-toggle";
 import { setModalita } from "../actions";
+import {
+  calcolaRiferimentoLARN,
+  confrontaConLARN,
+  DISCLAIMER_LARN,
+  type DatiBiometrici,
+} from "@/lib/larn";
 
 type Ingrediente = {
   nome: string;
@@ -16,6 +22,7 @@ type Nutrizione = {
   proteine_g: number;
   carboidrati_g: number;
   grassi_g: number;
+  fibre_g: number;
 };
 
 type Pasto = {
@@ -52,6 +59,7 @@ export function MenuView({
   initialSettimana,
   budgetSettimanale,
   budgetStimatoIniziale,
+  datiBiometrici,
 }: {
   token: string;
   initialModalita: "routine" | "scoperta";
@@ -59,6 +67,7 @@ export function MenuView({
   initialSettimana: string;
   budgetSettimanale: number | null;
   budgetStimatoIniziale: number | null;
+  datiBiometrici: DatiBiometrici | null;
 }) {
   const [modalita, setModalitaState] = useState(initialModalita);
   const [cambiandoModalita, setCambiandoModalita] = useState(false);
@@ -77,6 +86,25 @@ export function MenuView({
   const [rifiutoModifica, setRifiutoModifica] = useState<string | null>(null);
 
   const [pastoEspanso, setPastoEspanso] = useState<string | null>(null);
+
+  const confrontoLARN = useMemo(() => {
+    if (!giorni || !datiBiometrici) return null;
+
+    const totali = { calorie: 0, proteine_g: 0, carboidrati_g: 0, grassi_g: 0, fibre_g: 0 };
+    for (const giorno of giorni) {
+      for (const pasto of giorno.pasti) {
+        if (!pasto.nutrizione) continue;
+        totali.calorie += pasto.nutrizione.calorie ?? 0;
+        totali.proteine_g += pasto.nutrizione.proteine_g ?? 0;
+        totali.carboidrati_g += pasto.nutrizione.carboidrati_g ?? 0;
+        totali.grassi_g += pasto.nutrizione.grassi_g ?? 0;
+        totali.fibre_g += pasto.nutrizione.fibre_g ?? 0;
+      }
+    }
+
+    const riferimento = calcolaRiferimentoLARN(datiBiometrici);
+    return confrontaConLARN(totali, riferimento);
+  }, [giorni, datiBiometrici]);
 
   async function handleGenerate() {
     setLoading(true);
@@ -249,7 +277,8 @@ export function MenuView({
                         {pasto.nutrizione && (
                           <p className="mt-1 text-xs text-zinc-400">
                             {pasto.nutrizione.calorie} kcal · {pasto.nutrizione.proteine_g}g proteine ·{" "}
-                            {pasto.nutrizione.carboidrati_g}g carboidrati · {pasto.nutrizione.grassi_g}g grassi
+                            {pasto.nutrizione.carboidrati_g}g carboidrati · {pasto.nutrizione.grassi_g}g grassi ·{" "}
+                            {pasto.nutrizione.fibre_g}g fibre
                           </p>
                         )}
                         {espanso && haPreparazione && (
@@ -273,6 +302,37 @@ export function MenuView({
               </div>
             ))}
           </div>
+
+          {!confrontoLARN && (
+            <p className="text-xs text-zinc-400">
+              Inserisci sesso, età, peso, altezza e livello di attività nelle{" "}
+              <a href={`/piano/${token}/impostazioni`} className="underline">
+                Impostazioni
+              </a>{" "}
+              per vedere un confronto indicativo tra il piano e i valori di riferimento
+              nutrizionali.
+            </p>
+          )}
+
+          {confrontoLARN && (
+            <div className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
+              <h3 className="mb-3 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                Confronto nutrizionale settimanale
+              </h3>
+              <ul className="flex flex-col gap-1.5">
+                {confrontoLARN.map((n) => (
+                  <li key={n.etichetta} className="text-sm text-zinc-600 dark:text-zinc-400">
+                    {n.etichetta} nella fascia{" "}
+                    <span className="font-medium text-zinc-800 dark:text-zinc-200">{n.fascia}</span>{" "}
+                    rispetto al riferimento ({Math.round(n.totale)}
+                    {n.unita} questa settimana, riferimento {Math.round(n.riferimento)}
+                    {n.unita})
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs text-zinc-400">{DISCLAIMER_LARN}</p>
+            </div>
+          )}
 
           <div className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
             <h3 className="mb-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
