@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ModalitaToggle } from "../modalita-toggle";
 import { setModalita } from "../actions";
+import { Spinner } from "@/components/spinner";
 import {
   calcolaRiferimentoLARN,
   confrontaConLARN,
@@ -221,10 +222,14 @@ export function MenuView({
           <button
             onClick={handleGenerate}
             disabled={loading || cambiandoModalita}
-            className="rounded-full bg-black px-6 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+            className="flex items-center gap-2 rounded-full bg-black px-6 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
           >
+            {loading && <Spinner className="h-4 w-4" />}
             {loading ? "Genero il piano..." : "Genera il piano della settimana"}
           </button>
+          {loading && (
+            <p className="text-xs text-zinc-400">Può richiedere qualche secondo...</p>
+          )}
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         </div>
       )}
@@ -232,13 +237,17 @@ export function MenuView({
       {giorni && (
         <div className="flex flex-col gap-6 text-left">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-zinc-400">Settimana del {settimana}</p>
+            <p className="text-xs text-zinc-400">
+              Settimana del {settimana}
+              {loading && " · genero il nuovo piano, qualche secondo..."}
+            </p>
             {modalita === "scoperta" && (
               <button
                 onClick={handleGenerate}
                 disabled={loading || cambiandoModalita}
-                className="rounded-full border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+                className="flex items-center gap-1.5 rounded-full border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
               >
+                {loading && <Spinner className="h-3.5 w-3.5" />}
                 {loading ? "Genero..." : "Altri suggerimenti"}
               </button>
             )}
@@ -350,10 +359,13 @@ export function MenuView({
                     <div
                       key={n.chiave}
                       className="flex items-center gap-1.5 rounded-full border border-zinc-200 py-1.5 pl-3 pr-1.5 text-xs dark:border-zinc-800"
-                      title={`${Math.round(n.totale)}${n.unita} questa settimana · riferimento ${Math.round(n.riferimento)}${n.unita}`}
                     >
                       <span className="text-zinc-500 dark:text-zinc-400">{n.etichetta}</span>
                       <span className={`font-medium ${coloreFascia}`}>{n.fascia}</span>
+                      <span className="text-zinc-400">
+                        ({Math.round(n.totale)}/{Math.round(n.riferimento)}
+                        {n.unita})
+                      </span>
                       {n.fascia === "bassa" && (
                         <button
                           onClick={() => handleAzioneNutriente(n, "Aumenta")}
@@ -374,13 +386,13 @@ export function MenuView({
                           −
                         </button>
                       )}
-                      {inCorso && <span className="text-zinc-400">...</span>}
+                      {inCorso && <Spinner className="h-3.5 w-3.5 text-zinc-400" />}
                     </div>
                   );
                 })}
               </div>
               <p className="mt-3 text-xs text-zinc-400">
-                Tocca un valore per i numeri esatti. {DISCLAIMER_LARN}
+                Tra parentesi: questa settimana / riferimento. {DISCLAIMER_LARN}
               </p>
             </div>
           )}
@@ -411,8 +423,9 @@ export function MenuView({
             <button
               onClick={handleModifica}
               disabled={modificando || !messaggio.trim() || Boolean(nutrienteInCorso)}
-              className="mt-3 rounded-full bg-black px-5 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black"
+              className="mt-3 flex items-center gap-2 rounded-full bg-black px-5 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black"
             >
+              {modificando && <Spinner className="h-4 w-4" />}
               {modificando ? "Applico la modifica..." : "Applica modifica"}
             </button>
           </div>

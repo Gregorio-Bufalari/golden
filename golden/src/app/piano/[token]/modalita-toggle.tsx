@@ -12,7 +12,11 @@ export function ModalitaToggle({
   return (
     <div className="flex items-center gap-2 text-sm">
       <span className="text-zinc-500 dark:text-zinc-400">Modalità:</span>
-      <div className="flex rounded-full border border-zinc-200 p-0.5 dark:border-zinc-800">
+      <div
+        className={`flex rounded-full border border-zinc-200 p-0.5 transition-opacity dark:border-zinc-800 ${
+          disabled ? "opacity-50" : ""
+        }`}
+      >
         <button
           onClick={() => onSwitch("routine")}
           disabled={disabled}
