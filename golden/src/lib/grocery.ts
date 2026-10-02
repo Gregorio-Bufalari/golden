@@ -8,6 +8,8 @@ type GiornoConIngredienti = {
 export type GroceryItem = {
   nome: string;
   quantita: number;
+  quantitaNecessaria: number;
+  confezione: number | null;
   unita: Ingrediente["unita"];
   prezzo_stimato: number;
 };
@@ -21,6 +23,7 @@ export type GroceryReparto = {
 export type RimastoItem = {
   nome: string;
   quantita: number;
+  quantitaNecessaria: number;
   unita: Ingrediente["unita"];
 };
 
@@ -199,7 +202,7 @@ export function buildGroceryList(
       quantitaAcquistata = Math.ceil(quantitaDaComprare / taglia) * taglia;
       const avanzo = quantitaAcquistata - quantitaDaComprare;
       if (avanzo > 0) {
-        rimasto.push({ nome, quantita: avanzo, unita });
+        rimasto.push({ nome, quantita: avanzo, quantitaNecessaria: quantitaDaComprare, unita });
       }
     }
 
@@ -208,7 +211,14 @@ export function buildGroceryList(
     const prezzo_stimato = prezzoPerUnita * quantitaAcquistata * moltiplicatore;
 
     const items = perReparto.get(reparto) || [];
-    items.push({ nome, quantita: quantitaAcquistata, unita, prezzo_stimato });
+    items.push({
+      nome,
+      quantita: quantitaAcquistata,
+      quantitaNecessaria: quantitaDaComprare,
+      confezione: taglia,
+      unita,
+      prezzo_stimato,
+    });
     perReparto.set(reparto, items);
   }
 

@@ -20,6 +20,13 @@ create table if not exists profiles (
   budget_settimanale numeric(10, 2),
   supermercato text,
   modalita text not null default 'routine' check (modalita in ('routine', 'scoperta')),
+  -- Dati biometrici opzionali, usati solo per il confronto nutrizionale LARN
+  -- (vedi src/lib/larn.ts) — nessun piano viene generato in base a questi dati.
+  sesso text check (sesso in ('M', 'F')),
+  eta integer,
+  peso_kg numeric(5, 2),
+  altezza_cm numeric(5, 1),
+  livello_attivita text check (livello_attivita in ('sedentario', 'moderato', 'attivo')),
   link_token text not null unique default encode(gen_random_bytes(16), 'hex'),
   created_at timestamptz not null default now()
 );

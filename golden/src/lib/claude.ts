@@ -30,6 +30,7 @@ const NutrizioneSchema = z.object({
   proteine_g: z.number(),
   carboidrati_g: z.number(),
   grassi_g: z.number(),
+  fibre_g: z.number(),
 });
 
 const PastoSchema = z.object({
@@ -38,6 +39,7 @@ const PastoSchema = z.object({
   ingredienti: z.array(IngredienteSchema),
   tempo_preparazione_min: z.number(),
   nutrizione: NutrizioneSchema,
+  preparazione: z.array(z.string()),
 });
 
 const GiornoSchema = z.object({
@@ -72,6 +74,14 @@ export type ProfiloPerPiano = {
   budget_settimanale: number | null;
 };
 
+const NOTA_COSTO_CONFEZIONI =
+  "Attenzione a come si traduce in costo reale: al supermercato si compra una confezione INTERA per ogni " +
+  "ingrediente distinto, anche se in ricetta ne servono pochi grammi (es. anche solo 5g di cumino richiedono " +
+  "comunque di comprare l'intero barattolo di spezie). Quindi più ingredienti diversi e specifici introduci " +
+  "nella settimana, più sale il costo reale, indipendentemente dalle quantità per ricetta. La leva più efficace " +
+  "per restare nel budget è RIUSARE le stesse spezie/condimenti/ingredienti di base in più pasti della settimana " +
+  "invece di introdurne uno nuovo ogni volta, oltre a scegliere ingredienti più economici.";
+
 function buildContestoProfilo(profilo: ProfiloPerPiano): string {
   const righe = [
     `Restrizioni alimentari (vincolo rigido, da rispettare SEMPRE senza eccezioni): ${
@@ -84,7 +94,9 @@ function buildContestoProfilo(profilo: ProfiloPerPiano): string {
     `Tempo massimo di preparazione per pasto: ${profilo.tempo_max_cucina || 30} minuti`,
     `Numero di persone per cui cucinare: ${profilo.household_size || 1}`,
     `Budget settimanale per la spesa: ${
-      profilo.budget_settimanale ? `€${profilo.budget_settimanale} (vincolo rigido: il totale stimato della spesa, somma di tutti i prezzo_stimato_eur, NON deve superarlo)` : "non specificato"
+      profilo.budget_settimanale
+        ? `€${profilo.budget_settimanale} (vincolo rigido: il totale stimato della spesa, somma di tutti i prezzo_stimato_eur, NON deve superarlo). ${NOTA_COSTO_CONFEZIONI}`
+        : "non specificato"
     }`,
   ];
   return righe.join("\n");
@@ -103,8 +115,12 @@ const ISTRUZIONI_INGREDIENTI =
 
 const ISTRUZIONI_NUTRIZIONE =
   "Per ogni pasto (non per singolo ingrediente) indica anche il campo nutrizione: calorie totali del piatto (kcal), " +
-  "proteine_g, carboidrati_g e grassi_g (grammi), per la porzione così come preparata (per persona, non per l'intera pentola). " +
+  "proteine_g, carboidrati_g, grassi_g e fibre_g (grammi), per la porzione così come preparata (per persona, non per l'intera pentola). " +
   "Sono valori stimati con buon senso nutrizionale, non da un database ufficiale — va bene un'approssimazione ragionevole.";
+
+const ISTRUZIONI_PREPARAZIONE =
+  "Per ogni pasto indica anche il campo preparazione: un array di 3-6 passaggi brevi e chiari, in italiano, " +
+  "che spiegano come cucinare il piatto dall'inizio alla fine, scritti per chi ha poca esperienza in cucina.";
 
 export async function generateMealPlan(profilo: ProfiloPerPiano): Promise<MealPlan> {
   const response = await client.messages.parse({
@@ -115,7 +131,7 @@ export async function generateMealPlan(profilo: ProfiloPerPiano): Promise<MealPl
       "Le restrizioni alimentari sono un vincolo rigido e non negoziabile: non includere MAI, nemmeno in tracce dichiarate, un ingrediente incompatibile con le restrizioni indicate. " +
       "Se è indicato un budget settimanale, è anch'esso un vincolo rigido: il totale stimato della spesa (somma di tutti i prezzo_stimato_eur dell'intero piano) non deve superarlo. " +
       "Rispetta anche obiettivo, preferenze e tempo di preparazione, in questo ordine di priorità, scegliendo ingredienti e porzioni che permettano di rientrare nel budget. " +
-      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE,
+      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE,
     messages: [
       {
         role: "user",
@@ -164,7 +180,7 @@ export async function modificaPiano(
       "In quel caso imposta modifica_applicata a false, spiega brevemente il motivo in motivo_rifiuto (in italiano, " +
       "rivolgendoti direttamente all'utente) e restituisci il piano INVARIATO. Se invece la richiesta è compatibile, " +
       "applicala, imposta modifica_applicata a true e motivo_rifiuto a null. " +
-      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE,
+      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE,
     messages: [
       {
         role: "user",
@@ -205,14 +221,18 @@ export async function adattaBudget(
       "senza violare le restrizioni alimentari (vincolo rigido, non negoziabile) e senza stravolgere le preferenze. " +
       "Riduci il costo totale stimato sostituendo ingredienti costosi con alternative più economiche (es. proteine " +
       "meno pregiate, prodotti di stagione, porzioni più ragionevoli), mantenendo varietà e qualità nutrizionale. " +
-      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE,
+      NOTA_COSTO_CONFEZIONI + " " +
+      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE,
     messages: [
       {
         role: "user",
         content:
           `Profilo:\n${buildContestoProfilo(profilo)}\n\n` +
           `Piano attuale (JSON):\n${JSON.stringify({ giorni: giorniAttuali })}\n\n` +
-          `Il costo totale stimato di questo piano è €${totaleAttualeEur.toFixed(2)}, ma il budget settimanale è €${budgetEur}. ` +
+          `Il costo REALE di questo piano, calcolato dopo l'acquisto (confezioni intere e fascia del supermercato), è €${totaleAttualeEur.toFixed(2)}, ma il budget settimanale è €${budgetEur}. ` +
+          "Il modo più efficace per abbassarlo non è ridurre di poco ogni quantità, ma RIDURRE IL NUMERO DI INGREDIENTI DIVERSI E SPECIFICI usati nella settimana " +
+          "(riusa le stesse spezie/condimenti/basi in più pasti invece di introdurne uno nuovo ogni volta) e sostituire gli ingredienti più costosi. " +
+          "Punta a un costo comodamente sotto il budget (non appena sotto), perché l'arrotondamento alle confezioni reali può far risalire il totale. " +
           "Rivedi il piano per rientrare nel budget, restituendo tutti i 7 giorni.",
       },
     ],
@@ -240,7 +260,7 @@ export async function regeneratePasto(
     system:
       "Sei un assistente che rigenera un singolo pasto di un piano settimanale, in italiano. " +
       "Le restrizioni alimentari sono un vincolo rigido: non includere MAI un ingrediente incompatibile. " +
-      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE,
+      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE,
     messages: [
       {
         role: "user",

@@ -11,6 +11,11 @@ export type ImpostazioniInput = {
   tempo_max_cucina: number | null;
   budget_settimanale: number | null;
   supermercato: string;
+  sesso: "M" | "F" | null;
+  eta: number | null;
+  peso_kg: number | null;
+  altezza_cm: number | null;
+  livello_attivita: "sedentario" | "moderato" | "attivo" | null;
 };
 
 export async function updateProfilo(
@@ -37,6 +42,11 @@ export async function updateProfilo(
       tempo_max_cucina: input.tempo_max_cucina,
       budget_settimanale: input.budget_settimanale,
       supermercato: input.supermercato || null,
+      sesso: input.sesso,
+      eta: input.eta,
+      peso_kg: input.peso_kg,
+      altezza_cm: input.altezza_cm,
+      livello_attivita: input.livello_attivita,
     })
     .eq("link_token", token);
 

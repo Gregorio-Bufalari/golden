@@ -1,8 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ModalitaToggle } from "../modalita-toggle";
 import { setModalita } from "../actions";
+import {
+  calcolaRiferimentoLARN,
+  confrontaConLARN,
+  DISCLAIMER_LARN,
+  type DatiBiometrici,
+} from "@/lib/larn";
 
 type Ingrediente = {
   nome: string;
@@ -16,6 +22,7 @@ type Nutrizione = {
   proteine_g: number;
   carboidrati_g: number;
   grassi_g: number;
+  fibre_g: number;
 };
 
 type Pasto = {
@@ -24,6 +31,7 @@ type Pasto = {
   ingredienti: Ingrediente[];
   tempo_preparazione_min: number;
   nutrizione: Nutrizione;
+  preparazione?: string[];
   verificare?: boolean;
   ingredienti_a_rischio?: string[];
 };
@@ -51,6 +59,7 @@ export function MenuView({
   initialSettimana,
   budgetSettimanale,
   budgetStimatoIniziale,
+  datiBiometrici,
 }: {
   token: string;
   initialModalita: "routine" | "scoperta";
@@ -58,6 +67,7 @@ export function MenuView({
   initialSettimana: string;
   budgetSettimanale: number | null;
   budgetStimatoIniziale: number | null;
+  datiBiometrici: DatiBiometrici | null;
 }) {
   const [modalita, setModalitaState] = useState(initialModalita);
   const [cambiandoModalita, setCambiandoModalita] = useState(false);
@@ -74,6 +84,27 @@ export function MenuView({
   const [modificando, setModificando] = useState(false);
   const [erroreModifica, setErroreModifica] = useState<string | null>(null);
   const [rifiutoModifica, setRifiutoModifica] = useState<string | null>(null);
+
+  const [pastoEspanso, setPastoEspanso] = useState<string | null>(null);
+
+  const confrontoLARN = useMemo(() => {
+    if (!giorni || !datiBiometrici) return null;
+
+    const totali = { calorie: 0, proteine_g: 0, carboidrati_g: 0, grassi_g: 0, fibre_g: 0 };
+    for (const giorno of giorni) {
+      for (const pasto of giorno.pasti) {
+        if (!pasto.nutrizione) continue;
+        totali.calorie += pasto.nutrizione.calorie ?? 0;
+        totali.proteine_g += pasto.nutrizione.proteine_g ?? 0;
+        totali.carboidrati_g += pasto.nutrizione.carboidrati_g ?? 0;
+        totali.grassi_g += pasto.nutrizione.grassi_g ?? 0;
+        totali.fibre_g += pasto.nutrizione.fibre_g ?? 0;
+      }
+    }
+
+    const riferimento = calcolaRiferimentoLARN(datiBiometrici);
+    return confrontaConLARN(totali, riferimento);
+  }, [giorni, datiBiometrici]);
 
   async function handleGenerate() {
     setLoading(true);
@@ -210,43 +241,98 @@ export function MenuView({
                   {giorno.giorno}
                 </h3>
                 <div className="flex flex-col gap-4">
-                  {giorno.pasti.map((pasto, i) => (
-                    <div key={i}>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium uppercase text-zinc-500 dark:text-zinc-500">
-                          {pasto.tipo}
-                        </span>
-                        <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                          {pasto.nome}
-                        </span>
-                        <span className="text-xs text-zinc-400">
-                          ({pasto.tempo_preparazione_min} min)
-                        </span>
-                      </div>
-                      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                        {pasto.ingredienti
-                          .map((ing) => `${ing.nome} (${formatQuantita(ing.quantita, ing.unita)})`)
-                          .join(", ")}
-                      </p>
-                      {pasto.nutrizione && (
-                        <p className="mt-1 text-xs text-zinc-400">
-                          {pasto.nutrizione.calorie} kcal · {pasto.nutrizione.proteine_g}g proteine ·{" "}
-                          {pasto.nutrizione.carboidrati_g}g carboidrati · {pasto.nutrizione.grassi_g}g grassi
+                  {giorno.pasti.map((pasto, i) => {
+                    const chiave = `${giorno.giorno}-${i}`;
+                    const espanso = pastoEspanso === chiave;
+                    const haPreparazione = Boolean(pasto.preparazione?.length);
+                    return (
+                      <div key={i}>
+                        <button
+                          type="button"
+                          onClick={() => haPreparazione && setPastoEspanso(espanso ? null : chiave)}
+                          className={`flex w-full flex-wrap items-center gap-2 text-left ${
+                            haPreparazione ? "cursor-pointer" : "cursor-default"
+                          }`}
+                        >
+                          <span className="text-xs font-medium uppercase text-zinc-500 dark:text-zinc-500">
+                            {pasto.tipo}
+                          </span>
+                          <span className="font-medium text-zinc-900 underline decoration-dotted underline-offset-4 dark:text-zinc-100">
+                            {pasto.nome}
+                          </span>
+                          <span className="text-xs text-zinc-400">
+                            ({pasto.tempo_preparazione_min} min)
+                          </span>
+                          {haPreparazione && (
+                            <span className="text-xs text-zinc-400">
+                              {espanso ? "▲ nascondi preparazione" : "▼ vedi preparazione"}
+                            </span>
+                          )}
+                        </button>
+                        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                          {pasto.ingredienti
+                            .map((ing) => `${ing.nome} (${formatQuantita(ing.quantita, ing.unita)})`)
+                            .join(", ")}
                         </p>
-                      )}
-                      {pasto.verificare && (
-                        <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
-                          ⚠️ Verifica necessaria: possibili tracce di glutine in{" "}
-                          {pasto.ingredienti_a_rischio?.join(", ")}. Controlla le etichette
-                          prima di procedere.
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        {pasto.nutrizione && (
+                          <p className="mt-1 text-xs text-zinc-400">
+                            {pasto.nutrizione.calorie} kcal · {pasto.nutrizione.proteine_g}g proteine ·{" "}
+                            {pasto.nutrizione.carboidrati_g}g carboidrati · {pasto.nutrizione.grassi_g}g grassi ·{" "}
+                            {pasto.nutrizione.fibre_g}g fibre
+                          </p>
+                        )}
+                        {espanso && haPreparazione && (
+                          <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5 text-sm text-zinc-600 dark:text-zinc-400">
+                            {pasto.preparazione?.map((passo, j) => (
+                              <li key={j}>{passo}</li>
+                            ))}
+                          </ol>
+                        )}
+                        {pasto.verificare && (
+                          <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
+                            ⚠️ Verifica necessaria: possibili tracce di glutine in{" "}
+                            {pasto.ingredienti_a_rischio?.join(", ")}. Controlla le etichette
+                            prima di procedere.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
           </div>
+
+          {!confrontoLARN && (
+            <p className="text-xs text-zinc-400">
+              Inserisci sesso, età, peso, altezza e livello di attività nelle{" "}
+              <a href={`/piano/${token}/impostazioni`} className="underline">
+                Impostazioni
+              </a>{" "}
+              per vedere un confronto indicativo tra il piano e i valori di riferimento
+              nutrizionali.
+            </p>
+          )}
+
+          {confrontoLARN && (
+            <div className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
+              <h3 className="mb-3 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                Confronto nutrizionale settimanale
+              </h3>
+              <ul className="flex flex-col gap-1.5">
+                {confrontoLARN.map((n) => (
+                  <li key={n.etichetta} className="text-sm text-zinc-600 dark:text-zinc-400">
+                    {n.etichetta} nella fascia{" "}
+                    <span className="font-medium text-zinc-800 dark:text-zinc-200">{n.fascia}</span>{" "}
+                    rispetto al riferimento ({Math.round(n.totale)}
+                    {n.unita} questa settimana, riferimento {Math.round(n.riferimento)}
+                    {n.unita})
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs text-zinc-400">{DISCLAIMER_LARN}</p>
+            </div>
+          )}
 
           <div className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
             <h3 className="mb-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
