@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { generateMealPlan, type ProfiloPerPiano } from "@/lib/claude";
 import { validaGiorni, adattaEntroBudget, type GiornoValidato } from "@/lib/piano-validazione";
 import { leggiDispensa, applicaConsumiDispensa } from "@/lib/dispensa";
-import type { GroceryList } from "@/lib/grocery";
+import type { GroceryList, ConsumoDispensa } from "@/lib/grocery";
 
 // Generare un piano può richiedere diverse chiamate a Claude in sequenza
 // (generazione, eventuali rigenerazioni per il glutine, adattamento al
@@ -59,6 +59,9 @@ export async function POST(request: Request) {
   let groceryList: GroceryList;
   let riusato = false;
   let budgetSuperato = false;
+  // Consumi applicati alla dispensa da QUESTO inserimento: null quando si
+  // riusa un piano routine già esistente senza toccare la dispensa.
+  let consumiDispensaSalvati: ConsumoDispensa[] | null = null;
 
   async function generaFresco() {
     const dispensa = await leggiDispensa(supabase, profileId);
@@ -105,6 +108,7 @@ export async function POST(request: Request) {
         giorniValidati = risultato.giorni;
         groceryList = risultato.groceryList;
         budgetSuperato = risultato.budgetSuperato;
+        consumiDispensaSalvati = risultato.consumiDispensa;
       } catch (err) {
         console.error("generateMealPlan error:", err);
         return NextResponse.json(
@@ -119,6 +123,7 @@ export async function POST(request: Request) {
       giorniValidati = risultato.giorni;
       groceryList = risultato.groceryList;
       budgetSuperato = risultato.budgetSuperato;
+      consumiDispensaSalvati = risultato.consumiDispensa;
     } catch (err) {
       console.error("generateMealPlan error:", err);
       return NextResponse.json(
@@ -137,6 +142,7 @@ export async function POST(request: Request) {
       modalita_usata: profile.modalita,
       budget_stimato: groceryList.totale_stimato,
       grocery_list: groceryList,
+      consumi_dispensa: consumiDispensaSalvati,
     })
     .select("id, settimana")
     .single();
