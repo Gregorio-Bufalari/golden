@@ -5,7 +5,7 @@ import { validaGiorni, adattaEntroBudget } from "@/lib/piano-validazione";
 
 // Vedi la stessa impostazione in /api/piano/generate: più chiamate a Claude
 // in sequenza possono superare il limite di default di Vercel.
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const { token, messaggio } = await request.json();
