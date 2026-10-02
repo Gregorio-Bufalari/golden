@@ -201,17 +201,15 @@ export function PianoGenerator({
             ) : (
               <span />
             )}
-            <button
-              onClick={handleGenerate}
-              disabled={loading || cambiandoModalita}
-              className="rounded-full border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
-            >
-              {loading
-                ? "Genero..."
-                : modalita === "scoperta"
-                  ? "Un altro piano"
-                  : "Aggiorna il piano"}
-            </button>
+            {modalita === "scoperta" && (
+              <button
+                onClick={handleGenerate}
+                disabled={loading || cambiandoModalita}
+                className="rounded-full border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+              >
+                {loading ? "Genero..." : "Altri suggerimenti"}
+              </button>
+            )}
           </div>
           {error && <p className="text-sm text-red-600 dark:text-red-400 print:hidden">{error}</p>}
 
