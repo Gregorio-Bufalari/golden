@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateMealPlan, type ProfiloPerPiano } from "@/lib/claude";
-import { validaGiorni, type GiornoValidato } from "@/lib/piano-validazione";
-import { buildGroceryList, type GroceryList } from "@/lib/grocery";
+import { validaGiorni, adattaEntroBudget, type GiornoValidato } from "@/lib/piano-validazione";
+import type { GroceryList } from "@/lib/grocery";
 
 function mondayOfThisWeek(d = new Date()): string {
   const day = d.getDay();
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select(
-      "id, restrizioni, obiettivo, preferenze, tempo_max_cucina, household_size, modalita, supermercato",
+      "id, restrizioni, obiettivo, preferenze, tempo_max_cucina, household_size, modalita, supermercato, budget_settimanale",
     )
     .eq("link_token", token)
     .single();
@@ -39,11 +39,13 @@ export async function POST(request: Request) {
     preferenze: profile.preferenze,
     tempo_max_cucina: profile.tempo_max_cucina,
     household_size: profile.household_size,
+    budget_settimanale: profile.budget_settimanale,
   };
 
   let giorniValidati: GiornoValidato[];
   let groceryList: GroceryList;
   let riusato = false;
+  let budgetSuperato = false;
 
   if (profile.modalita === "routine") {
     const { data: ultimoPiano } = await supabase
@@ -63,7 +65,16 @@ export async function POST(request: Request) {
     } else {
       try {
         const plan = await generateMealPlan(profiloInput);
-        giorniValidati = await validaGiorni(profiloInput, plan.giorni);
+        const giorniBase = await validaGiorni(profiloInput, plan.giorni);
+        const risultato = await adattaEntroBudget(
+          profiloInput,
+          giorniBase,
+          profile.supermercato,
+          profile.budget_settimanale,
+        );
+        giorniValidati = risultato.giorni;
+        groceryList = risultato.groceryList;
+        budgetSuperato = risultato.budgetSuperato;
       } catch (err) {
         console.error("generateMealPlan error:", err);
         return NextResponse.json(
@@ -71,12 +82,20 @@ export async function POST(request: Request) {
           { status: 502 },
         );
       }
-      groceryList = buildGroceryList(giorniValidati, profile.supermercato);
     }
   } else {
     try {
       const plan = await generateMealPlan(profiloInput);
-      giorniValidati = await validaGiorni(profiloInput, plan.giorni);
+      const giorniBase = await validaGiorni(profiloInput, plan.giorni);
+      const risultato = await adattaEntroBudget(
+        profiloInput,
+        giorniBase,
+        profile.supermercato,
+        profile.budget_settimanale,
+      );
+      giorniValidati = risultato.giorni;
+      groceryList = risultato.groceryList;
+      budgetSuperato = risultato.budgetSuperato;
     } catch (err) {
       console.error("generateMealPlan error:", err);
       return NextResponse.json(
@@ -84,7 +103,6 @@ export async function POST(request: Request) {
         { status: 502 },
       );
     }
-    groceryList = buildGroceryList(giorniValidati, profile.supermercato);
   }
 
   const settimana = mondayOfThisWeek();
@@ -116,5 +134,7 @@ export async function POST(request: Request) {
     giorni: giorniValidati,
     grocery_list: groceryList,
     riusato,
+    budget_superato: budgetSuperato,
+    budget_settimanale: profile.budget_settimanale,
   });
 }

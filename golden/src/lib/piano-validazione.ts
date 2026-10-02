@@ -1,8 +1,10 @@
 import "server-only";
-import { regeneratePasto, type Pasto, type Giorno, type ProfiloPerPiano } from "./claude";
+import { regeneratePasto, adattaBudget, type Pasto, type Giorno, type ProfiloPerPiano } from "./claude";
 import { ingredientiARischio } from "./glutine-check";
+import { buildGroceryList, type GroceryList } from "./grocery";
 
 const MAX_RIGENERAZIONI = 2;
+const MAX_TENTATIVI_BUDGET = 2;
 
 export type PastoValidato = Pasto & {
   verificare?: boolean;
@@ -54,4 +56,33 @@ export async function validaGiorni(
   }
 
   return giorniValidati;
+}
+
+export async function adattaEntroBudget(
+  profilo: ProfiloPerPiano,
+  giorniIniziali: GiornoValidato[],
+  supermercato: string | null,
+  budget: number | null,
+): Promise<{ giorni: GiornoValidato[]; groceryList: GroceryList; budgetSuperato: boolean }> {
+  let giorni = giorniIniziali;
+  let groceryList = buildGroceryList(giorni, supermercato);
+
+  if (!budget) {
+    return { giorni, groceryList, budgetSuperato: false };
+  }
+
+  let tentativi = 0;
+  while (groceryList.totale_stimato > budget && tentativi < MAX_TENTATIVI_BUDGET) {
+    tentativi += 1;
+    try {
+      const pianoAdattato = await adattaBudget(profilo, giorni as Giorno[], groceryList.totale_stimato, budget);
+      giorni = await validaGiorni(profilo, pianoAdattato.giorni);
+      groceryList = buildGroceryList(giorni, supermercato);
+    } catch (err) {
+      console.error("adattaBudget error:", err);
+      break;
+    }
+  }
+
+  return { giorni, groceryList, budgetSuperato: groceryList.totale_stimato > budget };
 }

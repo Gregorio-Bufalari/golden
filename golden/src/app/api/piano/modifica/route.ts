@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { modificaPiano, type ProfiloPerPiano, type Giorno } from "@/lib/claude";
-import { validaGiorni } from "@/lib/piano-validazione";
-import { buildGroceryList } from "@/lib/grocery";
+import { validaGiorni, adattaEntroBudget } from "@/lib/piano-validazione";
 
 export async function POST(request: Request) {
   const { token, messaggio } = await request.json();
@@ -19,7 +18,7 @@ export async function POST(request: Request) {
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select(
-      "id, restrizioni, obiettivo, preferenze, tempo_max_cucina, household_size, supermercato",
+      "id, restrizioni, obiettivo, preferenze, tempo_max_cucina, household_size, supermercato, budget_settimanale",
     )
     .eq("link_token", token)
     .single();
@@ -49,16 +48,40 @@ export async function POST(request: Request) {
     preferenze: profile.preferenze,
     tempo_max_cucina: profile.tempo_max_cucina,
     household_size: profile.household_size,
+    budget_settimanale: profile.budget_settimanale,
   };
 
   let giorniValidati;
+  let groceryList;
+  let budgetSuperato = false;
   try {
-    const nuovoPiano = await modificaPiano(
+    const risultato = await modificaPiano(
       profiloInput,
       pianoAttuale.meal_plan.giorni as Giorno[],
       messaggio.trim(),
     );
-    giorniValidati = await validaGiorni(profiloInput, nuovoPiano.giorni);
+
+    if (!risultato.modificaApplicata) {
+      return NextResponse.json({
+        modifica_applicata: false,
+        motivo_rifiuto:
+          risultato.motivoRifiuto ||
+          "Non posso applicare questa modifica perché è incompatibile con le tue restrizioni alimentari.",
+        settimana: pianoAttuale.settimana,
+        giorni: pianoAttuale.meal_plan.giorni,
+      });
+    }
+
+    const giorniBase = await validaGiorni(profiloInput, risultato.giorni);
+    const adattato = await adattaEntroBudget(
+      profiloInput,
+      giorniBase,
+      profile.supermercato,
+      profile.budget_settimanale,
+    );
+    giorniValidati = adattato.giorni;
+    groceryList = adattato.groceryList;
+    budgetSuperato = adattato.budgetSuperato;
   } catch (err) {
     console.error("modificaPiano error:", err);
     return NextResponse.json(
@@ -66,8 +89,6 @@ export async function POST(request: Request) {
       { status: 502 },
     );
   }
-
-  const groceryList = buildGroceryList(giorniValidati, profile.supermercato);
 
   const { error: updateError } = await supabase
     .from("weekly_plans")
@@ -87,8 +108,11 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
+    modifica_applicata: true,
     settimana: pianoAttuale.settimana,
     giorni: giorniValidati,
     grocery_list: groceryList,
+    budget_superato: budgetSuperato,
+    budget_settimanale: profile.budget_settimanale,
   });
 }
