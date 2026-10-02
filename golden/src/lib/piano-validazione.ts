@@ -4,7 +4,7 @@ import { ingredientiARischio } from "./glutine-check";
 import { buildGroceryList, type GroceryList, type ConsumoDispensa } from "./grocery";
 
 const MAX_RIGENERAZIONI = 2;
-const MAX_TENTATIVI_BUDGET = 2;
+const MAX_TENTATIVI_BUDGET = 3;
 
 export type PastoValidato = Pasto & {
   verificare?: boolean;

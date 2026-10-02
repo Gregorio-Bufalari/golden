@@ -24,6 +24,7 @@ type Pasto = {
   ingredienti: Ingrediente[];
   tempo_preparazione_min: number;
   nutrizione: Nutrizione;
+  preparazione?: string[];
   verificare?: boolean;
   ingredienti_a_rischio?: string[];
 };
@@ -74,6 +75,8 @@ export function MenuView({
   const [modificando, setModificando] = useState(false);
   const [erroreModifica, setErroreModifica] = useState<string | null>(null);
   const [rifiutoModifica, setRifiutoModifica] = useState<string | null>(null);
+
+  const [pastoEspanso, setPastoEspanso] = useState<string | null>(null);
 
   async function handleGenerate() {
     setLoading(true);
@@ -210,39 +213,62 @@ export function MenuView({
                   {giorno.giorno}
                 </h3>
                 <div className="flex flex-col gap-4">
-                  {giorno.pasti.map((pasto, i) => (
-                    <div key={i}>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium uppercase text-zinc-500 dark:text-zinc-500">
-                          {pasto.tipo}
-                        </span>
-                        <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                          {pasto.nome}
-                        </span>
-                        <span className="text-xs text-zinc-400">
-                          ({pasto.tempo_preparazione_min} min)
-                        </span>
-                      </div>
-                      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                        {pasto.ingredienti
-                          .map((ing) => `${ing.nome} (${formatQuantita(ing.quantita, ing.unita)})`)
-                          .join(", ")}
-                      </p>
-                      {pasto.nutrizione && (
-                        <p className="mt-1 text-xs text-zinc-400">
-                          {pasto.nutrizione.calorie} kcal · {pasto.nutrizione.proteine_g}g proteine ·{" "}
-                          {pasto.nutrizione.carboidrati_g}g carboidrati · {pasto.nutrizione.grassi_g}g grassi
+                  {giorno.pasti.map((pasto, i) => {
+                    const chiave = `${giorno.giorno}-${i}`;
+                    const espanso = pastoEspanso === chiave;
+                    const haPreparazione = Boolean(pasto.preparazione?.length);
+                    return (
+                      <div key={i}>
+                        <button
+                          type="button"
+                          onClick={() => haPreparazione && setPastoEspanso(espanso ? null : chiave)}
+                          className={`flex w-full flex-wrap items-center gap-2 text-left ${
+                            haPreparazione ? "cursor-pointer" : "cursor-default"
+                          }`}
+                        >
+                          <span className="text-xs font-medium uppercase text-zinc-500 dark:text-zinc-500">
+                            {pasto.tipo}
+                          </span>
+                          <span className="font-medium text-zinc-900 underline decoration-dotted underline-offset-4 dark:text-zinc-100">
+                            {pasto.nome}
+                          </span>
+                          <span className="text-xs text-zinc-400">
+                            ({pasto.tempo_preparazione_min} min)
+                          </span>
+                          {haPreparazione && (
+                            <span className="text-xs text-zinc-400">
+                              {espanso ? "▲ nascondi preparazione" : "▼ vedi preparazione"}
+                            </span>
+                          )}
+                        </button>
+                        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                          {pasto.ingredienti
+                            .map((ing) => `${ing.nome} (${formatQuantita(ing.quantita, ing.unita)})`)
+                            .join(", ")}
                         </p>
-                      )}
-                      {pasto.verificare && (
-                        <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
-                          ⚠️ Verifica necessaria: possibili tracce di glutine in{" "}
-                          {pasto.ingredienti_a_rischio?.join(", ")}. Controlla le etichette
-                          prima di procedere.
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        {pasto.nutrizione && (
+                          <p className="mt-1 text-xs text-zinc-400">
+                            {pasto.nutrizione.calorie} kcal · {pasto.nutrizione.proteine_g}g proteine ·{" "}
+                            {pasto.nutrizione.carboidrati_g}g carboidrati · {pasto.nutrizione.grassi_g}g grassi
+                          </p>
+                        )}
+                        {espanso && haPreparazione && (
+                          <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5 text-sm text-zinc-600 dark:text-zinc-400">
+                            {pasto.preparazione?.map((passo, j) => (
+                              <li key={j}>{passo}</li>
+                            ))}
+                          </ol>
+                        )}
+                        {pasto.verificare && (
+                          <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
+                            ⚠️ Verifica necessaria: possibili tracce di glutine in{" "}
+                            {pasto.ingredienti_a_rischio?.join(", ")}. Controlla le etichette
+                            prima di procedere.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
