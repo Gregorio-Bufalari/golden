@@ -111,19 +111,34 @@ export async function generateMealPlan(profilo: ProfiloPerPiano): Promise<MealPl
   return response.parsed_output;
 }
 
+const ModificaOutputSchema = z.object({
+  modifica_applicata: z.boolean(),
+  motivo_rifiuto: z.string().nullable(),
+  giorni: z.array(GiornoSchema).length(7),
+});
+
+export type RisultatoModifica = {
+  modificaApplicata: boolean;
+  motivoRifiuto: string | null;
+  giorni: Giorno[];
+};
+
 export async function modificaPiano(
   profilo: ProfiloPerPiano,
   giorniAttuali: Giorno[],
   messaggioUtente: string,
-): Promise<MealPlan> {
+): Promise<RisultatoModifica> {
   const response = await client.messages.parse({
     model: MODEL,
     max_tokens: 8000,
     system:
       "Sei un assistente che modifica un piano settimanale di pasti già esistente, in base a una richiesta " +
       "dell'utente in linguaggio naturale, in italiano. Applica SOLO la modifica richiesta, lasciando invariato " +
-      "il resto del piano quando possibile. Le restrizioni alimentari restano un vincolo rigido e non negoziabile " +
-      "anche dopo la modifica: non includere MAI un ingrediente incompatibile. " +
+      "il resto del piano quando possibile. Le restrizioni alimentari restano un vincolo rigido e non negoziabile: " +
+      "se la richiesta dell'utente include un ingrediente o un pasto incompatibile con le restrizioni, NON applicarla. " +
+      "In quel caso imposta modifica_applicata a false, spiega brevemente il motivo in motivo_rifiuto (in italiano, " +
+      "rivolgendoti direttamente all'utente) e restituisci il piano INVARIATO. Se invece la richiesta è compatibile, " +
+      "applicala, imposta modifica_applicata a true e motivo_rifiuto a null. " +
       ISTRUZIONI_INGREDIENTI,
     messages: [
       {
@@ -132,11 +147,11 @@ export async function modificaPiano(
           `Profilo:\n${buildContestoProfilo(profilo)}\n\n` +
           `Piano attuale (JSON):\n${JSON.stringify({ giorni: giorniAttuali })}\n\n` +
           `Richiesta dell'utente: "${messaggioUtente}"\n\n` +
-          "Restituisci il piano completo aggiornato (tutti i 7 giorni), applicando la modifica richiesta e lasciando invariato il resto.",
+          "Restituisci il piano completo (tutti i 7 giorni): aggiornato se la richiesta è compatibile con le restrizioni, invariato altrimenti.",
       },
     ],
     output_config: {
-      format: zodOutputFormat(MealPlanSchema),
+      format: zodOutputFormat(ModificaOutputSchema),
     },
   });
 
@@ -144,7 +159,11 @@ export async function modificaPiano(
     throw new Error("Claude non ha restituito un piano valido.");
   }
 
-  return response.parsed_output;
+  return {
+    modificaApplicata: response.parsed_output.modifica_applicata,
+    motivoRifiuto: response.parsed_output.motivo_rifiuto,
+    giorni: response.parsed_output.giorni,
+  };
 }
 
 export async function regeneratePasto(

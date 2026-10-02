@@ -42,6 +42,17 @@ function isDomenicaSera(): boolean {
   return now.getDay() === 0 && now.getHours() >= 18;
 }
 
+function formatQuantita(quantita: number, unita: Ingrediente["unita"]): string {
+  if (unita === "g" && quantita >= 1000) {
+    return `${(quantita / 1000).toFixed(quantita % 1000 === 0 ? 0 : 1)} kg`;
+  }
+  if (unita === "ml" && quantita >= 1000) {
+    return `${(quantita / 1000).toFixed(quantita % 1000 === 0 ? 0 : 1)} l`;
+  }
+  const arrotondata = Math.round(quantita * 10) / 10;
+  return `${arrotondata} ${unita}`;
+}
+
 export function PianoGenerator({ token }: { token: string }) {
   const [giorni, setGiorni] = useState<Giorno[] | null>(null);
   const [groceryList, setGroceryList] = useState<GroceryListData | null>(null);
@@ -53,6 +64,7 @@ export function PianoGenerator({ token }: { token: string }) {
   const [messaggio, setMessaggio] = useState("");
   const [modificando, setModificando] = useState(false);
   const [erroreModifica, setErroreModifica] = useState<string | null>(null);
+  const [rifiutoModifica, setRifiutoModifica] = useState<string | null>(null);
 
   async function handleGenerate() {
     setLoading(true);
@@ -86,6 +98,7 @@ export function PianoGenerator({ token }: { token: string }) {
     if (!messaggio.trim()) return;
     setModificando(true);
     setErroreModifica(null);
+    setRifiutoModifica(null);
 
     try {
       const res = await fetch("/api/piano/modifica", {
@@ -97,6 +110,11 @@ export function PianoGenerator({ token }: { token: string }) {
 
       if (!res.ok) {
         setErroreModifica(data.error || "Qualcosa è andato storto.");
+        return;
+      }
+
+      if (data.modifica_applicata === false) {
+        setRifiutoModifica(data.motivo_rifiuto);
         return;
       }
 
@@ -132,49 +150,66 @@ export function PianoGenerator({ token }: { token: string }) {
 
       {giorni && (
         <div className="flex flex-col gap-6 text-left">
-          {riusato && (
-            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 print:hidden">
-              Piano ripreso dalla settimana scorsa (modalità routine) — prezzi e quantità
-              da ricalcolare in futuro.
-            </p>
-          )}
-          {giorni.map((giorno) => (
-            <div
-              key={giorno.giorno}
-              className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800"
+          <div className="flex items-center justify-between print:hidden">
+            {riusato ? (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Piano ripreso dalla settimana scorsa (modalità routine) — prezzi e quantità
+                da ricalcolare in futuro.
+              </p>
+            ) : (
+              <span />
+            )}
+            <button
+              onClick={handleGenerate}
+              disabled={loading}
+              className="rounded-full border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
             >
-              <h3 className="mb-3 text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                {giorno.giorno}
-              </h3>
-              <div className="flex flex-col gap-4">
-                {giorno.pasti.map((pasto, i) => (
-                  <div key={i}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium uppercase text-zinc-500 dark:text-zinc-500">
-                        {pasto.tipo}
-                      </span>
-                      <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                        {pasto.nome}
-                      </span>
-                      <span className="text-xs text-zinc-400">
-                        ({pasto.tempo_preparazione_min} min)
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                      {pasto.ingredienti.map((ing) => ing.nome).join(", ")}
-                    </p>
-                    {pasto.verificare && (
-                      <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
-                        ⚠️ Verifica necessaria: possibili tracce di glutine in{" "}
-                        {pasto.ingredienti_a_rischio?.join(", ")}. Controlla le etichette
-                        prima di procedere.
+              {loading ? "Genero..." : "Rigenera il piano"}
+            </button>
+          </div>
+          {error && <p className="text-sm text-red-600 dark:text-red-400 print:hidden">{error}</p>}
+
+          <div className="flex flex-col gap-6 print:hidden">
+            {giorni.map((giorno) => (
+              <div
+                key={giorno.giorno}
+                className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800"
+              >
+                <h3 className="mb-3 text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+                  {giorno.giorno}
+                </h3>
+                <div className="flex flex-col gap-4">
+                  {giorno.pasti.map((pasto, i) => (
+                    <div key={i}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium uppercase text-zinc-500 dark:text-zinc-500">
+                          {pasto.tipo}
+                        </span>
+                        <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                          {pasto.nome}
+                        </span>
+                        <span className="text-xs text-zinc-400">
+                          ({pasto.tempo_preparazione_min} min)
+                        </span>
                       </div>
-                    )}
-                  </div>
-                ))}
+                      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                        {pasto.ingredienti
+                          .map((ing) => `${ing.nome} (${formatQuantita(ing.quantita, ing.unita)})`)
+                          .join(", ")}
+                      </p>
+                      {pasto.verificare && (
+                        <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
+                          ⚠️ Verifica necessaria: possibili tracce di glutine in{" "}
+                          {pasto.ingredienti_a_rischio?.join(", ")}. Controlla le etichette
+                          prima di procedere.
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
 
           {groceryList && <GroceryList data={groceryList} settimana={settimana} />}
 
@@ -195,6 +230,11 @@ export function PianoGenerator({ token }: { token: string }) {
             />
             {erroreModifica && (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400">{erroreModifica}</p>
+            )}
+            {rifiutoModifica && (
+              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+                {rifiutoModifica}
+              </div>
             )}
             <button
               onClick={handleModifica}

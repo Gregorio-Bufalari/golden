@@ -57,13 +57,50 @@ function fasciaDaSupermercato(supermercato: string | null): "discount" | "media"
   return FASCIA_SUPERMERCATO[supermercato] || "media";
 }
 
+// "Surgelati" copre sia verdure surgelate (economiche) sia pesce/carne
+// surgelati (molto più cari): senza questa distinzione il prezzo medio del
+// reparto sottostima pesantemente pesce/carne surgelati.
+const CARNE_PESCE_KEYWORDS = [
+  "pesce",
+  "merluzzo",
+  "salmone",
+  "orata",
+  "branzino",
+  "trota",
+  "tonno",
+  "gamber",
+  "vongol",
+  "cozz",
+  "calamar",
+  "polpa",
+  "pollo",
+  "tacchino",
+  "manzo",
+  "maiale",
+  "vitello",
+  "macinato",
+  "salsiccia",
+  "wurstel",
+  "hamburger",
+  "spezzatino",
+];
+
+function isCarneOPesce(nome: string): boolean {
+  const lower = nome.toLowerCase();
+  return CARNE_PESCE_KEYWORDS.some((k) => lower.includes(k));
+}
+
 function stimaPrezzo(
   reparto: string,
+  nome: string,
   quantita: number,
   unita: Ingrediente["unita"],
   fascia: "discount" | "media" | "premium",
 ): number {
-  const base = PREZZI_BASE[reparto] || PREZZI_BASE.Altro;
+  const base =
+    reparto === "Surgelati" && isCarneOPesce(nome)
+      ? PREZZI_BASE["Carne e pesce"]
+      : PREZZI_BASE[reparto] || PREZZI_BASE.Altro;
   const moltiplicatore = TIER_MOLTIPLICATORE[fascia];
 
   let prezzoBase: number;
@@ -113,7 +150,7 @@ export function buildGroceryList(
 
   const perReparto = new Map<string, GroceryItem[]>();
   for (const { reparto, nome, unita, quantita } of aggregato.values()) {
-    const prezzo_stimato = stimaPrezzo(reparto, quantita, unita, fascia);
+    const prezzo_stimato = stimaPrezzo(reparto, nome, quantita, unita, fascia);
     const items = perReparto.get(reparto) || [];
     items.push({ nome, quantita, unita, prezzo_stimato });
     perReparto.set(reparto, items);

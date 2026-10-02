@@ -53,12 +53,24 @@ export async function POST(request: Request) {
 
   let giorniValidati;
   try {
-    const nuovoPiano = await modificaPiano(
+    const risultato = await modificaPiano(
       profiloInput,
       pianoAttuale.meal_plan.giorni as Giorno[],
       messaggio.trim(),
     );
-    giorniValidati = await validaGiorni(profiloInput, nuovoPiano.giorni);
+
+    if (!risultato.modificaApplicata) {
+      return NextResponse.json({
+        modifica_applicata: false,
+        motivo_rifiuto:
+          risultato.motivoRifiuto ||
+          "Non posso applicare questa modifica perché è incompatibile con le tue restrizioni alimentari.",
+        settimana: pianoAttuale.settimana,
+        giorni: pianoAttuale.meal_plan.giorni,
+      });
+    }
+
+    giorniValidati = await validaGiorni(profiloInput, risultato.giorni);
   } catch (err) {
     console.error("modificaPiano error:", err);
     return NextResponse.json(
@@ -87,6 +99,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
+    modifica_applicata: true,
     settimana: pianoAttuale.settimana,
     giorni: giorniValidati,
     grocery_list: groceryList,
