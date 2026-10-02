@@ -35,3 +35,9 @@ export const SUPERMERCATO_OPTIONS = [
   "Eurospin",
   "Altro",
 ];
+
+export const LIVELLO_ATTIVITA_OPTIONS: { value: "sedentario" | "moderato" | "attivo"; label: string }[] = [
+  { value: "sedentario", label: "Sedentario" },
+  { value: "moderato", label: "Moderato" },
+  { value: "attivo", label: "Attivo" },
+];

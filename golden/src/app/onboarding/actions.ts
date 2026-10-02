@@ -15,6 +15,11 @@ export type OnboardingInput = {
   tempo_max_cucina: number;
   budget_settimanale: number;
   supermercato: string;
+  sesso: "M" | "F" | null;
+  eta: number | null;
+  peso_kg: number | null;
+  altezza_cm: number | null;
+  livello_attivita: "sedentario" | "moderato" | "attivo" | null;
 };
 
 export async function createProfile(
@@ -40,6 +45,11 @@ export async function createProfile(
       tempo_max_cucina: input.tempo_max_cucina || null,
       budget_settimanale: input.budget_settimanale || null,
       supermercato: input.supermercato || null,
+      sesso: input.sesso,
+      eta: input.eta,
+      peso_kg: input.peso_kg,
+      altezza_cm: input.altezza_cm,
+      livello_attivita: input.livello_attivita,
     })
     .select("link_token")
     .single();

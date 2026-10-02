@@ -84,6 +84,7 @@ export function MenuView({
   const [modificando, setModificando] = useState(false);
   const [erroreModifica, setErroreModifica] = useState<string | null>(null);
   const [rifiutoModifica, setRifiutoModifica] = useState<string | null>(null);
+  const [nutrienteInCorso, setNutrienteInCorso] = useState<string | null>(null);
 
   const [pastoEspanso, setPastoEspanso] = useState<string | null>(null);
 
@@ -151,9 +152,7 @@ export function MenuView({
     setCambiandoModalita(false);
   }
 
-  async function handleModifica() {
-    if (!messaggio.trim()) return;
-    setModificando(true);
+  async function applicaModifica(testo: string): Promise<boolean> {
     setErroreModifica(null);
     setRifiutoModifica(null);
 
@@ -161,29 +160,45 @@ export function MenuView({
       const res = await fetch("/api/piano/modifica", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, messaggio }),
+        body: JSON.stringify({ token, messaggio: testo }),
       });
       const data = await res.json();
 
       if (!res.ok) {
         setErroreModifica(data.error || "Qualcosa è andato storto.");
-        return;
+        return false;
       }
 
       if (data.modifica_applicata === false) {
         setRifiutoModifica(data.motivo_rifiuto);
-        return;
+        return false;
       }
 
       setGiorni(data.giorni);
       setBudgetSuperato(Boolean(data.budget_superato));
       setBudgetStimato(data.grocery_list?.totale_stimato ?? null);
-      setMessaggio("");
+      return true;
     } catch {
       setErroreModifica("Qualcosa è andato storto. Riprova.");
-    } finally {
-      setModificando(false);
+      return false;
     }
+  }
+
+  async function handleModifica() {
+    if (!messaggio.trim()) return;
+    setModificando(true);
+    const ok = await applicaModifica(messaggio);
+    if (ok) setMessaggio("");
+    setModificando(false);
+  }
+
+  async function handleAzioneNutriente(chiave: string, nomeModifica: string, direzione: "Aumenta" | "Riduci") {
+    if (nutrienteInCorso) return;
+    setNutrienteInCorso(chiave);
+    await applicaModifica(
+      `${direzione} ${nomeModifica} nel piano di questa settimana, mantenendo le restrizioni e il resto il più possibile invariato.`,
+    );
+    setNutrienteInCorso(null);
   }
 
   return (
@@ -319,18 +334,49 @@ export function MenuView({
               <h3 className="mb-3 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
                 Confronto nutrizionale settimanale
               </h3>
-              <ul className="flex flex-col gap-1.5">
-                {confrontoLARN.map((n) => (
-                  <li key={n.etichetta} className="text-sm text-zinc-600 dark:text-zinc-400">
-                    {n.etichetta} nella fascia{" "}
-                    <span className="font-medium text-zinc-800 dark:text-zinc-200">{n.fascia}</span>{" "}
-                    rispetto al riferimento ({Math.round(n.totale)}
-                    {n.unita} questa settimana, riferimento {Math.round(n.riferimento)}
-                    {n.unita})
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-3 text-xs text-zinc-400">{DISCLAIMER_LARN}</p>
+              <div className="flex flex-wrap gap-2">
+                {confrontoLARN.map((n) => {
+                  const inCorso = nutrienteInCorso === n.chiave;
+                  const coloreFascia =
+                    n.fascia === "media"
+                      ? "text-green-700 dark:text-green-400"
+                      : "text-amber-700 dark:text-amber-400";
+                  return (
+                    <div
+                      key={n.chiave}
+                      className="flex items-center gap-1.5 rounded-full border border-zinc-200 py-1.5 pl-3 pr-1.5 text-xs dark:border-zinc-800"
+                      title={`${Math.round(n.totale)}${n.unita} questa settimana · riferimento ${Math.round(n.riferimento)}${n.unita}`}
+                    >
+                      <span className="text-zinc-500 dark:text-zinc-400">{n.etichetta}</span>
+                      <span className={`font-medium ${coloreFascia}`}>{n.fascia}</span>
+                      {n.fascia === "bassa" && (
+                        <button
+                          onClick={() => handleAzioneNutriente(n.chiave, n.nomeModifica, "Aumenta")}
+                          disabled={Boolean(nutrienteInCorso) || modificando}
+                          aria-label={`Aumenta ${n.etichetta.toLowerCase()}`}
+                          className="flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300 disabled:opacity-40 dark:border-zinc-700"
+                        >
+                          +
+                        </button>
+                      )}
+                      {n.fascia === "alta" && (
+                        <button
+                          onClick={() => handleAzioneNutriente(n.chiave, n.nomeModifica, "Riduci")}
+                          disabled={Boolean(nutrienteInCorso) || modificando}
+                          aria-label={`Riduci ${n.etichetta.toLowerCase()}`}
+                          className="flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300 disabled:opacity-40 dark:border-zinc-700"
+                        >
+                          −
+                        </button>
+                      )}
+                      {inCorso && <span className="text-zinc-400">...</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-xs text-zinc-400">
+                Tocca un valore per i numeri esatti. {DISCLAIMER_LARN}
+              </p>
             </div>
           )}
 
@@ -359,7 +405,7 @@ export function MenuView({
             )}
             <button
               onClick={handleModifica}
-              disabled={modificando || !messaggio.trim()}
+              disabled={modificando || !messaggio.trim() || Boolean(nutrienteInCorso)}
               className="mt-3 rounded-full bg-black px-5 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black"
             >
               {modificando ? "Applico la modifica..." : "Applica modifica"}

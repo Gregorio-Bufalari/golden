@@ -76,29 +76,39 @@ function fasciaDaRapporto(rapporto: number): Fascia {
 }
 
 export type ConfrontoNutriente = {
+  chiave: keyof TotaliNutrizionali;
   etichetta: string;
+  nomeModifica: string;
   totale: number;
   riferimento: number;
   fascia: Fascia;
   unita: string;
 };
 
-const NUTRIENTI: { chiave: keyof TotaliNutrizionali; etichetta: string; unita: string }[] = [
-  { chiave: "calorie", etichetta: "Apporto energetico", unita: "kcal" },
-  { chiave: "proteine_g", etichetta: "Apporto proteico", unita: "g" },
-  { chiave: "carboidrati_g", etichetta: "Apporto di carboidrati", unita: "g" },
-  { chiave: "grassi_g", etichetta: "Apporto di grassi", unita: "g" },
-  { chiave: "fibre_g", etichetta: "Apporto di fibre", unita: "g" },
+const NUTRIENTI: { chiave: keyof TotaliNutrizionali; etichetta: string; nomeModifica: string; unita: string }[] = [
+  { chiave: "calorie", etichetta: "Energia", nomeModifica: "l'apporto energetico (calorie)", unita: "kcal" },
+  { chiave: "proteine_g", etichetta: "Proteine", nomeModifica: "l'apporto proteico", unita: "g" },
+  { chiave: "carboidrati_g", etichetta: "Carboidrati", nomeModifica: "l'apporto di carboidrati", unita: "g" },
+  { chiave: "grassi_g", etichetta: "Grassi", nomeModifica: "l'apporto di grassi", unita: "g" },
+  { chiave: "fibre_g", etichetta: "Fibre", nomeModifica: "l'apporto di fibre", unita: "g" },
 ];
 
 export function confrontaConLARN(
   totali: TotaliNutrizionali,
   riferimento: RiferimentoLARN,
 ): ConfrontoNutriente[] {
-  return NUTRIENTI.map(({ chiave, etichetta, unita }) => {
+  return NUTRIENTI.map(({ chiave, etichetta, nomeModifica, unita }) => {
     const totale = totali[chiave];
     const rif = riferimento[chiave];
     const rapporto = rif > 0 ? totale / rif : 1;
-    return { etichetta, totale, riferimento: rif, fascia: fasciaDaRapporto(rapporto), unita };
+    return {
+      chiave,
+      etichetta,
+      nomeModifica,
+      totale,
+      riferimento: rif,
+      fascia: fasciaDaRapporto(rapporto),
+      unita,
+    };
   });
 }

@@ -50,14 +50,18 @@ export default async function FrigoPage({
             {rimanenze.map((r) => (
               <li
                 key={`${r.ingrediente}-${r.unita}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 px-4 py-2.5 text-sm dark:border-zinc-800"
+                className="flex items-start justify-between gap-3 overflow-hidden rounded-lg border border-zinc-200 px-4 py-2.5 text-sm dark:border-zinc-800"
               >
-                <span className="text-zinc-800 dark:text-zinc-200">{r.ingrediente}</span>
-                <div className="flex shrink-0 flex-col items-end">
+                <span className="min-w-0 break-words text-zinc-800 dark:text-zinc-200">
+                  {r.ingrediente}
+                </span>
+                <div className="flex max-w-[55%] shrink-0 flex-col items-end text-right">
                   <span className="text-zinc-500 dark:text-zinc-400">
                     {formatQuantita(Number(r.quantita), r.unita)}
                   </span>
-                  <span className="text-xs text-zinc-400">{conservazioneTipica(r.ingrediente)}</span>
+                  <span className="break-words text-xs text-zinc-400">
+                    {conservazioneTipica(r.ingrediente)}
+                  </span>
                 </div>
               </li>
             ))}
