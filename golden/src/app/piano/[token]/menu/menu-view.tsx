@@ -350,10 +350,13 @@ export function MenuView({
                     <div
                       key={n.chiave}
                       className="flex items-center gap-1.5 rounded-full border border-zinc-200 py-1.5 pl-3 pr-1.5 text-xs dark:border-zinc-800"
-                      title={`${Math.round(n.totale)}${n.unita} questa settimana · riferimento ${Math.round(n.riferimento)}${n.unita}`}
                     >
                       <span className="text-zinc-500 dark:text-zinc-400">{n.etichetta}</span>
                       <span className={`font-medium ${coloreFascia}`}>{n.fascia}</span>
+                      <span className="text-zinc-400">
+                        ({Math.round(n.totale)}/{Math.round(n.riferimento)}
+                        {n.unita})
+                      </span>
                       {n.fascia === "bassa" && (
                         <button
                           onClick={() => handleAzioneNutriente(n, "Aumenta")}
@@ -380,7 +383,7 @@ export function MenuView({
                 })}
               </div>
               <p className="mt-3 text-xs text-zinc-400">
-                Tocca un valore per i numeri esatti. {DISCLAIMER_LARN}
+                Tra parentesi: questa settimana / riferimento. {DISCLAIMER_LARN}
               </p>
             </div>
           )}
