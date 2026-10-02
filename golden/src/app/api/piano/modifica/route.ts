@@ -36,6 +36,7 @@ export async function POST(request: Request) {
     .select("id, settimana, meal_plan")
     .eq("profile_id", profile.id)
     .order("settimana", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 

@@ -43,6 +43,7 @@ export async function POST(request: Request) {
   const profileId: string = profile.id;
   const supermercato = profile.supermercato;
   const budgetSettimanale = profile.budget_settimanale;
+  const modalitaProfilo = profile.modalita as "routine" | "scoperta";
   const profiloInput: ProfiloPerPiano = {
     restrizioni: profile.restrizioni || [],
     obiettivo: profile.obiettivo,
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
 
   async function generaFresco() {
     const dispensa = await leggiDispensa(supabase, profileId);
-    const plan = await generateMealPlan(profiloInput);
+    const plan = await generateMealPlan(profiloInput, modalitaProfilo);
     const giorniBase = await validaGiorni(profiloInput, plan.giorni);
     const risultato = await adattaEntroBudget(
       profiloInput,
@@ -88,6 +89,7 @@ export async function POST(request: Request) {
       .eq("profile_id", profile.id)
       .eq("modalita_usata", "routine")
       .order("settimana", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 

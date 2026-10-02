@@ -9,6 +9,7 @@ type CheckinRow = {
 };
 
 type WeeklyPlanRow = {
+  id: string;
   settimana: string;
   budget_stimato: number | null;
   checkins: CheckinRow[];
@@ -34,9 +35,10 @@ export default async function AndamentoPage({
 
   const { data: piani } = await supabase
     .from("weekly_plans")
-    .select("settimana, budget_stimato, checkins(seguito_piano, spreco, categoria_spreco, spesa_reale, retailer_usato)")
+    .select("id, settimana, budget_stimato, checkins(seguito_piano, spreco, categoria_spreco, spesa_reale, retailer_usato)")
     .eq("profile_id", profile.id)
-    .order("settimana", { ascending: false });
+    .order("settimana", { ascending: false })
+    .order("created_at", { ascending: false });
 
   const settimane = (piani || []) as unknown as WeeklyPlanRow[];
   // Risparmio = quanto l'app aveva stimato per QUELLA settimana meno quanto hai
@@ -116,7 +118,7 @@ export default async function AndamentoPage({
               const checkin = s.checkins[0];
               return (
                 <li
-                  key={s.settimana}
+                  key={s.id}
                   className="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-2.5 text-sm dark:border-zinc-800"
                 >
                   <span className="text-zinc-600 dark:text-zinc-400">
