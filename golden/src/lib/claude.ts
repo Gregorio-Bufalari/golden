@@ -3,7 +3,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5-5";
+// Sonnet invece di Opus: elencare pasti/ingredienti/prezzi non richiede un
+// ragionamento complesso, e Sonnet genera molto più velocemente — importante
+// per restare entro i tempi di esecuzione di una funzione serverless. La
+// sicurezza celiaca non dipende dal modello: resta garantita dal controllo
+// statico in glutine-check.ts, applicato comunque dopo la generazione.
+const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
 
 const client = new Anthropic();
 
@@ -141,6 +146,7 @@ export async function generateMealPlan(profilo: ProfiloPerPiano): Promise<MealPl
       },
     ],
     output_config: {
+      effort: "low",
       format: zodOutputFormat(MealPlanSchema),
     },
   });
@@ -192,6 +198,7 @@ export async function modificaPiano(
       },
     ],
     output_config: {
+      effort: "low",
       format: zodOutputFormat(ModificaOutputSchema),
     },
   });
@@ -237,6 +244,7 @@ export async function adattaBudget(
       },
     ],
     output_config: {
+      effort: "low",
       format: zodOutputFormat(MealPlanSchema),
     },
   });
@@ -270,6 +278,7 @@ export async function regeneratePasto(
       },
     ],
     output_config: {
+      effort: "low",
       format: zodOutputFormat(PastoSchema),
     },
   });
