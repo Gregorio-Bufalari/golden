@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateMealPlan, type ProfiloPerPiano } from "@/lib/claude";
 import { validaGiorni, adattaEntroBudget, type GiornoValidato } from "@/lib/piano-validazione";
+import { leggiDispensa, applicaConsumiDispensa } from "@/lib/dispensa";
 import type { GroceryList } from "@/lib/grocery";
 
 function mondayOfThisWeek(d = new Date()): string {
@@ -33,6 +34,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Profilo non trovato." }, { status: 404 });
   }
 
+  const profileId: string = profile.id;
+  const supermercato = profile.supermercato;
+  const budgetSettimanale = profile.budget_settimanale;
   const profiloInput: ProfiloPerPiano = {
     restrizioni: profile.restrizioni || [],
     obiettivo: profile.obiettivo,
@@ -42,10 +46,34 @@ export async function POST(request: Request) {
     budget_settimanale: profile.budget_settimanale,
   };
 
+  const settimana = mondayOfThisWeek();
+
   let giorniValidati: GiornoValidato[];
   let groceryList: GroceryList;
   let riusato = false;
   let budgetSuperato = false;
+
+  async function generaFresco() {
+    const dispensa = await leggiDispensa(supabase, profileId);
+    const plan = await generateMealPlan(profiloInput);
+    const giorniBase = await validaGiorni(profiloInput, plan.giorni);
+    const risultato = await adattaEntroBudget(
+      profiloInput,
+      giorniBase,
+      supermercato,
+      budgetSettimanale,
+      dispensa,
+    );
+    await applicaConsumiDispensa(
+      supabase,
+      profileId,
+      dispensa,
+      risultato.consumiDispensa,
+      risultato.groceryList.rimasto,
+      settimana,
+    );
+    return risultato;
+  }
 
   if (profile.modalita === "routine") {
     const { data: ultimoPiano } = await supabase
@@ -65,14 +93,7 @@ export async function POST(request: Request) {
       riusato = true;
     } else {
       try {
-        const plan = await generateMealPlan(profiloInput);
-        const giorniBase = await validaGiorni(profiloInput, plan.giorni);
-        const risultato = await adattaEntroBudget(
-          profiloInput,
-          giorniBase,
-          profile.supermercato,
-          profile.budget_settimanale,
-        );
+        const risultato = await generaFresco();
         giorniValidati = risultato.giorni;
         groceryList = risultato.groceryList;
         budgetSuperato = risultato.budgetSuperato;
@@ -86,14 +107,7 @@ export async function POST(request: Request) {
     }
   } else {
     try {
-      const plan = await generateMealPlan(profiloInput);
-      const giorniBase = await validaGiorni(profiloInput, plan.giorni);
-      const risultato = await adattaEntroBudget(
-        profiloInput,
-        giorniBase,
-        profile.supermercato,
-        profile.budget_settimanale,
-      );
+      const risultato = await generaFresco();
       giorniValidati = risultato.giorni;
       groceryList = risultato.groceryList;
       budgetSuperato = risultato.budgetSuperato;
@@ -105,8 +119,6 @@ export async function POST(request: Request) {
       );
     }
   }
-
-  const settimana = mondayOfThisWeek();
 
   const { data: weeklyPlan, error: insertError } = await supabase
     .from("weekly_plans")

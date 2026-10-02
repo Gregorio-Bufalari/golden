@@ -31,6 +31,21 @@ export type GroceryList = {
   fascia: "discount" | "media" | "premium";
 };
 
+export type ConsumoDispensa = {
+  nome: string;
+  unita: Ingrediente["unita"];
+  quantita: number;
+};
+
+export type RisultatoGroceryList = {
+  groceryList: GroceryList;
+  consumiDispensa: ConsumoDispensa[];
+};
+
+function chiaveDispensa(nome: string, unita: string): string {
+  return `${nome.toLowerCase()}__${unita}`;
+}
+
 // Il prezzo di ogni ingrediente è stimato da Claude al momento della
 // generazione del piano (vedi ISTRUZIONI_INGREDIENTI in claude.ts), ingrediente
 // per ingrediente — non un prezzo medio per reparto. Qui applichiamo solo
@@ -117,10 +132,16 @@ function trovaConfezione(
   return null;
 }
 
+/**
+ * @param dispensa Saldo disponibile in dispensa, chiave `nome__unita` (minuscolo) -> quantità.
+ *   Viene sottratto dal fabbisogno PRIMA di arrotondare alla confezione: se la
+ *   dispensa copre già tutto il necessario, l'ingrediente non compare nella lista.
+ */
 export function buildGroceryList(
   giorni: GiornoConIngredienti[],
   supermercato: string | null,
-): GroceryList {
+  dispensa: Map<string, number> = new Map(),
+): RisultatoGroceryList {
   const fascia = fasciaDaSupermercato(supermercato);
   const moltiplicatore = TIER_MOLTIPLICATORE[fascia];
 
@@ -153,23 +174,37 @@ export function buildGroceryList(
   }
 
   const rimasto: RimastoItem[] = [];
+  const consumiDispensa: ConsumoDispensa[] = [];
   const perReparto = new Map<string, GroceryItem[]>();
 
   for (const { reparto, nome, unita, quantitaUsata, prezzo } of aggregato.values()) {
+    const saldoDispensa = dispensa.get(chiaveDispensa(nome, unita)) || 0;
+    const consumatoDallaDispensa = Math.min(saldoDispensa, quantitaUsata);
+    if (consumatoDallaDispensa > 0) {
+      consumiDispensa.push({ nome, unita, quantita: consumatoDallaDispensa });
+    }
+
+    const quantitaDaComprare = quantitaUsata - consumatoDallaDispensa;
+    const prezzoPerUnita = quantitaUsata > 0 ? prezzo / quantitaUsata : prezzo;
+
+    if (quantitaDaComprare <= 0) {
+      // La dispensa copre già tutto il fabbisogno: niente da comprare.
+      continue;
+    }
+
     const taglia = trovaConfezione(reparto, nome, unita);
 
-    let quantitaAcquistata = quantitaUsata;
-    if (taglia && quantitaUsata > 0) {
-      quantitaAcquistata = Math.ceil(quantitaUsata / taglia) * taglia;
-      const avanzo = quantitaAcquistata - quantitaUsata;
+    let quantitaAcquistata = quantitaDaComprare;
+    if (taglia) {
+      quantitaAcquistata = Math.ceil(quantitaDaComprare / taglia) * taglia;
+      const avanzo = quantitaAcquistata - quantitaDaComprare;
       if (avanzo > 0) {
         rimasto.push({ nome, quantita: avanzo, unita });
       }
     }
 
-    // Prezzo scalato dalla quantità effettivamente usata a quella acquistata
-    // (compri la confezione intera, non solo la parte che usi nelle ricette).
-    const prezzoPerUnita = quantitaUsata > 0 ? prezzo / quantitaUsata : prezzo;
+    // Prezzo scalato dalla quantità effettivamente usata (prima della
+    // dispensa) a quella acquistata (compri la confezione intera).
     const prezzo_stimato = prezzoPerUnita * quantitaAcquistata * moltiplicatore;
 
     const items = perReparto.get(reparto) || [];
@@ -185,5 +220,13 @@ export function buildGroceryList(
 
   const totale_stimato = reparti.reduce((sum, r) => sum + r.subtotale, 0);
 
-  return { reparti, rimasto: rimasto.sort((a, b) => a.nome.localeCompare(b.nome)), totale_stimato, fascia };
+  return {
+    groceryList: {
+      reparti,
+      rimasto: rimasto.sort((a, b) => a.nome.localeCompare(b.nome)),
+      totale_stimato,
+      fascia,
+    },
+    consumiDispensa,
+  };
 }

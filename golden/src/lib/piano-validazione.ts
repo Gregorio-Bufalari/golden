@@ -1,7 +1,7 @@
 import "server-only";
 import { regeneratePasto, adattaBudget, type Pasto, type Giorno, type ProfiloPerPiano } from "./claude";
 import { ingredientiARischio } from "./glutine-check";
-import { buildGroceryList, type GroceryList } from "./grocery";
+import { buildGroceryList, type GroceryList, type ConsumoDispensa } from "./grocery";
 
 const MAX_RIGENERAZIONI = 2;
 const MAX_TENTATIVI_BUDGET = 2;
@@ -63,26 +63,42 @@ export async function adattaEntroBudget(
   giorniIniziali: GiornoValidato[],
   supermercato: string | null,
   budget: number | null,
-): Promise<{ giorni: GiornoValidato[]; groceryList: GroceryList; budgetSuperato: boolean }> {
+  dispensa: Map<string, number> = new Map(),
+): Promise<{
+  giorni: GiornoValidato[];
+  groceryList: GroceryList;
+  consumiDispensa: ConsumoDispensa[];
+  budgetSuperato: boolean;
+}> {
   let giorni = giorniIniziali;
-  let groceryList = buildGroceryList(giorni, supermercato);
+  let risultato = buildGroceryList(giorni, supermercato, dispensa);
 
   if (!budget) {
-    return { giorni, groceryList, budgetSuperato: false };
+    return { giorni, groceryList: risultato.groceryList, consumiDispensa: risultato.consumiDispensa, budgetSuperato: false };
   }
 
   let tentativi = 0;
-  while (groceryList.totale_stimato > budget && tentativi < MAX_TENTATIVI_BUDGET) {
+  while (risultato.groceryList.totale_stimato > budget && tentativi < MAX_TENTATIVI_BUDGET) {
     tentativi += 1;
     try {
-      const pianoAdattato = await adattaBudget(profilo, giorni as Giorno[], groceryList.totale_stimato, budget);
+      const pianoAdattato = await adattaBudget(
+        profilo,
+        giorni as Giorno[],
+        risultato.groceryList.totale_stimato,
+        budget,
+      );
       giorni = await validaGiorni(profilo, pianoAdattato.giorni);
-      groceryList = buildGroceryList(giorni, supermercato);
+      risultato = buildGroceryList(giorni, supermercato, dispensa);
     } catch (err) {
       console.error("adattaBudget error:", err);
       break;
     }
   }
 
-  return { giorni, groceryList, budgetSuperato: groceryList.totale_stimato > budget };
+  return {
+    giorni,
+    groceryList: risultato.groceryList,
+    consumiDispensa: risultato.consumiDispensa,
+    budgetSuperato: risultato.groceryList.totale_stimato > budget,
+  };
 }
