@@ -50,6 +50,25 @@ create table if not exists checkins (
 
 create index if not exists checkins_weekly_plan_id_idx on checkins(weekly_plan_id);
 
+-- Saldo corrente della "dispensa": quanto avanza di ogni ingrediente dopo
+-- aver arrotondato alla confezione reale. Una riga per (profile_id,
+-- ingrediente, unita) col saldo attuale; settimana = ultimo aggiornamento.
+-- Scalata automaticamente dal fabbisogno dei piani futuri finché non si
+-- esaurisce (vedi src/lib/dispensa.ts).
+create table if not exists rimanenze (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references profiles(id) on delete cascade,
+  ingrediente text not null,
+  unita text not null,
+  quantita numeric(10, 2) not null default 0,
+  settimana date not null,
+  created_at timestamptz not null default now(),
+  unique (profile_id, ingrediente, unita)
+);
+
+create index if not exists rimanenze_profile_id_idx on rimanenze(profile_id);
+
 alter table profiles enable row level security;
 alter table weekly_plans enable row level security;
 alter table checkins enable row level security;
+alter table rimanenze enable row level security;

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { GroceryList } from "./grocery-list";
-import { CheckinForm } from "./checkin-form";
+import { ModalitaToggle } from "../modalita-toggle";
+import { setModalita } from "../actions";
 
 type Ingrediente = {
   nome: string;
@@ -11,11 +11,19 @@ type Ingrediente = {
   reparto: string;
 };
 
+type Nutrizione = {
+  calorie: number;
+  proteine_g: number;
+  carboidrati_g: number;
+  grassi_g: number;
+};
+
 type Pasto = {
   tipo: "pranzo" | "cena";
   nome: string;
   ingredienti: Ingrediente[];
   tempo_preparazione_min: number;
+  nutrizione: Nutrizione;
   verificare?: boolean;
   ingredienti_a_rischio?: string[];
 };
@@ -24,23 +32,6 @@ type Giorno = {
   giorno: string;
   pasti: Pasto[];
 };
-
-type GroceryReparto = {
-  reparto: string;
-  items: { nome: string; quantita: number; unita: Ingrediente["unita"]; prezzo_stimato: number }[];
-  subtotale: number;
-};
-
-type GroceryListData = {
-  reparti: GroceryReparto[];
-  totale_stimato: number;
-  fascia: "discount" | "media" | "premium";
-};
-
-function isDomenicaSera(): boolean {
-  const now = new Date();
-  return now.getDay() === 0 && now.getHours() >= 18;
-}
 
 function formatQuantita(quantita: number, unita: Ingrediente["unita"]): string {
   if (unita === "g" && quantita >= 1000) {
@@ -53,15 +44,31 @@ function formatQuantita(quantita: number, unita: Ingrediente["unita"]): string {
   return `${arrotondata} ${unita}`;
 }
 
-export function PianoGenerator({ token }: { token: string }) {
-  const [giorni, setGiorni] = useState<Giorno[] | null>(null);
-  const [groceryList, setGroceryList] = useState<GroceryListData | null>(null);
-  const [settimana, setSettimana] = useState<string>("");
+export function MenuView({
+  token,
+  initialModalita,
+  initialGiorni,
+  initialSettimana,
+  budgetSettimanale,
+  budgetStimatoIniziale,
+}: {
+  token: string;
+  initialModalita: "routine" | "scoperta";
+  initialGiorni: Giorno[] | null;
+  initialSettimana: string;
+  budgetSettimanale: number | null;
+  budgetStimatoIniziale: number | null;
+}) {
+  const [modalita, setModalitaState] = useState(initialModalita);
+  const [cambiandoModalita, setCambiandoModalita] = useState(false);
+  const [giorni, setGiorni] = useState<Giorno[] | null>(initialGiorni);
+  const [settimana, setSettimana] = useState(initialSettimana);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [riusato, setRiusato] = useState(false);
-  const [budgetSuperato, setBudgetSuperato] = useState(false);
-  const [budgetSettimanale, setBudgetSettimanale] = useState<number | null>(null);
+  const [budgetSuperato, setBudgetSuperato] = useState(
+    Boolean(budgetSettimanale && budgetStimatoIniziale && budgetStimatoIniziale > budgetSettimanale),
+  );
+  const [budgetStimato, setBudgetStimato] = useState<number | null>(budgetStimatoIniziale);
 
   const [messaggio, setMessaggio] = useState("");
   const [modificando, setModificando] = useState(false);
@@ -86,16 +93,31 @@ export function PianoGenerator({ token }: { token: string }) {
       }
 
       setGiorni(data.giorni);
-      setGroceryList(data.grocery_list);
       setSettimana(data.settimana);
-      setRiusato(Boolean(data.riusato));
       setBudgetSuperato(Boolean(data.budget_superato));
-      setBudgetSettimanale(data.budget_settimanale ?? null);
+      setBudgetStimato(data.grocery_list?.totale_stimato ?? null);
     } catch {
       setError("Qualcosa è andato storto. Riprova.");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleSwitchModalita(nuova: "routine" | "scoperta") {
+    if (nuova === modalita || cambiandoModalita) return;
+    setCambiandoModalita(true);
+    const precedente = modalita;
+    setModalitaState(nuova);
+
+    const result = await setModalita(token, nuova);
+    if ("error" in result) {
+      setModalitaState(precedente);
+      setCambiandoModalita(false);
+      return;
+    }
+
+    await handleGenerate();
+    setCambiandoModalita(false);
   }
 
   async function handleModifica() {
@@ -123,9 +145,8 @@ export function PianoGenerator({ token }: { token: string }) {
       }
 
       setGiorni(data.giorni);
-      setGroceryList(data.grocery_list);
       setBudgetSuperato(Boolean(data.budget_superato));
-      setBudgetSettimanale(data.budget_settimanale ?? null);
+      setBudgetStimato(data.grocery_list?.totale_stimato ?? null);
       setMessaggio("");
     } catch {
       setErroreModifica("Qualcosa è andato storto. Riprova.");
@@ -135,17 +156,20 @@ export function PianoGenerator({ token }: { token: string }) {
   }
 
   return (
-    <div className="mt-10 w-full max-w-2xl">
+    <div className="mt-6 w-full max-w-2xl">
+      <div className="mb-4 flex justify-center">
+        <ModalitaToggle
+          modalita={modalita}
+          onSwitch={handleSwitchModalita}
+          disabled={cambiandoModalita || loading}
+        />
+      </div>
+
       {!giorni && (
         <div className="flex flex-col items-center gap-3">
-          {isDomenicaSera() && (
-            <div className="mb-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
-              È domenica sera — pronto per confermare il piano della prossima settimana?
-            </div>
-          )}
           <button
             onClick={handleGenerate}
-            disabled={loading}
+            disabled={loading || cambiandoModalita}
             className="rounded-full bg-black px-6 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
           >
             {loading ? "Genero il piano..." : "Genera il piano della settimana"}
@@ -156,26 +180,27 @@ export function PianoGenerator({ token }: { token: string }) {
 
       {giorni && (
         <div className="flex flex-col gap-6 text-left">
-          <div className="flex items-center justify-between print:hidden">
-            {riusato ? (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Piano ripreso dalla settimana scorsa (modalità routine) — prezzi e quantità
-                da ricalcolare in futuro.
-              </p>
-            ) : (
-              <span />
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-zinc-400">Settimana del {settimana}</p>
+            {modalita === "scoperta" && (
+              <button
+                onClick={handleGenerate}
+                disabled={loading || cambiandoModalita}
+                className="rounded-full border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+              >
+                {loading ? "Genero..." : "Altri suggerimenti"}
+              </button>
             )}
-            <button
-              onClick={handleGenerate}
-              disabled={loading}
-              className="rounded-full border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
-            >
-              {loading ? "Genero..." : "Rigenera il piano"}
-            </button>
           </div>
-          {error && <p className="text-sm text-red-600 dark:text-red-400 print:hidden">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-          <div className="flex flex-col gap-6 print:hidden">
+          {budgetSuperato && budgetSettimanale && budgetStimato && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+              Il piano supera il budget: stimato €{budgetStimato.toFixed(2)} contro €{budgetSettimanale}.
+            </div>
+          )}
+
+          <div className="flex flex-col gap-6">
             {giorni.map((giorno) => (
               <div
                 key={giorno.giorno}
@@ -203,6 +228,12 @@ export function PianoGenerator({ token }: { token: string }) {
                           .map((ing) => `${ing.nome} (${formatQuantita(ing.quantita, ing.unita)})`)
                           .join(", ")}
                       </p>
+                      {pasto.nutrizione && (
+                        <p className="mt-1 text-xs text-zinc-400">
+                          {pasto.nutrizione.calorie} kcal · {pasto.nutrizione.proteine_g}g proteine ·{" "}
+                          {pasto.nutrizione.carboidrati_g}g carboidrati · {pasto.nutrizione.grassi_g}g grassi
+                        </p>
+                      )}
                       {pasto.verificare && (
                         <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
                           ⚠️ Verifica necessaria: possibili tracce di glutine in{" "}
@@ -217,18 +248,7 @@ export function PianoGenerator({ token }: { token: string }) {
             ))}
           </div>
 
-          {budgetSuperato && budgetSettimanale && groceryList && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-              Il piano supera il budget impostato: stimato €{groceryList.totale_stimato.toFixed(2)}{" "}
-              contro un budget di €{budgetSettimanale}. Ho già provato a ridurre il costo
-              sostituendo alcuni ingredienti; puoi chiedermi di tagliare ancora nel box
-              &quot;Modifica il piano&quot; qui sotto.
-            </div>
-          )}
-
-          {groceryList && <GroceryList data={groceryList} settimana={settimana} />}
-
-          <div className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800 print:hidden">
+          <div className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
             <h3 className="mb-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
               Modifica il piano
             </h3>
@@ -259,8 +279,6 @@ export function PianoGenerator({ token }: { token: string }) {
               {modificando ? "Applico la modifica..." : "Applica modifica"}
             </button>
           </div>
-
-          <CheckinForm token={token} />
         </div>
       )}
     </div>

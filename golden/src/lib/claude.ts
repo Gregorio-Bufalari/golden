@@ -25,11 +25,19 @@ const IngredienteSchema = z.object({
   prezzo_stimato_eur: z.number(),
 });
 
+const NutrizioneSchema = z.object({
+  calorie: z.number(),
+  proteine_g: z.number(),
+  carboidrati_g: z.number(),
+  grassi_g: z.number(),
+});
+
 const PastoSchema = z.object({
   tipo: z.enum(["pranzo", "cena"]),
   nome: z.string(),
   ingredienti: z.array(IngredienteSchema),
   tempo_preparazione_min: z.number(),
+  nutrizione: NutrizioneSchema,
 });
 
 const GiornoSchema = z.object({
@@ -50,6 +58,7 @@ const MealPlanSchema = z.object({
 });
 
 export type Ingrediente = z.infer<typeof IngredienteSchema>;
+export type Nutrizione = z.infer<typeof NutrizioneSchema>;
 export type Pasto = z.infer<typeof PastoSchema>;
 export type Giorno = z.infer<typeof GiornoSchema>;
 export type MealPlan = z.infer<typeof MealPlanSchema>;
@@ -92,6 +101,11 @@ const ISTRUZIONI_INGREDIENTI =
   "surgelati NON costano uguale anche se stanno entrambi nei surgelati; il salmone costa più del pollo; il parmigiano " +
   "più della mozzarella. Stima con buon senso in base al tipo di prodotto specifico, fresco o surgelato, standard o pregiato.";
 
+const ISTRUZIONI_NUTRIZIONE =
+  "Per ogni pasto (non per singolo ingrediente) indica anche il campo nutrizione: calorie totali del piatto (kcal), " +
+  "proteine_g, carboidrati_g e grassi_g (grammi), per la porzione così come preparata (per persona, non per l'intera pentola). " +
+  "Sono valori stimati con buon senso nutrizionale, non da un database ufficiale — va bene un'approssimazione ragionevole.";
+
 export async function generateMealPlan(profilo: ProfiloPerPiano): Promise<MealPlan> {
   const response = await client.messages.parse({
     model: MODEL,
@@ -101,7 +115,7 @@ export async function generateMealPlan(profilo: ProfiloPerPiano): Promise<MealPl
       "Le restrizioni alimentari sono un vincolo rigido e non negoziabile: non includere MAI, nemmeno in tracce dichiarate, un ingrediente incompatibile con le restrizioni indicate. " +
       "Se è indicato un budget settimanale, è anch'esso un vincolo rigido: il totale stimato della spesa (somma di tutti i prezzo_stimato_eur dell'intero piano) non deve superarlo. " +
       "Rispetta anche obiettivo, preferenze e tempo di preparazione, in questo ordine di priorità, scegliendo ingredienti e porzioni che permettano di rientrare nel budget. " +
-      ISTRUZIONI_INGREDIENTI,
+      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE,
     messages: [
       {
         role: "user",
@@ -150,7 +164,7 @@ export async function modificaPiano(
       "In quel caso imposta modifica_applicata a false, spiega brevemente il motivo in motivo_rifiuto (in italiano, " +
       "rivolgendoti direttamente all'utente) e restituisci il piano INVARIATO. Se invece la richiesta è compatibile, " +
       "applicala, imposta modifica_applicata a true e motivo_rifiuto a null. " +
-      ISTRUZIONI_INGREDIENTI,
+      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE,
     messages: [
       {
         role: "user",
@@ -191,7 +205,7 @@ export async function adattaBudget(
       "senza violare le restrizioni alimentari (vincolo rigido, non negoziabile) e senza stravolgere le preferenze. " +
       "Riduci il costo totale stimato sostituendo ingredienti costosi con alternative più economiche (es. proteine " +
       "meno pregiate, prodotti di stagione, porzioni più ragionevoli), mantenendo varietà e qualità nutrizionale. " +
-      ISTRUZIONI_INGREDIENTI,
+      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE,
     messages: [
       {
         role: "user",
@@ -226,7 +240,7 @@ export async function regeneratePasto(
     system:
       "Sei un assistente che rigenera un singolo pasto di un piano settimanale, in italiano. " +
       "Le restrizioni alimentari sono un vincolo rigido: non includere MAI un ingrediente incompatibile. " +
-      ISTRUZIONI_INGREDIENTI,
+      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE,
     messages: [
       {
         role: "user",

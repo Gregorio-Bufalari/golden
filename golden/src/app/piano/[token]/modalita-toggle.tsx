@@ -1,37 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { setModalita } from "./actions";
-
 export function ModalitaToggle({
-  token,
-  initialModalita,
+  modalita,
+  onSwitch,
+  disabled,
 }: {
-  token: string;
-  initialModalita: "routine" | "scoperta";
+  modalita: "routine" | "scoperta";
+  onSwitch: (nuova: "routine" | "scoperta") => void;
+  disabled?: boolean;
 }) {
-  const [modalita, setModalitaState] = useState(initialModalita);
-  const [saving, setSaving] = useState(false);
-
-  async function handleSwitch(nuova: "routine" | "scoperta") {
-    if (nuova === modalita) return;
-    setSaving(true);
-    const prev = modalita;
-    setModalitaState(nuova);
-    const result = await setModalita(token, nuova);
-    if ("error" in result) {
-      setModalitaState(prev);
-    }
-    setSaving(false);
-  }
-
   return (
-    <div className="mt-6 flex items-center gap-2 text-sm">
+    <div className="flex items-center gap-2 text-sm">
       <span className="text-zinc-500 dark:text-zinc-400">Modalità:</span>
       <div className="flex rounded-full border border-zinc-200 p-0.5 dark:border-zinc-800">
         <button
-          onClick={() => handleSwitch("routine")}
-          disabled={saving}
+          onClick={() => onSwitch("routine")}
+          disabled={disabled}
           className={`rounded-full px-3 py-1 transition-colors ${
             modalita === "routine"
               ? "bg-black text-white dark:bg-white dark:text-black"
@@ -41,8 +25,8 @@ export function ModalitaToggle({
           Routine
         </button>
         <button
-          onClick={() => handleSwitch("scoperta")}
-          disabled={saving}
+          onClick={() => onSwitch("scoperta")}
+          disabled={disabled}
           className={`rounded-full px-3 py-1 transition-colors ${
             modalita === "scoperta"
               ? "bg-black text-white dark:bg-white dark:text-black"
