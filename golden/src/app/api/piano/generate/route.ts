@@ -5,6 +5,12 @@ import { validaGiorni, adattaEntroBudget, type GiornoValidato } from "@/lib/pian
 import { leggiDispensa, applicaConsumiDispensa } from "@/lib/dispensa";
 import type { GroceryList } from "@/lib/grocery";
 
+// Generare un piano può richiedere diverse chiamate a Claude in sequenza
+// (generazione, eventuali rigenerazioni per il glutine, adattamento al
+// budget): il limite di default di Vercel per una funzione serverless è
+// troppo basso e interromperebbe la richiesta a metà.
+export const maxDuration = 60;
+
 function mondayOfThisWeek(d = new Date()): string {
   const day = d.getDay();
   const diffToMonday = day === 0 ? -6 : 1 - day;
