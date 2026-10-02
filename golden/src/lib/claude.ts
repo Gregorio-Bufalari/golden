@@ -125,7 +125,7 @@ const ISTRUZIONI_PREPARAZIONE =
 export async function generateMealPlan(profilo: ProfiloPerPiano): Promise<MealPlan> {
   const response = await client.messages.parse({
     model: MODEL,
-    max_tokens: 8000,
+    max_tokens: 16000,
     system:
       "Sei un assistente che genera piani settimanali di pasti (pranzo e cena, 7 giorni) in italiano. " +
       "Le restrizioni alimentari sono un vincolo rigido e non negoziabile: non includere MAI, nemmeno in tracce dichiarate, un ingrediente incompatibile con le restrizioni indicate. " +
@@ -171,7 +171,7 @@ export async function modificaPiano(
 ): Promise<RisultatoModifica> {
   const response = await client.messages.parse({
     model: MODEL,
-    max_tokens: 8000,
+    max_tokens: 16000,
     system:
       "Sei un assistente che modifica un piano settimanale di pasti già esistente, in base a una richiesta " +
       "dell'utente in linguaggio naturale, in italiano. Applica SOLO la modifica richiesta, lasciando invariato " +
@@ -215,7 +215,7 @@ export async function adattaBudget(
 ): Promise<MealPlan> {
   const response = await client.messages.parse({
     model: MODEL,
-    max_tokens: 8000,
+    max_tokens: 16000,
     system:
       "Sei un assistente che riduce il costo di un piano settimanale di pasti già esistente, in italiano, " +
       "senza violare le restrizioni alimentari (vincolo rigido, non negoziabile) e senza stravolgere le preferenze. " +
@@ -256,7 +256,7 @@ export async function regeneratePasto(
 ): Promise<Pasto> {
   const response = await client.messages.parse({
     model: MODEL,
-    max_tokens: 2000,
+    max_tokens: 4000,
     system:
       "Sei un assistente che rigenera un singolo pasto di un piano settimanale, in italiano. " +
       "Le restrizioni alimentari sono un vincolo rigido: non includere MAI un ingrediente incompatibile. " +
