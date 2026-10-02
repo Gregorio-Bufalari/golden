@@ -9,7 +9,7 @@ export default async function MenuPage({
   const { token } = await params;
   const supabase = createAdminClient();
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select(
       "id, nome, restrizioni, modalita, budget_settimanale, sesso, eta, peso_kg, altezza_cm, livello_attivita",
@@ -17,8 +17,15 @@ export default async function MenuPage({
     .eq("link_token", token)
     .single();
 
-  if (!profile) {
-    return null;
+  if (profileError || !profile) {
+    console.error("MenuPage profile fetch error:", profileError);
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Non sono riuscito a caricare il profilo. Riprova tra poco.
+        </p>
+      </div>
+    );
   }
 
   const { data: ultimoPiano } = await supabase
