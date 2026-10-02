@@ -20,7 +20,8 @@ create table if not exists profiles (
   budget_settimanale numeric(10, 2),
   supermercato text,
   modalita text not null default 'routine' check (modalita in ('routine', 'scoperta')),
-  link_token text not null unique default encode(gen_random_bytes(16), 'hex')
+  link_token text not null unique default encode(gen_random_bytes(16), 'hex'),
+  created_at timestamptz not null default now()
 );
 
 create table if not exists weekly_plans (
@@ -30,7 +31,8 @@ create table if not exists weekly_plans (
   meal_plan jsonb,
   grocery_list jsonb,
   budget_stimato numeric(10, 2),
-  modalita_usata text check (modalita_usata in ('routine', 'scoperta'))
+  modalita_usata text check (modalita_usata in ('routine', 'scoperta')),
+  created_at timestamptz not null default now()
 );
 
 create index if not exists weekly_plans_profile_id_idx on weekly_plans(profile_id);
@@ -42,7 +44,8 @@ create table if not exists checkins (
   spreco boolean,
   categoria_spreco text,
   spesa_reale numeric(10, 2),
-  retailer_usato text
+  retailer_usato text,
+  created_at timestamptz not null default now()
 );
 
 create index if not exists checkins_weekly_plan_id_idx on checkins(weekly_plan_id);
