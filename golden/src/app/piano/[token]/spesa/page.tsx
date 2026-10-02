@@ -35,7 +35,11 @@ export default async function SpesaPage({
 
       <div className="mt-6 w-full max-w-2xl">
         {ultimoPiano?.grocery_list ? (
-          <GroceryList data={ultimoPiano.grocery_list} settimana={ultimoPiano.settimana} />
+          <GroceryList
+            token={token}
+            initialData={ultimoPiano.grocery_list}
+            settimana={ultimoPiano.settimana}
+          />
         ) : (
           <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
             Nessuna lista della spesa ancora — genera prima il piano nella sezione{" "}
