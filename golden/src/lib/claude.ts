@@ -204,7 +204,10 @@ export async function modificaPiano(
       },
     ],
     output_config: {
-      effort: "low",
+      // "medium", non "low" come le generazioni massive: qui l'AI deve
+      // interpretare con più cura una richiesta mirata (es. "aumenta le
+      // proteine di tot grammi"), non solo elencare 14 pasti.
+      effort: "medium",
       format: zodOutputFormat(ModificaOutputSchema),
     },
   });

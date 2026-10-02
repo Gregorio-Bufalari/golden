@@ -8,6 +8,7 @@ import {
   confrontaConLARN,
   DISCLAIMER_LARN,
   type DatiBiometrici,
+  type ConfrontoNutriente,
 } from "@/lib/larn";
 
 type Ingrediente = {
@@ -192,11 +193,15 @@ export function MenuView({
     setModificando(false);
   }
 
-  async function handleAzioneNutriente(chiave: string, nomeModifica: string, direzione: "Aumenta" | "Riduci") {
+  async function handleAzioneNutriente(n: ConfrontoNutriente, direzione: "Aumenta" | "Riduci") {
     if (nutrienteInCorso) return;
-    setNutrienteInCorso(chiave);
+    setNutrienteInCorso(n.chiave);
+    const verboAzione = direzione === "Aumenta" ? "Aumentalo" : "Riducilo";
     await applicaModifica(
-      `${direzione} ${nomeModifica} nel piano di questa settimana, mantenendo le restrizioni e il resto il più possibile invariato.`,
+      `Il totale di ${n.nomeModifica} in questo piano è circa ${Math.round(n.totale)}${n.unita} questa settimana; ` +
+        `il riferimento indicativo è ${Math.round(n.riferimento)}${n.unita}. ${verboAzione} in modo concreto, ` +
+        "avvicinandoti al riferimento — se serve cambia quali pasti lo contengono, non solo le porzioni — " +
+        "mantenendo le restrizioni e senza stravolgere il resto del piano più del necessario.",
     );
     setNutrienteInCorso(null);
   }
@@ -351,7 +356,7 @@ export function MenuView({
                       <span className={`font-medium ${coloreFascia}`}>{n.fascia}</span>
                       {n.fascia === "bassa" && (
                         <button
-                          onClick={() => handleAzioneNutriente(n.chiave, n.nomeModifica, "Aumenta")}
+                          onClick={() => handleAzioneNutriente(n, "Aumenta")}
                           disabled={Boolean(nutrienteInCorso) || modificando}
                           aria-label={`Aumenta ${n.etichetta.toLowerCase()}`}
                           className="flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300 disabled:opacity-40 dark:border-zinc-700"
@@ -361,7 +366,7 @@ export function MenuView({
                       )}
                       {n.fascia === "alta" && (
                         <button
-                          onClick={() => handleAzioneNutriente(n.chiave, n.nomeModifica, "Riduci")}
+                          onClick={() => handleAzioneNutriente(n, "Riduci")}
                           disabled={Boolean(nutrienteInCorso) || modificando}
                           aria-label={`Riduci ${n.etichetta.toLowerCase()}`}
                           className="flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300 disabled:opacity-40 dark:border-zinc-700"
