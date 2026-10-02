@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { submitCheckin } from "./checkin-actions";
+import { Spinner } from "@/components/spinner";
 
 const CATEGORIE_SPRECO = ["Verdura", "Proteine", "Latticini", "Pane", "Altro"];
 const RETAILER_OPTIONS = ["Esselunga", "Coop", "Conad", "Carrefour", "Lidl", "Eurospin", "Altro"];
@@ -157,8 +158,9 @@ export function CheckinForm({ token }: { token: string }) {
       <button
         onClick={handleSubmit}
         disabled={!puoInviare || submitting}
-        className="self-start rounded-full bg-black px-5 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black"
+        className="flex items-center gap-2 self-start rounded-full bg-black px-5 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black"
       >
+        {submitting && <Spinner className="h-4 w-4" />}
         {submitting ? "Invio..." : "Invia check-in"}
       </button>
     </div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createProfile, type OnboardingInput } from "./actions";
+import { Spinner } from "@/components/spinner";
 import {
   RESTRIZIONI_OPTIONS,
   OBIETTIVO_OPTIONS,
@@ -487,8 +488,9 @@ export default function OnboardingPage() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="rounded-full bg-black px-6 py-2.5 text-sm font-medium text-white transition-opacity disabled:opacity-40 dark:bg-white dark:text-black"
+                className="flex items-center gap-2 rounded-full bg-black px-6 py-2.5 text-sm font-medium text-white transition-opacity disabled:opacity-40 dark:bg-white dark:text-black"
               >
+                {submitting && <Spinner className="h-4 w-4" />}
                 {submitting ? "Creazione in corso..." : "Crea il mio piano"}
               </button>
             )}

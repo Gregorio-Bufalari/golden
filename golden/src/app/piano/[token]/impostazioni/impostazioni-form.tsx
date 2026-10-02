@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { updateProfilo } from "./actions";
+import { Spinner } from "@/components/spinner";
 import {
   RESTRIZIONI_OPTIONS,
   OBIETTIVO_OPTIONS,
@@ -384,8 +385,9 @@ export function ImpostazioniForm({ token, profile }: { token: string; profile: P
       <button
         onClick={handleSalva}
         disabled={salvando}
-        className="self-start rounded-full bg-black px-6 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+        className="flex items-center gap-2 self-start rounded-full bg-black px-6 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
       >
+        {salvando && <Spinner className="h-4 w-4" />}
         {salvando ? "Salvo..." : "Salva impostazioni"}
       </button>
     </div>

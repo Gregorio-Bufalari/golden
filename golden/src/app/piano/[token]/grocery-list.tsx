@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Spinner } from "@/components/spinner";
 
 type GroceryItem = {
   nome: string;
@@ -254,7 +255,7 @@ export function GroceryList({
                     >
                       +
                     </button>
-                    {caricando && <span className="text-xs text-zinc-400">...</span>}
+                    {caricando && <Spinner className="h-3.5 w-3.5 text-zinc-400" />}
                   </span>
                 </li>
               );
