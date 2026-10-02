@@ -9,6 +9,7 @@ import {
   CUCINA_OPTIONS,
   TEMPO_OPTIONS,
   SUPERMERCATO_OPTIONS,
+  LIVELLO_ATTIVITA_OPTIONS,
 } from "@/lib/opzioni-profilo";
 
 type FormState = {
@@ -22,6 +23,11 @@ type FormState = {
   tempo_max_cucina: number | null;
   budget_settimanale: string;
   supermercato: string;
+  sesso: "M" | "F" | "";
+  eta: string;
+  peso_kg: string;
+  altezza_cm: string;
+  livello_attivita: "sedentario" | "moderato" | "attivo" | "";
 };
 
 const initialState: FormState = {
@@ -35,6 +41,11 @@ const initialState: FormState = {
   tempo_max_cucina: null,
   budget_settimanale: "",
   supermercato: "",
+  sesso: "",
+  eta: "",
+  peso_kg: "",
+  altezza_cm: "",
+  livello_attivita: "",
 };
 
 function toggleInArray(list: string[], value: string): string[] {
@@ -48,7 +59,7 @@ export default function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const totalSteps = 7;
+  const totalSteps = 8;
 
   function toggleRestrizione(value: string) {
     setForm((prev) => {
@@ -86,6 +97,11 @@ export default function OnboardingPage() {
       tempo_max_cucina: form.tempo_max_cucina ?? 0,
       budget_settimanale: Number(form.budget_settimanale) || 0,
       supermercato: form.supermercato,
+      sesso: form.sesso || null,
+      eta: form.eta ? Number(form.eta) : null,
+      peso_kg: form.peso_kg ? Number(form.peso_kg) : null,
+      altezza_cm: form.altezza_cm ? Number(form.altezza_cm) : null,
+      livello_attivita: form.livello_attivita || null,
     };
 
     const result = await createProfile(input);
@@ -336,6 +352,109 @@ export default function OnboardingPage() {
                     {opt}
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {step === 7 && (
+            <div className="flex flex-col gap-6">
+              <div>
+                <h2 className="text-xl font-semibold text-zinc-950 dark:text-zinc-50">
+                  Dati biometrici{" "}
+                  <span className="text-sm font-normal text-zinc-400">(facoltativo)</span>
+                </h2>
+                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                  Se li compili, nella sezione Menu ti mostriamo un confronto indicativo tra il
+                  piano e i valori di riferimento nutrizionali generali. Puoi saltare questo passo
+                  e compilarlo in un secondo momento dalle Impostazioni.
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Sesso
+                </label>
+                <div className="flex gap-2">
+                  {(["M", "F"] as const).map((opt) => (
+                    <button
+                      type="button"
+                      key={opt}
+                      onClick={() => setForm((p) => ({ ...p, sesso: p.sesso === opt ? "" : opt }))}
+                      className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
+                        form.sesso === opt
+                          ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
+                          : "border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      {opt === "M" ? "Maschio" : "Femmina"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Età
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={form.eta}
+                  onChange={(e) => setForm((p) => ({ ...p, eta: e.target.value }))}
+                  className="w-full rounded-lg border border-zinc-300 bg-transparent px-4 py-2.5 text-zinc-950 placeholder:text-zinc-400 focus:border-black focus:outline-none dark:border-zinc-700 dark:text-zinc-50 dark:focus:border-white"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    Peso (kg)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    step="0.1"
+                    value={form.peso_kg}
+                    onChange={(e) => setForm((p) => ({ ...p, peso_kg: e.target.value }))}
+                    className="w-full rounded-lg border border-zinc-300 bg-transparent px-4 py-2.5 text-zinc-950 placeholder:text-zinc-400 focus:border-black focus:outline-none dark:border-zinc-700 dark:text-zinc-50 dark:focus:border-white"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    Altezza (cm)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    step="0.5"
+                    value={form.altezza_cm}
+                    onChange={(e) => setForm((p) => ({ ...p, altezza_cm: e.target.value }))}
+                    className="w-full rounded-lg border border-zinc-300 bg-transparent px-4 py-2.5 text-zinc-950 placeholder:text-zinc-400 focus:border-black focus:outline-none dark:border-zinc-700 dark:text-zinc-50 dark:focus:border-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Livello di attività fisica
+                </label>
+                <div className="flex flex-col gap-2">
+                  {LIVELLO_ATTIVITA_OPTIONS.map((opt) => (
+                    <label
+                      key={opt.value}
+                      className="flex cursor-pointer items-center gap-3 rounded-lg border border-zinc-200 px-4 py-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+                    >
+                      <input
+                        type="radio"
+                        name="livello_attivita"
+                        checked={form.livello_attivita === opt.value}
+                        onChange={() => setForm((p) => ({ ...p, livello_attivita: opt.value }))}
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm text-zinc-800 dark:text-zinc-200">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
           )}

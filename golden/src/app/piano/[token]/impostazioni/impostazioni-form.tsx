@@ -8,6 +8,7 @@ import {
   CUCINA_OPTIONS,
   TEMPO_OPTIONS,
   SUPERMERCATO_OPTIONS,
+  LIVELLO_ATTIVITA_OPTIONS,
 } from "@/lib/opzioni-profilo";
 
 type ProfileData = {
@@ -25,12 +26,6 @@ type ProfileData = {
   altezza_cm: number | null;
   livello_attivita: "sedentario" | "moderato" | "attivo" | null;
 };
-
-const LIVELLO_ATTIVITA_OPTIONS: { value: "sedentario" | "moderato" | "attivo"; label: string }[] = [
-  { value: "sedentario", label: "Sedentario" },
-  { value: "moderato", label: "Moderato" },
-  { value: "attivo", label: "Attivo" },
-];
 
 function toggleInArray(list: string[], value: string): string[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];

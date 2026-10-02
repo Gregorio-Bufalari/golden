@@ -186,6 +186,12 @@ export async function modificaPiano(
       "In quel caso imposta modifica_applicata a false, spiega brevemente il motivo in motivo_rifiuto (in italiano, " +
       "rivolgendoti direttamente all'utente) e restituisci il piano INVARIATO. Se invece la richiesta è compatibile, " +
       "applicala, imposta modifica_applicata a true e motivo_rifiuto a null. " +
+      "Il piano ha sempre esattamente 14 pasti fissi (7 giorni, pranzo e cena): non puoi aggiungere o togliere " +
+      "pasti, ma puoi cambiarne liberamente la composizione. Se la richiesta implica un cambiamento significativo " +
+      "nella quantità settimanale di un ingrediente o di un nutriente (es. usarne molto di più o di meno), la " +
+      "soluzione migliore è quasi sempre cambiare QUALI pasti lo contengono — sostituendo un piatto con un altro " +
+      "che usa di più (o di meno) quell'ingrediente — piuttosto che alterare le porzioni di una singola ricetta " +
+      "fino a renderle irrealistiche per una persona (es. non proporre mai 800g di pollo in un solo piatto). " +
       ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE,
     messages: [
       {

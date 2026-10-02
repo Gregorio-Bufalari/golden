@@ -101,16 +101,18 @@ export function GroceryList({
   const [errore, setErrore] = useState<string | null>(null);
   const [rifiuto, setRifiuto] = useState<string | null>(null);
 
-  // + su un avanzo = "usane di più questa settimana" (riduce il rimasto,
-  // la quantità già acquistata non cambia); - fa il contrario.
+  // Il numero accanto ai pulsanti è l'avanzo: + deve farlo crescere (si usa
+  // MENO dell'ingrediente nel menu, ne resta di più in dispensa), - deve
+  // farlo scendere (si usa DI PIÙ nel menu, ne resta meno). La quantità già
+  // acquistata non cambia in nessuno dei due casi.
   async function handleCambiaUso(item: RimastoItem, direzione: 1 | -1) {
     const chiave = `${item.nome}__${item.unita}`;
     if (itemInCorso) return;
 
     const step = stepPer(item.unita);
-    const nuovaQuantita = Math.max(step, item.quantitaNecessaria + direzione * step);
+    const nuovaQuantita = Math.max(step, item.quantitaNecessaria - direzione * step);
     const quantitaArrotondata = Math.round(nuovaQuantita * 100) / 100;
-    const verbo = direzione === 1 ? "Aumenta" : "Riduci";
+    const verbo = direzione === 1 ? "Riduci" : "Aumenta";
     const messaggio = `${verbo} ${item.nome} a ${quantitaArrotondata}${item.unita} questa settimana`;
 
     setItemInCorso(chiave);
@@ -219,8 +221,9 @@ export function GroceryList({
             Rimasto in frigo/dispensa
           </h4>
           <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
-            Comprando le confezioni intere, questa settimana avanza — usa +/- per usarne di più o
-            di meno nel menu: la quantità già acquistata non cambia, cambia solo quanto avanza.
+            Comprando le confezioni intere, questa settimana avanza. Premi + se vuoi che ne avanzi
+            di più (il menu ne userà di meno), o − se vuoi usarne di più e farne avanzare di meno.
+            La quantità già acquistata non cambia.
           </p>
           <ul className="flex flex-col gap-1">
             {data.rimasto.map((item) => {
@@ -238,7 +241,7 @@ export function GroceryList({
                     <button
                       onClick={() => handleCambiaUso(item, -1)}
                       disabled={Boolean(itemInCorso)}
-                      aria-label={`Usa meno ${item.nome}`}
+                      aria-label={`Usa di più ${item.nome} (ne avanza meno)`}
                       className="flex h-6 w-6 items-center justify-center rounded-full border border-zinc-300 text-xs disabled:opacity-40 dark:border-zinc-700"
                     >
                       −
@@ -246,7 +249,7 @@ export function GroceryList({
                     <button
                       onClick={() => handleCambiaUso(item, 1)}
                       disabled={Boolean(itemInCorso)}
-                      aria-label={`Usa più ${item.nome}`}
+                      aria-label={`Fai avanzare di più ${item.nome} (ne usa meno)`}
                       className="flex h-6 w-6 items-center justify-center rounded-full border border-zinc-300 text-xs disabled:opacity-40 dark:border-zinc-700"
                     >
                       +
