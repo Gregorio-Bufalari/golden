@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PianoGenerator } from "./piano-generator";
-import { ModalitaToggle } from "./modalita-toggle";
 
 export default async function PianoPage({
   params,
@@ -35,14 +34,10 @@ export default async function PianoPage({
         </p>
       )}
 
-      <div className="print:hidden">
-        <ModalitaToggle
-          token={profile.link_token}
-          initialModalita={profile.modalita as "routine" | "scoperta"}
-        />
-      </div>
-
-      <PianoGenerator token={profile.link_token} />
+      <PianoGenerator
+        token={profile.link_token}
+        initialModalita={profile.modalita as "routine" | "scoperta"}
+      />
     </div>
   );
 }

@@ -13,8 +13,15 @@ type GroceryReparto = {
   subtotale: number;
 };
 
+type RimastoItem = {
+  nome: string;
+  quantita: number;
+  unita: GroceryItem["unita"];
+};
+
 type GroceryListData = {
   reparti: GroceryReparto[];
+  rimasto: RimastoItem[];
   totale_stimato: number;
   fascia: "discount" | "media" | "premium";
 };
@@ -44,6 +51,14 @@ function buildTestoWhatsApp(data: GroceryListData, settimana: string): string {
   }
 
   righe.push(`Totale stimato: ~€${data.totale_stimato.toFixed(2)}`);
+
+  if (data.rimasto.length > 0) {
+    righe.push("", "*Rimasto in frigo/dispensa*");
+    for (const item of data.rimasto) {
+      righe.push(`- ${item.nome}: ${formatQuantita(item.quantita, item.unita)}`);
+    }
+  }
+
   return righe.join("\n");
 }
 
@@ -113,8 +128,27 @@ export function GroceryList({
         <span>~€{data.totale_stimato.toFixed(2)}</span>
       </div>
       <p className="mt-1 text-xs text-zinc-400">
-        Prezzo stimato sulla fascia {data.fascia === "discount" ? "discount" : data.fascia === "premium" ? "premium" : "media"} — non è il prezzo reale del tuo supermercato.
+        Le quantità sono arrotondate alla confezione reale (es. 1kg di riso, non 160g) — prezzo
+        stimato sulla fascia {data.fascia === "discount" ? "discount" : data.fascia === "premium" ? "premium" : "media"}, non il prezzo reale del tuo supermercato.
       </p>
+
+      {data.rimasto.length > 0 && (
+        <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <h4 className="mb-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+            Rimasto in frigo/dispensa
+          </h4>
+          <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
+            Comprando le confezioni intere, questa settimana avanza:
+          </p>
+          <ul className="flex flex-col gap-1">
+            {data.rimasto.map((item) => (
+              <li key={item.nome} className="text-sm text-zinc-600 dark:text-zinc-400">
+                {item.nome} — {formatQuantita(item.quantita, item.unita)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

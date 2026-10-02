@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { GroceryList } from "./grocery-list";
 import { CheckinForm } from "./checkin-form";
+import { ModalitaToggle } from "./modalita-toggle";
+import { setModalita } from "./actions";
 
 type Ingrediente = {
   nome: string;
@@ -33,6 +35,7 @@ type GroceryReparto = {
 
 type GroceryListData = {
   reparti: GroceryReparto[];
+  rimasto: { nome: string; quantita: number; unita: Ingrediente["unita"] }[];
   totale_stimato: number;
   fascia: "discount" | "media" | "premium";
 };
@@ -53,7 +56,15 @@ function formatQuantita(quantita: number, unita: Ingrediente["unita"]): string {
   return `${arrotondata} ${unita}`;
 }
 
-export function PianoGenerator({ token }: { token: string }) {
+export function PianoGenerator({
+  token,
+  initialModalita,
+}: {
+  token: string;
+  initialModalita: "routine" | "scoperta";
+}) {
+  const [modalita, setModalitaState] = useState(initialModalita);
+  const [cambiandoModalita, setCambiandoModalita] = useState(false);
   const [giorni, setGiorni] = useState<Giorno[] | null>(null);
   const [groceryList, setGroceryList] = useState<GroceryListData | null>(null);
   const [settimana, setSettimana] = useState<string>("");
@@ -98,6 +109,23 @@ export function PianoGenerator({ token }: { token: string }) {
     }
   }
 
+  async function handleSwitchModalita(nuova: "routine" | "scoperta") {
+    if (nuova === modalita || cambiandoModalita) return;
+    setCambiandoModalita(true);
+    const precedente = modalita;
+    setModalitaState(nuova);
+
+    const result = await setModalita(token, nuova);
+    if ("error" in result) {
+      setModalitaState(precedente);
+      setCambiandoModalita(false);
+      return;
+    }
+
+    await handleGenerate();
+    setCambiandoModalita(false);
+  }
+
   async function handleModifica() {
     if (!messaggio.trim()) return;
     setModificando(true);
@@ -136,6 +164,14 @@ export function PianoGenerator({ token }: { token: string }) {
 
   return (
     <div className="mt-10 w-full max-w-2xl">
+      <div className="mb-4 flex justify-center print:hidden">
+        <ModalitaToggle
+          modalita={modalita}
+          onSwitch={handleSwitchModalita}
+          disabled={cambiandoModalita || loading}
+        />
+      </div>
+
       {!giorni && (
         <div className="flex flex-col items-center gap-3">
           {isDomenicaSera() && (
@@ -145,7 +181,7 @@ export function PianoGenerator({ token }: { token: string }) {
           )}
           <button
             onClick={handleGenerate}
-            disabled={loading}
+            disabled={loading || cambiandoModalita}
             className="rounded-full bg-black px-6 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
           >
             {loading ? "Genero il piano..." : "Genera il piano della settimana"}
@@ -167,10 +203,14 @@ export function PianoGenerator({ token }: { token: string }) {
             )}
             <button
               onClick={handleGenerate}
-              disabled={loading}
+              disabled={loading || cambiandoModalita}
               className="rounded-full border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
             >
-              {loading ? "Genero..." : "Rigenera il piano"}
+              {loading
+                ? "Genero..."
+                : modalita === "scoperta"
+                  ? "Un altro piano"
+                  : "Aggiorna il piano"}
             </button>
           </div>
           {error && <p className="text-sm text-red-600 dark:text-red-400 print:hidden">{error}</p>}
