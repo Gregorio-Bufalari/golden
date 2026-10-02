@@ -60,6 +60,8 @@ export function PianoGenerator({ token }: { token: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [riusato, setRiusato] = useState(false);
+  const [budgetSuperato, setBudgetSuperato] = useState(false);
+  const [budgetSettimanale, setBudgetSettimanale] = useState<number | null>(null);
 
   const [messaggio, setMessaggio] = useState("");
   const [modificando, setModificando] = useState(false);
@@ -87,6 +89,8 @@ export function PianoGenerator({ token }: { token: string }) {
       setGroceryList(data.grocery_list);
       setSettimana(data.settimana);
       setRiusato(Boolean(data.riusato));
+      setBudgetSuperato(Boolean(data.budget_superato));
+      setBudgetSettimanale(data.budget_settimanale ?? null);
     } catch {
       setError("Qualcosa è andato storto. Riprova.");
     } finally {
@@ -120,6 +124,8 @@ export function PianoGenerator({ token }: { token: string }) {
 
       setGiorni(data.giorni);
       setGroceryList(data.grocery_list);
+      setBudgetSuperato(Boolean(data.budget_superato));
+      setBudgetSettimanale(data.budget_settimanale ?? null);
       setMessaggio("");
     } catch {
       setErroreModifica("Qualcosa è andato storto. Riprova.");
@@ -210,6 +216,15 @@ export function PianoGenerator({ token }: { token: string }) {
               </div>
             ))}
           </div>
+
+          {budgetSuperato && budgetSettimanale && groceryList && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+              Il piano supera il budget impostato: stimato €{groceryList.totale_stimato.toFixed(2)}{" "}
+              contro un budget di €{budgetSettimanale}. Ho già provato a ridurre il costo
+              sostituendo alcuni ingredienti; puoi chiedermi di tagliare ancora nel box
+              &quot;Modifica il piano&quot; qui sotto.
+            </div>
+          )}
 
           {groceryList && <GroceryList data={groceryList} settimana={settimana} />}
 

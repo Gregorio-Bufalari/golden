@@ -60,6 +60,7 @@ export type ProfiloPerPiano = {
   preferenze: { cucina?: string[]; graditi?: string; non_graditi?: string } | null;
   tempo_max_cucina: number | null;
   household_size: number | null;
+  budget_settimanale: number | null;
 };
 
 function buildContestoProfilo(profilo: ProfiloPerPiano): string {
@@ -73,6 +74,9 @@ function buildContestoProfilo(profilo: ProfiloPerPiano): string {
     `Alimenti non graditi (da evitare): ${profilo.preferenze?.non_graditi || "nessuno"}`,
     `Tempo massimo di preparazione per pasto: ${profilo.tempo_max_cucina || 30} minuti`,
     `Numero di persone per cui cucinare: ${profilo.household_size || 1}`,
+    `Budget settimanale per la spesa: ${
+      profilo.budget_settimanale ? `€${profilo.budget_settimanale} (vincolo rigido: il totale stimato della spesa, somma di tutti i prezzo_stimato_eur, NON deve superarlo)` : "non specificato"
+    }`,
   ];
   return righe.join("\n");
 }
@@ -95,7 +99,8 @@ export async function generateMealPlan(profilo: ProfiloPerPiano): Promise<MealPl
     system:
       "Sei un assistente che genera piani settimanali di pasti (pranzo e cena, 7 giorni) in italiano. " +
       "Le restrizioni alimentari sono un vincolo rigido e non negoziabile: non includere MAI, nemmeno in tracce dichiarate, un ingrediente incompatibile con le restrizioni indicate. " +
-      "Rispetta anche obiettivo, preferenze e tempo di preparazione, in questo ordine di priorità. " +
+      "Se è indicato un budget settimanale, è anch'esso un vincolo rigido: il totale stimato della spesa (somma di tutti i prezzo_stimato_eur dell'intero piano) non deve superarlo. " +
+      "Rispetta anche obiettivo, preferenze e tempo di preparazione, in questo ordine di priorità, scegliendo ingredienti e porzioni che permettano di rientrare nel budget. " +
       ISTRUZIONI_INGREDIENTI,
     messages: [
       {
@@ -170,6 +175,43 @@ export async function modificaPiano(
     motivoRifiuto: response.parsed_output.motivo_rifiuto,
     giorni: response.parsed_output.giorni,
   };
+}
+
+export async function adattaBudget(
+  profilo: ProfiloPerPiano,
+  giorniAttuali: Giorno[],
+  totaleAttualeEur: number,
+  budgetEur: number,
+): Promise<MealPlan> {
+  const response = await client.messages.parse({
+    model: MODEL,
+    max_tokens: 8000,
+    system:
+      "Sei un assistente che riduce il costo di un piano settimanale di pasti già esistente, in italiano, " +
+      "senza violare le restrizioni alimentari (vincolo rigido, non negoziabile) e senza stravolgere le preferenze. " +
+      "Riduci il costo totale stimato sostituendo ingredienti costosi con alternative più economiche (es. proteine " +
+      "meno pregiate, prodotti di stagione, porzioni più ragionevoli), mantenendo varietà e qualità nutrizionale. " +
+      ISTRUZIONI_INGREDIENTI,
+    messages: [
+      {
+        role: "user",
+        content:
+          `Profilo:\n${buildContestoProfilo(profilo)}\n\n` +
+          `Piano attuale (JSON):\n${JSON.stringify({ giorni: giorniAttuali })}\n\n` +
+          `Il costo totale stimato di questo piano è €${totaleAttualeEur.toFixed(2)}, ma il budget settimanale è €${budgetEur}. ` +
+          "Rivedi il piano per rientrare nel budget, restituendo tutti i 7 giorni.",
+      },
+    ],
+    output_config: {
+      format: zodOutputFormat(MealPlanSchema),
+    },
+  });
+
+  if (!response.parsed_output) {
+    throw new Error("Claude non ha restituito un piano valido.");
+  }
+
+  return response.parsed_output;
 }
 
 export async function regeneratePasto(
