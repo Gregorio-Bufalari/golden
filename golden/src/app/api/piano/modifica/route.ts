@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { modificaPiano, type ProfiloPerPiano, type Giorno } from "@/lib/claude";
 import { validaGiorni, adattaEntroBudget } from "@/lib/piano-validazione";
+import { leggiDispensa, dispensaSenzaVersione, sostituisciConsumiDispensa } from "@/lib/dispensa";
+import type { GroceryList, ConsumoDispensa } from "@/lib/grocery";
 
 // Vedi la stessa impostazione in /api/piano/generate: più chiamate a Claude
 // in sequenza possono superare il limite di default di Vercel.
@@ -33,7 +35,7 @@ export async function POST(request: Request) {
 
   const { data: pianoAttuale } = await supabase
     .from("weekly_plans")
-    .select("id, settimana, meal_plan")
+    .select("id, settimana, meal_plan, grocery_list, consumi_dispensa")
     .eq("profile_id", profile.id)
     .order("settimana", { ascending: false })
     .order("created_at", { ascending: false })
@@ -56,9 +58,15 @@ export async function POST(request: Request) {
     budget_settimanale: profile.budget_settimanale,
   };
 
+  const profileId: string = profile.id;
+  const vecchioRimasto = (pianoAttuale.grocery_list as GroceryList | null)?.rimasto ?? [];
+  const vecchiConsumi = (pianoAttuale.consumi_dispensa as ConsumoDispensa[] | null) ?? [];
+
   let giorniValidati;
   let groceryList;
   let budgetSuperato = false;
+  let nuoviConsumi: ConsumoDispensa[] = [];
+  let dispensaAttuale: Map<string, number> = new Map();
   try {
     const risultato = await modificaPiano(
       profiloInput,
@@ -77,16 +85,26 @@ export async function POST(request: Request) {
       });
     }
 
+    // La dispensa attuale include già l'effetto della versione precedente di
+    // QUESTO piano (consumi/avanzi applicati quando fu generato). Per
+    // ricalcolare la nuova lista della spesa serve la dispensa "vera" di
+    // prima — altrimenti gli avanzi non ancora reali di questa versione
+    // verrebbero trattati come scorte già disponibili.
+    dispensaAttuale = await leggiDispensa(supabase, profileId);
+    const dispensaBase = dispensaSenzaVersione(dispensaAttuale, vecchiConsumi, vecchioRimasto);
+
     const giorniBase = await validaGiorni(profiloInput, risultato.giorni);
     const adattato = await adattaEntroBudget(
       profiloInput,
       giorniBase,
       profile.supermercato,
       profile.budget_settimanale,
+      dispensaBase,
     );
     giorniValidati = adattato.giorni;
     groceryList = adattato.groceryList;
     budgetSuperato = adattato.budgetSuperato;
+    nuoviConsumi = adattato.consumiDispensa;
   } catch (err) {
     console.error("modificaPiano error:", err);
     return NextResponse.json(
@@ -95,11 +113,23 @@ export async function POST(request: Request) {
     );
   }
 
+  await sostituisciConsumiDispensa(
+    supabase,
+    profileId,
+    dispensaAttuale,
+    vecchiConsumi,
+    vecchioRimasto,
+    nuoviConsumi,
+    groceryList.rimasto,
+    pianoAttuale.settimana,
+  );
+
   const { error: updateError } = await supabase
     .from("weekly_plans")
     .update({
       meal_plan: { giorni: giorniValidati },
       grocery_list: groceryList,
+      consumi_dispensa: nuoviConsumi,
       budget_stimato: groceryList.totale_stimato,
     })
     .eq("id", pianoAttuale.id);
