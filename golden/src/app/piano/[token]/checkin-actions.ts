@@ -31,6 +31,7 @@ export async function submitCheckin(
     .select("id")
     .eq("profile_id", profile.id)
     .order("settimana", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 

@@ -127,7 +127,16 @@ const ISTRUZIONI_PREPARAZIONE =
   "Per ogni pasto indica anche il campo preparazione: un array di 3-6 passaggi brevi e chiari, in italiano, " +
   "che spiegano come cucinare il piatto dall'inizio alla fine, scritti per chi ha poca esperienza in cucina.";
 
-export async function generateMealPlan(profilo: ProfiloPerPiano): Promise<MealPlan> {
+const ISTRUZIONE_SCOPERTA =
+  "L'utente ha scelto la modalità 'Scoperta': non vuole il piano più prevedibile e sicuro, vuole provare cose " +
+  "diverse dal solito. Proponi ricette, cucine, tecniche di cottura e ingredienti che normalmente non sceglieresti " +
+  "di default per questo profilo — più varietà rispetto a un piano standard — sempre nel rispetto di restrizioni, " +
+  "preferenze e budget. Evita i piatti più ovvi e ripetitivi per questo tipo di richiesta.";
+
+export async function generateMealPlan(
+  profilo: ProfiloPerPiano,
+  modalita: "routine" | "scoperta" = "routine",
+): Promise<MealPlan> {
   const response = await client.messages.parse({
     model: MODEL,
     max_tokens: 16000,
@@ -136,6 +145,7 @@ export async function generateMealPlan(profilo: ProfiloPerPiano): Promise<MealPl
       "Le restrizioni alimentari sono un vincolo rigido e non negoziabile: non includere MAI, nemmeno in tracce dichiarate, un ingrediente incompatibile con le restrizioni indicate. " +
       "Se è indicato un budget settimanale, è anch'esso un vincolo rigido: il totale stimato della spesa (somma di tutti i prezzo_stimato_eur dell'intero piano) non deve superarlo. " +
       "Rispetta anche obiettivo, preferenze e tempo di preparazione, in questo ordine di priorità, scegliendo ingredienti e porzioni che permettano di rientrare nel budget. " +
+      (modalita === "scoperta" ? ISTRUZIONE_SCOPERTA + " " : "") +
       ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE,
     messages: [
       {

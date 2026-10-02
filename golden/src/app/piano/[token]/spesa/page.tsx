@@ -24,6 +24,7 @@ export default async function SpesaPage({
     .select("settimana, grocery_list")
     .eq("profile_id", profile.id)
     .order("settimana", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 

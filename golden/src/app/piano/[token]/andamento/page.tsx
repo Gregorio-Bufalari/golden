@@ -9,6 +9,7 @@ type CheckinRow = {
 };
 
 type WeeklyPlanRow = {
+  id: string;
   settimana: string;
   budget_stimato: number | null;
   checkins: CheckinRow[];
@@ -24,7 +25,7 @@ export default async function AndamentoPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, budget_settimanale")
+    .select("id")
     .eq("link_token", token)
     .single();
 
@@ -34,19 +35,26 @@ export default async function AndamentoPage({
 
   const { data: piani } = await supabase
     .from("weekly_plans")
-    .select("settimana, budget_stimato, checkins(seguito_piano, spreco, categoria_spreco, spesa_reale, retailer_usato)")
+    .select("id, settimana, budget_stimato, checkins(seguito_piano, spreco, categoria_spreco, spesa_reale, retailer_usato)")
     .eq("profile_id", profile.id)
-    .order("settimana", { ascending: false });
+    .order("settimana", { ascending: false })
+    .order("created_at", { ascending: false });
 
   const settimane = (piani || []) as unknown as WeeklyPlanRow[];
+  // Risparmio = quanto l'app aveva stimato per QUELLA settimana meno quanto hai
+  // dichiarato di aver speso davvero — non il budget fisso impostato una volta
+  // nel profilo, che è solo un vincolo per la generazione, non un termine di
+  // paragone settimanale.
   const checkinsConSpesa = settimane
-    .flatMap((s) => s.checkins.map((c) => ({ ...c, settimana: s.settimana })))
-    .filter((c) => c.spesa_reale !== null);
+    .flatMap((s) => s.checkins.map((c) => ({ ...c, settimana: s.settimana, budget_stimato: s.budget_stimato })))
+    .filter((c) => c.spesa_reale !== null && c.budget_stimato !== null);
 
-  const budgetFisso = profile.budget_settimanale;
   const risparmioCumulativo =
-    budgetFisso !== null
-      ? checkinsConSpesa.reduce((sum, c) => sum + (budgetFisso - (c.spesa_reale as number)), 0)
+    checkinsConSpesa.length > 0
+      ? checkinsConSpesa.reduce(
+          (sum, c) => sum + ((c.budget_stimato as number) - (c.spesa_reale as number)),
+          0,
+        )
       : null;
 
   const checkinsTotali = settimane.flatMap((s) => s.checkins);
@@ -98,7 +106,7 @@ export default async function AndamentoPage({
 
       <div className="mt-8 w-full max-w-2xl">
         <h2 className="mb-3 text-left text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-          Spesa stimata vs budget, settimana per settimana
+          Spesa stimata vs reale, settimana per settimana
         </h2>
         {settimane.length === 0 ? (
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -110,7 +118,7 @@ export default async function AndamentoPage({
               const checkin = s.checkins[0];
               return (
                 <li
-                  key={s.settimana}
+                  key={s.id}
                   className="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-2.5 text-sm dark:border-zinc-800"
                 >
                   <span className="text-zinc-600 dark:text-zinc-400">

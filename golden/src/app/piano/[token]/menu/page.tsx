@@ -33,6 +33,7 @@ export default async function MenuPage({
     .select("settimana, meal_plan, budget_stimato")
     .eq("profile_id", profile.id)
     .order("settimana", { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
