@@ -3,6 +3,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { modificaPiano, type ProfiloPerPiano, type Giorno } from "@/lib/claude";
 import { validaGiorni, adattaEntroBudget } from "@/lib/piano-validazione";
 
+// Vedi la stessa impostazione in /api/piano/generate: più chiamate a Claude
+// in sequenza possono superare il limite di default di Vercel.
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   const { token, messaggio } = await request.json();
 

@@ -4,7 +4,7 @@ import { ingredientiARischio } from "./glutine-check";
 import { buildGroceryList, type GroceryList, type ConsumoDispensa } from "./grocery";
 
 const MAX_RIGENERAZIONI = 2;
-const MAX_TENTATIVI_BUDGET = 3;
+const MAX_TENTATIVI_BUDGET = 2;
 
 export type PastoValidato = Pasto & {
   verificare?: boolean;
@@ -16,46 +16,54 @@ export type GiornoValidato = {
   pasti: PastoValidato[];
 };
 
+/**
+ * Controlla ogni pasto per ingredienti a rischio glutine e rigenera quelli
+ * sospetti. Le rigenerazioni di un singolo giro vengono lanciate in
+ * parallelo (non un pasto alla volta in sequenza) per restare entro i
+ * tempi di esecuzione della funzione su Vercel: con più pasti a rischio
+ * contemporaneamente, farli uno alla volta moltiplicava i tempi di attesa.
+ */
 export async function validaGiorni(
   profilo: ProfiloPerPiano,
   giorni: Giorno[],
 ): Promise<GiornoValidato[]> {
   const richiedeControlloGlutine = profilo.restrizioni?.includes("Glutine (celiachia)");
-  const giorniValidati: GiornoValidato[] = [];
+  const pasti: PastoValidato[][] = giorni.map((g) => [...g.pasti]);
 
-  for (const giorno of giorni) {
-    const pastiValidati: PastoValidato[] = [];
-
-    for (const pasto of giorno.pasti) {
-      let pastoCorrente: PastoValidato = pasto;
-
-      if (richiedeControlloGlutine) {
-        let rischi = ingredientiARischio(pastoCorrente.ingredienti.map((i) => i.nome));
-        let tentativi = 0;
-
-        while (rischi.length > 0 && tentativi < MAX_RIGENERAZIONI) {
-          tentativi += 1;
-          try {
-            pastoCorrente = await regeneratePasto(profilo, giorno.giorno, pastoCorrente, rischi);
-            rischi = ingredientiARischio(pastoCorrente.ingredienti.map((i) => i.nome));
-          } catch (err) {
-            console.error("regeneratePasto error:", err);
-            break;
-          }
-        }
-
-        if (rischi.length > 0) {
-          pastoCorrente = { ...pastoCorrente, verificare: true, ingredienti_a_rischio: rischi };
+  if (richiedeControlloGlutine) {
+    for (let tentativo = 0; tentativo < MAX_RIGENERAZIONI; tentativo++) {
+      const daRigenerare: { gi: number; pi: number; rischi: string[] }[] = [];
+      for (let gi = 0; gi < pasti.length; gi++) {
+        for (let pi = 0; pi < pasti[gi].length; pi++) {
+          const rischi = ingredientiARischio(pasti[gi][pi].ingredienti.map((i) => i.nome));
+          if (rischi.length > 0) daRigenerare.push({ gi, pi, rischi });
         }
       }
 
-      pastiValidati.push(pastoCorrente);
+      if (daRigenerare.length === 0) break;
+
+      await Promise.all(
+        daRigenerare.map(async ({ gi, pi, rischi }) => {
+          try {
+            pasti[gi][pi] = await regeneratePasto(profilo, giorni[gi].giorno, pasti[gi][pi], rischi);
+          } catch (err) {
+            console.error("regeneratePasto error:", err);
+          }
+        }),
+      );
     }
 
-    giorniValidati.push({ giorno: giorno.giorno, pasti: pastiValidati });
+    for (let gi = 0; gi < pasti.length; gi++) {
+      for (let pi = 0; pi < pasti[gi].length; pi++) {
+        const rischi = ingredientiARischio(pasti[gi][pi].ingredienti.map((i) => i.nome));
+        if (rischi.length > 0) {
+          pasti[gi][pi] = { ...pasti[gi][pi], verificare: true, ingredienti_a_rischio: rischi };
+        }
+      }
+    }
   }
 
-  return giorniValidati;
+  return giorni.map((g, gi) => ({ giorno: g.giorno, pasti: pasti[gi] }));
 }
 
 export async function adattaEntroBudget(
