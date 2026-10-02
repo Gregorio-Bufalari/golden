@@ -22,6 +22,7 @@ const IngredienteSchema = z.object({
   quantita: z.number(),
   unita: z.enum(["g", "kg", "ml", "l", "pz", "confezione"]),
   reparto: z.enum(REPARTI),
+  prezzo_stimato_eur: z.number(),
 });
 
 const PastoSchema = z.object({
@@ -80,7 +81,12 @@ const ISTRUZIONI_INGREDIENTI =
   "Per ogni ingrediente indica: nome (semplice, in italiano), quantità (numero) e unità " +
   '("g", "kg", "ml", "l", "pz" per i pezzi interi come uova o confezioni standard, "confezione" per prodotti confezionati), ' +
   "scalata per il numero di persone indicato. Indica anche il reparto del supermercato a cui appartiene " +
-  `(uno tra: ${REPARTI.join(", ")}).`;
+  `(uno tra: ${REPARTI.join(", ")}). ` +
+  "Indica infine prezzo_stimato_eur: il prezzo realistico in euro per QUELLA quantità specifica di QUEL " +
+  "preciso ingrediente, basato sui prezzi medi reali dei supermercati italiani (fascia media, es. Conad/Coop) — " +
+  "non un prezzo medio di reparto. Ogni ingrediente ha un prezzo diverso: es. 150g di merluzzo e 150g di piselli " +
+  "surgelati NON costano uguale anche se stanno entrambi nei surgelati; il salmone costa più del pollo; il parmigiano " +
+  "più della mozzarella. Stima con buon senso in base al tipo di prodotto specifico, fresco o surgelato, standard o pregiato.";
 
 export async function generateMealPlan(profilo: ProfiloPerPiano): Promise<MealPlan> {
   const response = await client.messages.parse({
