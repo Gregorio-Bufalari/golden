@@ -9,7 +9,7 @@ import type { GroceryList } from "@/lib/grocery";
 // (generazione, eventuali rigenerazioni per il glutine, adattamento al
 // budget): il limite di default di Vercel per una funzione serverless è
 // troppo basso e interromperebbe la richiesta a metà.
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 function mondayOfThisWeek(d = new Date()): string {
   const day = d.getDay();
