@@ -87,6 +87,8 @@ export function MenuView({
   const [erroreModifica, setErroreModifica] = useState<string | null>(null);
   const [rifiutoModifica, setRifiutoModifica] = useState<string | null>(null);
   const [nutrienteInCorso, setNutrienteInCorso] = useState<string | null>(null);
+  const [pastoInCorso, setPastoInCorso] = useState<string | null>(null);
+  const azioneInCorso = Boolean(nutrienteInCorso) || Boolean(pastoInCorso) || modificando;
 
   const [pastoEspanso, setPastoEspanso] = useState<string | null>(null);
 
@@ -187,7 +189,7 @@ export function MenuView({
   }
 
   async function handleModifica() {
-    if (!messaggio.trim()) return;
+    if (!messaggio.trim() || azioneInCorso) return;
     setModificando(true);
     const ok = await applicaModifica(messaggio);
     if (ok) setMessaggio("");
@@ -195,7 +197,7 @@ export function MenuView({
   }
 
   async function handleAzioneNutriente(n: ConfrontoNutriente, direzione: "Aumenta" | "Riduci") {
-    if (nutrienteInCorso) return;
+    if (azioneInCorso) return;
     setNutrienteInCorso(n.chiave);
     const verboAzione = direzione === "Aumenta" ? "Aumentalo" : "Riducilo";
     await applicaModifica(
@@ -205,6 +207,19 @@ export function MenuView({
         "mantenendo le restrizioni e senza stravolgere il resto del piano più del necessario.",
     );
     setNutrienteInCorso(null);
+  }
+
+  // Riusa lo stesso motore di modifica in linguaggio naturale: il nuovo
+  // piatto passa sempre da validaGiorni (controllo glutine) e dal
+  // ricalcolo di lista della spesa e Frigo, esattamente come ogni altra
+  // modifica — nessun percorso separato.
+  async function handlePastoDiverso(giorno: Giorno, pasto: Pasto, chiave: string) {
+    if (azioneInCorso) return;
+    setPastoInCorso(chiave);
+    await applicaModifica(
+      `Proponi un piatto diverso per ${giorno.giorno} ${pasto.tipo}, stesse restrizioni e preferenze.`,
+    );
+    setPastoInCorso(null);
   }
 
   return (
@@ -310,6 +325,16 @@ export function MenuView({
                             {pasto.nutrizione.fibre_g}g fibre
                           </p>
                         )}
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <button
+                            onClick={() => handlePastoDiverso(giorno, pasto, chiave)}
+                            disabled={azioneInCorso}
+                            className="rounded-full border border-zinc-300 px-2 py-0.5 text-[11px] font-medium text-zinc-500 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-400"
+                          >
+                            Proponine un altro
+                          </button>
+                          {pastoInCorso === chiave && <Spinner className="h-3.5 w-3.5 text-zinc-400" />}
+                        </div>
                         {espanso && haPreparazione && (
                           <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5 text-sm text-zinc-600 dark:text-zinc-400">
                             {pasto.preparazione?.map((passo, j) => (
@@ -369,7 +394,7 @@ export function MenuView({
                       {n.fascia === "bassa" && (
                         <button
                           onClick={() => handleAzioneNutriente(n, "Aumenta")}
-                          disabled={Boolean(nutrienteInCorso) || modificando}
+                          disabled={azioneInCorso}
                           aria-label={`Aumenta ${n.etichetta.toLowerCase()}`}
                           className="flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300 disabled:opacity-40 dark:border-zinc-700"
                         >
@@ -379,7 +404,7 @@ export function MenuView({
                       {n.fascia === "alta" && (
                         <button
                           onClick={() => handleAzioneNutriente(n, "Riduci")}
-                          disabled={Boolean(nutrienteInCorso) || modificando}
+                          disabled={azioneInCorso}
                           aria-label={`Riduci ${n.etichetta.toLowerCase()}`}
                           className="flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300 disabled:opacity-40 dark:border-zinc-700"
                         >
@@ -422,7 +447,7 @@ export function MenuView({
             )}
             <button
               onClick={handleModifica}
-              disabled={modificando || !messaggio.trim() || Boolean(nutrienteInCorso)}
+              disabled={!messaggio.trim() || azioneInCorso}
               className="mt-3 flex items-center gap-2 rounded-full bg-black px-5 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black"
             >
               {modificando && <Spinner className="h-4 w-4" />}
