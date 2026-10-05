@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Spinner } from "@/components/spinner";
 import { setAcquistato } from "./spesa/actions";
+import { gruppoAcquisto, type GruppoAcquisto } from "@/lib/conservazione";
 
 type GroceryItem = {
   nome: string;
@@ -50,6 +51,73 @@ function formatRigaLista(item: GroceryItem): string {
     return `${item.nome} — ${formatQuantita(item.quantitaNecessaria, item.unita)} necessari (confezione ${formatQuantita(item.confezione, item.unita)}, avanzano ${formatQuantita(avanzo, item.unita)})`;
   }
   return `${item.nome} — ${formatQuantita(item.quantita, item.unita)}`;
+}
+
+// Stessa classificazione di conservazione già usata nella tab Frigo
+// (src/lib/conservazione.ts), riusata qui solo per raggruppare la lista
+// per urgenza d'acquisto — nessuna nuova logica, nessuna AI coinvolta.
+function filtraPerGruppo(reparti: GroceryReparto[], gruppo: GruppoAcquisto): GroceryReparto[] {
+  return reparti
+    .map((r) => ({ ...r, items: r.items.filter((i) => gruppoAcquisto(i.nome) === gruppo) }))
+    .filter((r) => r.items.length > 0);
+}
+
+function sommaPrezzi(reparti: GroceryReparto[]): number {
+  return reparti.flatMap((r) => r.items).reduce((somma, i) => somma + i.prezzo_stimato, 0);
+}
+
+function renderSezione(
+  titolo: string,
+  sottotitolo: string,
+  reparti: GroceryReparto[],
+  statoAcquisti: Record<string, boolean>,
+  onToggle: (nome: string) => void,
+) {
+  if (reparti.length === 0) return null;
+
+  return (
+    <div className="mb-6 last:mb-0">
+      <div className="mb-2">
+        <h4 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">{titolo}</h4>
+        <p className="text-xs text-zinc-400">
+          {sottotitolo} — ~€{sommaPrezzi(reparti).toFixed(2)}
+        </p>
+      </div>
+      <div className="flex flex-col gap-4">
+        {reparti.map((reparto) => (
+          <div key={reparto.reparto}>
+            <h5 className="mb-1 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+              {reparto.reparto}
+            </h5>
+            <ul className="flex flex-col gap-1">
+              {reparto.items.map((item) => {
+                const acquistato = Boolean(statoAcquisti[item.nome]);
+                return (
+                  <li
+                    key={item.nome}
+                    className="flex items-center justify-between gap-3 text-sm text-zinc-600 dark:text-zinc-400"
+                  >
+                    <label className="flex min-w-0 cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={acquistato}
+                        onChange={() => onToggle(item.nome)}
+                        className="h-4 w-4 shrink-0 print:hidden"
+                      />
+                      <span className={acquistato ? "text-zinc-400 line-through dark:text-zinc-600" : ""}>
+                        {formatRigaLista(item)}
+                      </span>
+                    </label>
+                    <span className="shrink-0 text-zinc-400">~€{item.prezzo_stimato.toFixed(2)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // Incremento tipico per click, diverso per unità di misura.
@@ -203,39 +271,20 @@ export function GroceryList({
         </div>
       )}
 
-      <div className="flex flex-col gap-4">
-        {data.reparti.map((reparto) => (
-          <div key={reparto.reparto}>
-            <h4 className="mb-1 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-              {reparto.reparto}
-            </h4>
-            <ul className="flex flex-col gap-1">
-              {reparto.items.map((item) => {
-                const acquistato = Boolean(statoAcquisti[item.nome]);
-                return (
-                  <li
-                    key={item.nome}
-                    className="flex items-center justify-between gap-3 text-sm text-zinc-600 dark:text-zinc-400"
-                  >
-                    <label className="flex min-w-0 cursor-pointer items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={acquistato}
-                        onChange={() => handleToggleAcquistato(item.nome)}
-                        className="h-4 w-4 shrink-0 print:hidden"
-                      />
-                      <span className={acquistato ? "text-zinc-400 line-through dark:text-zinc-600" : ""}>
-                        {formatRigaLista(item)}
-                      </span>
-                    </label>
-                    <span className="shrink-0 text-zinc-400">~€{item.prezzo_stimato.toFixed(2)}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </div>
+      {renderSezione(
+        "Da comprare subito",
+        "Freschi deperibili — frutta, verdura, carne, pesce, latticini",
+        filtraPerGruppo(data.reparti, "subito"),
+        statoAcquisti,
+        handleToggleAcquistato,
+      )}
+      {renderSezione(
+        "Può aspettare",
+        "Dispensa secca e surgelati — si conservano più a lungo",
+        filtraPerGruppo(data.reparti, "puo_aspettare"),
+        statoAcquisti,
+        handleToggleAcquistato,
+      )}
 
       <div className="mt-4 flex items-center justify-between border-t border-zinc-200 pt-3 text-sm font-medium dark:border-zinc-800">
         <span>Totale stimato</span>
