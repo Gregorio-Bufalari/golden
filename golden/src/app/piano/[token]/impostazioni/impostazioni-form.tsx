@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { updateProfilo } from "./actions";
 import { Spinner } from "@/components/spinner";
+import { inputClass, labelClass, checkboxClass, optionRowClass, Pill } from "@/components/form-kit";
 import {
   RESTRIZIONI_OPTIONS,
   OBIETTIVO_OPTIONS,
@@ -30,33 +31,6 @@ type ProfileData = {
 
 function toggleInArray(list: string[], value: string): string[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
-}
-
-const inputClass =
-  "w-full rounded-[10px] bg-panel px-4 py-3 text-sm text-ink placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-accent/40";
-const labelClass = "mb-2 block text-sm font-medium text-ink/75";
-const checkboxClass = "h-5 w-5 accent-accent";
-
-function Pill({
-  label,
-  selected,
-  onClick,
-}: {
-  label: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`min-h-11 rounded-full px-4 text-sm font-semibold ${
-        selected ? "bg-accent text-accent-fill-text" : "border border-ink/20 text-ink"
-      }`}
-    >
-      {label}
-    </button>
-  );
 }
 
 export function ImpostazioniForm({ token, profile }: { token: string; profile: ProfileData }) {
@@ -136,7 +110,7 @@ export function ImpostazioniForm({ token, profile }: { token: string; profile: P
         <label className={labelClass}>Restrizioni alimentari</label>
         <div className="flex flex-col gap-1.5">
           {RESTRIZIONI_OPTIONS.map((opt) => (
-            <label key={opt} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[10px] bg-panel px-4 text-sm text-ink">
+            <label key={opt} className={optionRowClass}>
               <input
                 type="checkbox"
                 checked={restrizioni.includes(opt)}
@@ -164,7 +138,7 @@ export function ImpostazioniForm({ token, profile }: { token: string; profile: P
         <label className={labelClass}>Obiettivo</label>
         <div className="flex flex-col gap-1.5">
           {OBIETTIVO_OPTIONS.map((opt) => (
-            <label key={opt} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[10px] bg-panel px-4 text-sm text-ink">
+            <label key={opt} className={optionRowClass}>
               <input
                 type="radio"
                 name="obiettivo"
@@ -201,7 +175,7 @@ export function ImpostazioniForm({ token, profile }: { token: string; profile: P
         <label className={labelClass}>Tempo massimo per cucinare</label>
         <div className="flex flex-col gap-1.5">
           {TEMPO_OPTIONS.map((opt) => (
-            <label key={opt.value} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[10px] bg-panel px-4 text-sm text-ink">
+            <label key={opt.value} className={optionRowClass}>
               <input
                 type="radio"
                 name="tempo"
@@ -294,7 +268,7 @@ export function ImpostazioniForm({ token, profile }: { token: string; profile: P
             <label className={labelClass}>Livello di attività fisica</label>
             <div className="flex flex-col gap-1.5">
               {LIVELLO_ATTIVITA_OPTIONS.map((opt) => (
-                <label key={opt.value} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[10px] bg-panel px-4 text-sm text-ink">
+                <label key={opt.value} className={optionRowClass}>
                   <input
                     type="radio"
                     name="livello_attivita"
