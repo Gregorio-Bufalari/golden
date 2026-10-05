@@ -29,6 +29,18 @@ const CATEGORIE_BASE: { keywords: string[]; categoria: Categoria }[] = [
     categoria: "fresco",
   },
   {
+    // Frutta e verdura fresca: mai arrotondata a confezione (si vende
+    // sfusa), quindi non compare mai nel Frigo — ma compare nella lista
+    // della spesa, dove questa categoria va riconosciuta comunque.
+    keywords: [
+      "pomodor", "zucchin", "insalata", "lattuga", "carot", "cipoll", "aglio",
+      "peperon", "melanzan", "patat", "broccol", "cavol", "finocchi", "sedano",
+      "cetriol", "rucola", "mela", "mele", "banana", "arancia", "pera", "limone",
+      "fragol", "uva", "kiwi", "avocado", "lime", "basilico", "prezzemolo", "funghi",
+    ],
+    categoria: "fresco",
+  },
+  {
     keywords: ["gamber", "piselli", "spinaci", "fagiolini", "mais", "verdure miste", "minestrone"],
     categoria: "surgelato",
   },
@@ -42,14 +54,36 @@ const CATEGORIE_BASE: { keywords: string[]; categoria: Categoria }[] = [
   },
 ];
 
-export function conservazioneTipica(nomeIngrediente: string): string {
+/** Categoria di conservazione riconosciuta, o null se l'ingrediente non è in nessuna lista. */
+export function categoriaConservazione(nomeIngrediente: string): Categoria | null {
   const lower = nomeIngrediente.toLowerCase();
 
   const stato = INDICATORI_STATO.find((c) => c.keywords.some((k) => lower.includes(k)));
-  if (stato) return TESTO_PER_CATEGORIA[stato.categoria];
+  if (stato) return stato.categoria;
 
   const base = CATEGORIE_BASE.find((c) => c.keywords.some((k) => lower.includes(k)));
-  if (base) return TESTO_PER_CATEGORIA[base.categoria];
+  if (base) return base.categoria;
 
+  return null;
+}
+
+export function conservazioneTipica(nomeIngrediente: string): string {
+  const categoria = categoriaConservazione(nomeIngrediente);
+  if (categoria) return TESTO_PER_CATEGORIA[categoria];
   return "Controlla la data di scadenza sulla confezione";
+}
+
+export type GruppoAcquisto = "subito" | "puo_aspettare";
+
+/**
+ * Raggruppa un ingrediente per urgenza d'acquisto, riusando la stessa
+ * classificazione di conservazione della tab Frigo: freschi deperibili e
+ * latticini/uova "da comprare subito"; surgelati, dispensa secca e
+ * ingredienti non riconosciuti (di solito spezie/condimenti da dispensa)
+ * "può aspettare".
+ */
+export function gruppoAcquisto(nomeIngrediente: string): GruppoAcquisto {
+  const categoria = categoriaConservazione(nomeIngrediente);
+  if (categoria === "fresco" || categoria === "frigo_aperto") return "subito";
+  return "puo_aspettare";
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { conservazioneTipica } from "./conservazione";
+import { conservazioneTipica, categoriaConservazione, gruppoAcquisto } from "./conservazione";
 
 describe("conservazioneTipica", () => {
   it("riconosce gli alimenti freschi deperibili", () => {
@@ -45,5 +45,41 @@ describe("conservazioneTipica", () => {
 
   it("non è sensibile a maiuscole/minuscole", () => {
     expect(conservazioneTipica("POLLO")).toMatch(/fresco deperibile/i);
+  });
+
+  it("riconosce la frutta e verdura fresca, che non compare mai nel Frigo ma compare nella Spesa", () => {
+    expect(conservazioneTipica("Pomodoro")).toMatch(/fresco deperibile/i);
+    expect(conservazioneTipica("Zucchine")).toMatch(/fresco deperibile/i);
+    expect(conservazioneTipica("Insalata mista")).toMatch(/fresco deperibile/i);
+  });
+});
+
+describe("categoriaConservazione", () => {
+  it("restituisce null per un ingrediente non riconosciuto", () => {
+    expect(categoriaConservazione("Cumino senza glutine")).toBeNull();
+  });
+
+  it("restituisce la categoria grezza (non il testo) per un ingrediente riconosciuto", () => {
+    expect(categoriaConservazione("Pollo")).toBe("fresco");
+    expect(categoriaConservazione("Riso")).toBe("dispensa");
+  });
+});
+
+describe("gruppoAcquisto", () => {
+  it("mette i freschi deperibili e i prodotti da frigo aperto in 'subito'", () => {
+    expect(gruppoAcquisto("Petto di pollo")).toBe("subito");
+    expect(gruppoAcquisto("Pomodoro")).toBe("subito");
+    expect(gruppoAcquisto("Mozzarella")).toBe("subito");
+    expect(gruppoAcquisto("Uova")).toBe("subito");
+  });
+
+  it("mette surgelati e dispensa secca in 'puo_aspettare'", () => {
+    expect(gruppoAcquisto("Spinaci surgelati")).toBe("puo_aspettare");
+    expect(gruppoAcquisto("Pasta")).toBe("puo_aspettare");
+    expect(gruppoAcquisto("Riso")).toBe("puo_aspettare");
+  });
+
+  it("un ingrediente non riconosciuto va in 'puo_aspettare' per difetto (di solito è una spezia da dispensa)", () => {
+    expect(gruppoAcquisto("Cumino senza glutine")).toBe("puo_aspettare");
   });
 });
