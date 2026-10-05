@@ -7,6 +7,7 @@ import { Spinner } from "@/components/spinner";
 import {
   calcolaRiferimentoLARN,
   confrontaConLARN,
+  sommaNutrizioneSettimanale,
   DISCLAIMER_LARN,
   type DatiBiometrici,
   type ConfrontoNutriente,
@@ -95,18 +96,7 @@ export function MenuView({
   const confrontoLARN = useMemo(() => {
     if (!giorni || !datiBiometrici) return null;
 
-    const totali = { calorie: 0, proteine_g: 0, carboidrati_g: 0, grassi_g: 0, fibre_g: 0 };
-    for (const giorno of giorni) {
-      for (const pasto of giorno.pasti) {
-        if (!pasto.nutrizione) continue;
-        totali.calorie += pasto.nutrizione.calorie ?? 0;
-        totali.proteine_g += pasto.nutrizione.proteine_g ?? 0;
-        totali.carboidrati_g += pasto.nutrizione.carboidrati_g ?? 0;
-        totali.grassi_g += pasto.nutrizione.grassi_g ?? 0;
-        totali.fibre_g += pasto.nutrizione.fibre_g ?? 0;
-      }
-    }
-
+    const totali = sommaNutrizioneSettimanale(giorni);
     const riferimento = calcolaRiferimentoLARN(datiBiometrici);
     return confrontaConLARN(totali, riferimento);
   }, [giorni, datiBiometrici]);

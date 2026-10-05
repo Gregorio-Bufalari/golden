@@ -27,6 +27,31 @@ export type Fascia = "bassa" | "media" | "alta";
 export const DISCLAIMER_LARN =
   "Stima indicativa basata su valori di riferimento generali (LARN). Non sostituisce il parere di un professionista.";
 
+type GiornoConNutrizione = {
+  pasti: { nutrizione?: TotaliNutrizionali | null }[];
+};
+
+/**
+ * Somma la nutrizione di tutti i pasti del piano (7 giorni x pranzo/cena)
+ * nei totali settimanali, da confrontare poi con confrontaConLARN. Pasti
+ * senza il campo nutrizione (non dovrebbe succedere, ma lo schema lo rende
+ * tecnicamente opzionale) vengono semplicemente ignorati nella somma.
+ */
+export function sommaNutrizioneSettimanale(giorni: GiornoConNutrizione[]): TotaliNutrizionali {
+  const totali: TotaliNutrizionali = { calorie: 0, proteine_g: 0, carboidrati_g: 0, grassi_g: 0, fibre_g: 0 };
+  for (const giorno of giorni) {
+    for (const pasto of giorno.pasti) {
+      if (!pasto.nutrizione) continue;
+      totali.calorie += pasto.nutrizione.calorie ?? 0;
+      totali.proteine_g += pasto.nutrizione.proteine_g ?? 0;
+      totali.carboidrati_g += pasto.nutrizione.carboidrati_g ?? 0;
+      totali.grassi_g += pasto.nutrizione.grassi_g ?? 0;
+      totali.fibre_g += pasto.nutrizione.fibre_g ?? 0;
+    }
+  }
+  return totali;
+}
+
 // Fattore di attività fisica (PAL) applicato al metabolismo basale.
 const PAL_PER_LIVELLO: Record<DatiBiometrici["livello_attivita"], number> = {
   sedentario: 1.3,
