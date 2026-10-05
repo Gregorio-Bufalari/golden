@@ -66,12 +66,37 @@ function sommaPrezzi(reparti: GroceryReparto[]): number {
   return reparti.flatMap((r) => r.items).reduce((somma, i) => somma + i.prezzo_stimato, 0);
 }
 
+/**
+ * Messaggio da mostrare dopo una sostituzione: confronta i nomi presenti
+ * nella lista prima e dopo la modifica. Pura funzione di confronto, nessuna
+ * chiamata esterna — il cambiamento vero lo decide sempre l'AI a monte.
+ */
+export function riepilogoSostituzione(
+  vecchiReparti: GroceryReparto[],
+  nuoviReparti: GroceryReparto[],
+  prodotto: string,
+): string {
+  const vecchiNomi = new Set(vecchiReparti.flatMap((r) => r.items.map((i) => i.nome)));
+  const nuoviNomi = new Set(nuoviReparti.flatMap((r) => r.items.map((i) => i.nome)));
+  const aggiunti = [...nuoviNomi].filter((n) => !vecchiNomi.has(n));
+
+  if (aggiunti.length > 0) {
+    return `${prodotto} sostituito con: ${aggiunti.join(", ")}.`;
+  }
+  if (!nuoviNomi.has(prodotto)) {
+    return `${prodotto} non è più nella lista — il piano è stato aggiornato.`;
+  }
+  return `Il piano è stato aggiornato per ${prodotto}.`;
+}
+
 function renderSezione(
   titolo: string,
   sottotitolo: string,
   reparti: GroceryReparto[],
   statoAcquisti: Record<string, boolean>,
   onToggle: (nome: string) => void,
+  itemInCorso: string | null,
+  onNonTrovato: (item: GroceryItem) => void,
 ) {
   if (reparti.length === 0) return null;
 
@@ -92,6 +117,8 @@ function renderSezione(
             <ul className="flex flex-col gap-1">
               {reparto.items.map((item) => {
                 const acquistato = Boolean(statoAcquisti[item.nome]);
+                const chiave = `sostituisci__${item.nome}`;
+                const caricando = itemInCorso === chiave;
                 return (
                   <li
                     key={item.nome}
@@ -108,7 +135,17 @@ function renderSezione(
                         {formatRigaLista(item)}
                       </span>
                     </label>
-                    <span className="shrink-0 text-zinc-400">~€{item.prezzo_stimato.toFixed(2)}</span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <button
+                        onClick={() => onNonTrovato(item)}
+                        disabled={Boolean(itemInCorso)}
+                        className="rounded-full border border-zinc-300 px-2 py-0.5 text-[11px] font-medium text-zinc-500 disabled:opacity-40 print:hidden dark:border-zinc-700 dark:text-zinc-400"
+                      >
+                        Non l&apos;ho trovato
+                      </button>
+                      {caricando && <Spinner className="h-3.5 w-3.5 text-zinc-400 print:hidden" />}
+                      <span className="text-zinc-400">~€{item.prezzo_stimato.toFixed(2)}</span>
+                    </span>
                   </li>
                 );
               })}
@@ -172,6 +209,7 @@ export function GroceryList({
   const [itemInCorso, setItemInCorso] = useState<string | null>(null);
   const [errore, setErrore] = useState<string | null>(null);
   const [rifiuto, setRifiuto] = useState<string | null>(null);
+  const [sostituzioneInfo, setSostituzioneInfo] = useState<string | null>(null);
   const [statoAcquisti, setStatoAcquisti] = useState<Record<string, boolean>>(initialStatoAcquisti);
 
   // Nessuna AI coinvolta: salva subito su Supabase, con aggiornamento
@@ -233,6 +271,50 @@ export function GroceryList({
     }
   }
 
+  // Riusa lo stesso motore di modifica in linguaggio naturale delle altre
+  // azioni: passa sempre dalla validazione sicurezza (restrizioni, rischio
+  // glutine) prima di aggiornare la lista.
+  async function handleNonTrovato(item: GroceryItem) {
+    const chiave = `sostituisci__${item.nome}`;
+    if (itemInCorso) return;
+
+    setItemInCorso(chiave);
+    setErrore(null);
+    setRifiuto(null);
+    setSostituzioneInfo(null);
+
+    try {
+      const res = await fetch("/api/piano/modifica", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          messaggio: `Sostituisci ${item.nome} con un'alternativa sicura e simile.`,
+        }),
+      });
+      const result = await res.json();
+
+      if (!res.ok) {
+        setErrore(result.error || "Qualcosa è andato storto.");
+        return;
+      }
+
+      if (result.modifica_applicata === false) {
+        setRifiuto(result.motivo_rifiuto);
+        return;
+      }
+
+      if (result.grocery_list) {
+        setSostituzioneInfo(riepilogoSostituzione(data.reparti, result.grocery_list.reparti, item.nome));
+        setData(result.grocery_list);
+      }
+    } catch {
+      setErrore("Qualcosa è andato storto. Riprova.");
+    } finally {
+      setItemInCorso(null);
+    }
+  }
+
   function handleWhatsApp() {
     const testo = buildTestoWhatsApp(data, settimana);
     window.open(`https://wa.me/?text=${encodeURIComponent(testo)}`, "_blank");
@@ -270,6 +352,11 @@ export function GroceryList({
           {rifiuto}
         </div>
       )}
+      {sostituzioneInfo && (
+        <div className="mb-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 print:hidden dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+          {sostituzioneInfo}
+        </div>
+      )}
 
       {renderSezione(
         "Da comprare subito",
@@ -277,6 +364,8 @@ export function GroceryList({
         filtraPerGruppo(data.reparti, "subito"),
         statoAcquisti,
         handleToggleAcquistato,
+        itemInCorso,
+        handleNonTrovato,
       )}
       {renderSezione(
         "Può aspettare",
@@ -284,6 +373,8 @@ export function GroceryList({
         filtraPerGruppo(data.reparti, "puo_aspettare"),
         statoAcquisti,
         handleToggleAcquistato,
+        itemInCorso,
+        handleNonTrovato,
       )}
 
       <div className="mt-4 flex items-center justify-between border-t border-zinc-200 pt-3 text-sm font-medium dark:border-zinc-800">
