@@ -46,10 +46,6 @@ type Giorno = {
   pasti: Pasto[];
 };
 
-function prezzoPasto(pasto: Pasto): number {
-  return pasto.ingredienti.reduce((somma, i) => somma + i.prezzo_stimato_eur, 0);
-}
-
 function ChevronIcon({ aperto }: { aperto: boolean }) {
   return (
     <svg
@@ -324,8 +320,6 @@ export function MenuView({
                                 {pasto.ingredienti.map((ing) => ing.nome).join(", ")}
                               </p>
                               <div className="mt-3.5 flex items-center gap-2 font-mono text-sm text-ink/75">
-                                <span>€{prezzoPasto(pasto).toFixed(2)}</span>
-                                <span className="text-ink/35">·</span>
                                 <span>{pasto.nutrizione.calorie} kcal</span>
                                 {haPreparazione && (
                                   <span className="ml-auto flex items-center gap-1 font-sans text-xs font-medium text-accent">
@@ -346,11 +340,14 @@ export function MenuView({
                           </div>
 
                           {espanso && haPreparazione && (
-                            <ol className="flex list-decimal flex-col gap-1 rounded-[14px] bg-panel px-5 py-4 pl-9 text-sm text-ink/80">
-                              {pasto.preparazione?.map((passo, j) => (
-                                <li key={j}>{passo}</li>
-                              ))}
-                            </ol>
+                            <div className="flex items-stretch gap-2">
+                              <ol className="flex flex-1 list-decimal flex-col gap-1 rounded-[14px] bg-panel px-5 py-4 pl-9 text-sm text-ink/80">
+                                {pasto.preparazione?.map((passo, j) => (
+                                  <li key={j}>{passo}</li>
+                                ))}
+                              </ol>
+                              <div className="w-11 shrink-0" aria-hidden="true" />
+                            </div>
                           )}
 
                           {pasto.verificare && (
