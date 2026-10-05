@@ -37,6 +37,12 @@ create table if not exists weekly_plans (
   settimana date not null,
   meal_plan jsonb,
   grocery_list jsonb,
+  -- Consumi dalla dispensa applicati da QUESTA versione del piano (oltre a
+  -- grocery_list.rimasto) — serve a "annullare e rifare" correttamente
+  -- l'effetto sulla dispensa quando il piano viene modificato più volte
+  -- nella stessa settimana (vedi src/lib/dispensa.ts). Null se questa
+  -- versione non ha applicato nulla alla dispensa (es. riuso in routine).
+  consumi_dispensa jsonb,
   budget_stimato numeric(10, 2),
   modalita_usata text check (modalita_usata in ('routine', 'scoperta')),
   created_at timestamptz not null default now()
