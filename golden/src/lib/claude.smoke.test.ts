@@ -15,6 +15,7 @@ import {
   type Pasto,
 } from "./claude";
 import { ingredientiARischio } from "./glutine-check";
+import { validaGiorni } from "./piano-validazione";
 import { creaPianoEsempio } from "@/test/fixtures/piano-esempio";
 
 const haChiaveApi = Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
@@ -106,6 +107,40 @@ describe.skipIf(!haChiaveApi)("Smoke test — API Anthropic reale", () => {
 
       const rischi = ingredientiARischio(nuovoPasto.ingredienti.map((i) => i.nome));
       expect(rischi).toEqual([]);
+    },
+    30_000,
+  );
+
+  it(
+    // Stessa pipeline del pulsante "Non l'ho trovato" nella lista della
+    // spesa: modificaPiano per sostituire l'ingrediente, poi validaGiorni
+    // (sempre, come fa /api/piano/modifica) a garanzia che il sostituto
+    // proposto dall'AI non reintroduca un rischio glutine non segnalato.
+    "\"Non l'ho trovato\": sostituire un ingrediente a rischio (Pasta) passa comunque dalla validazione glutine",
+    async () => {
+      const pianoConRischio = creaPianoEsempio();
+      const risultato = await modificaPiano(
+        profiloCeliaco,
+        pianoConRischio,
+        "Sostituisci Pasta con un'alternativa sicura e simile.",
+      );
+
+      expect(risultato.modificaApplicata).toBe(true);
+
+      const giorniValidati = await validaGiorni(profiloCeliaco, risultato.giorni);
+
+      for (const giorno of giorniValidati) {
+        for (const pasto of giorno.pasti) {
+          const rischi = ingredientiARischio(pasto.ingredienti.map((i) => i.nome));
+          if (rischi.length > 0) {
+            // Un rischio residuo è accettabile solo se la pipeline di
+            // sicurezza lo ha segnalato esplicitamente per la verifica
+            // manuale — mai in silenzio.
+            expect(pasto.verificare, `${giorno.giorno} ${pasto.tipo}: ${rischi.join(", ")}`).toBe(true);
+            expect(pasto.ingredienti_a_rischio).toEqual(expect.arrayContaining(rischi));
+          }
+        }
+      }
     },
     30_000,
   );
