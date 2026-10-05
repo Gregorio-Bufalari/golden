@@ -199,12 +199,20 @@ export function MenuView({
   async function handleAzioneNutriente(n: ConfrontoNutriente, direzione: "Aumenta" | "Riduci") {
     if (azioneInCorso) return;
     setNutrienteInCorso(n.chiave);
+    // Un target concreto rispetto al valore ATTUALE (non "avvicinati al
+    // riferimento"): quel testo si bloccava non appena il nutriente era già
+    // vicino al riferimento (fascia "media"), impedendo di continuare a
+    // spingerlo oltre in entrambe le direzioni se l'utente lo desiderava.
+    const segno = direzione === "Aumenta" ? 1 : -1;
+    const passo = Math.max(Math.round(n.totale * 0.15), Math.round(n.riferimento * 0.1), 1);
+    const nuovoTarget = Math.max(0, Math.round(n.totale) + segno * passo);
     const verboAzione = direzione === "Aumenta" ? "Aumentalo" : "Riducilo";
     await applicaModifica(
-      `Il totale di ${n.nomeModifica} in questo piano è circa ${Math.round(n.totale)}${n.unita} questa settimana; ` +
-        `il riferimento indicativo è ${Math.round(n.riferimento)}${n.unita}. ${verboAzione} in modo concreto, ` +
-        "avvicinandoti al riferimento — se serve cambia quali pasti lo contengono, non solo le porzioni — " +
-        "mantenendo le restrizioni e senza stravolgere il resto del piano più del necessario.",
+      `Il totale di ${n.nomeModifica} in questo piano è circa ${Math.round(n.totale)}${n.unita} questa settimana ` +
+        `(il riferimento indicativo LARN è ${Math.round(n.riferimento)}${n.unita}, solo per contesto). ` +
+        `${verboAzione} in modo concreto, puntando a circa ${nuovoTarget}${n.unita} questa settimana — ` +
+        "se serve cambia quali pasti lo contengono, non solo le porzioni — mantenendo le restrizioni e senza " +
+        "stravolgere il resto del piano più del necessario.",
     );
     setNutrienteInCorso(null);
   }
@@ -391,26 +399,22 @@ export function MenuView({
                         ({Math.round(n.totale)}/{Math.round(n.riferimento)}
                         {n.unita})
                       </span>
-                      {n.fascia === "bassa" && (
-                        <button
-                          onClick={() => handleAzioneNutriente(n, "Aumenta")}
-                          disabled={azioneInCorso}
-                          aria-label={`Aumenta ${n.etichetta.toLowerCase()}`}
-                          className="flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300 disabled:opacity-40 dark:border-zinc-700"
-                        >
-                          +
-                        </button>
-                      )}
-                      {n.fascia === "alta" && (
-                        <button
-                          onClick={() => handleAzioneNutriente(n, "Riduci")}
-                          disabled={azioneInCorso}
-                          aria-label={`Riduci ${n.etichetta.toLowerCase()}`}
-                          className="flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300 disabled:opacity-40 dark:border-zinc-700"
-                        >
-                          −
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleAzioneNutriente(n, "Riduci")}
+                        disabled={azioneInCorso}
+                        aria-label={`Riduci ${n.etichetta.toLowerCase()}`}
+                        className="flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300 disabled:opacity-40 dark:border-zinc-700"
+                      >
+                        −
+                      </button>
+                      <button
+                        onClick={() => handleAzioneNutriente(n, "Aumenta")}
+                        disabled={azioneInCorso}
+                        aria-label={`Aumenta ${n.etichetta.toLowerCase()}`}
+                        className="flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300 disabled:opacity-40 dark:border-zinc-700"
+                      >
+                        +
+                      </button>
                       {inCorso && <Spinner className="h-3.5 w-3.5 text-zinc-400" />}
                     </div>
                   );
