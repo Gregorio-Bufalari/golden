@@ -1,6 +1,12 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { conservazioneTipica, gruppoAcquisto } from "@/lib/conservazione";
+import { conservazioneTipica, gruppoAcquisto, coloreScadenza, type ColoreScadenza } from "@/lib/conservazione";
 import { PageHeader } from "../page-header";
+
+const DOT_PER_COLORE: Record<ColoreScadenza, string> = {
+  rosso: "bg-clay",
+  arancione: "bg-honey",
+  verde: "bg-accent",
+};
 
 function formatQuantita(quantita: number, unita: string): string {
   if (unita === "g" && quantita >= 1000) {
@@ -27,7 +33,13 @@ function Sezione({ titolo, righe }: { titolo: string; righe: Rimanenza[] }) {
             className="flex items-start justify-between gap-3 border-t border-ink/10 py-3 first:border-t-0"
           >
             <div className="min-w-0">
-              <div className="text-[15px] text-ink">{r.ingrediente}</div>
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`h-[7px] w-[7px] shrink-0 rounded-full ${DOT_PER_COLORE[coloreScadenza(r.ingrediente)]}`}
+                  aria-hidden="true"
+                />
+                <span className="text-[15px] text-ink">{r.ingrediente}</span>
+              </div>
               <div className="mt-0.5 text-xs text-ink/55">{conservazioneTipica(r.ingrediente)}</div>
             </div>
             <span className="shrink-0 font-mono text-sm text-ink/70">

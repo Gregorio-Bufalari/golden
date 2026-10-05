@@ -73,6 +73,21 @@ export function conservazioneTipica(nomeIngrediente: string): string {
   return "Controlla la data di scadenza sulla confezione";
 }
 
+export type ColoreScadenza = "rosso" | "arancione" | "verde";
+
+/**
+ * Stesso riconoscimento di categoriaConservazione, tradotto in un colore
+ * per il pallino nella tab Frigo: fresco (2-4 giorni) è il più urgente,
+ * frigo_aperto (5-7 giorni) è intermedio, surgelato/dispensa/non
+ * riconosciuto durano mesi o comunque non sono deperibili a breve.
+ */
+export function coloreScadenza(nomeIngrediente: string): ColoreScadenza {
+  const categoria = categoriaConservazione(nomeIngrediente);
+  if (categoria === "fresco") return "rosso";
+  if (categoria === "frigo_aperto") return "arancione";
+  return "verde";
+}
+
 export type GruppoAcquisto = "subito" | "puo_aspettare";
 
 /**
