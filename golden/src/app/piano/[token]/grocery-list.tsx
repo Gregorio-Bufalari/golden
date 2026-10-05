@@ -34,28 +34,6 @@ type GroceryListData = {
   fascia: "discount" | "media" | "premium";
 };
 
-type PastoPerRischio = { verificare?: boolean; ingredienti_a_rischio?: string[] };
-type GiornoPerRischio = { pasti: PastoPerRischio[] };
-
-/**
- * Ingredienti segnalati "da verificare" (rischio glutine) in uno o più
- * pasti della settimana, in minuscolo — per mostrare lo stesso avviso
- * anche sulla riga della lista della spesa, non solo sul piatto nel Menu.
- * Pura funzione di derivazione: nessuna nuova chiamata AI, stessi dati
- * già calcolati da validaGiorni.
- */
-export function ingredientiARischioSettimana(giorni: GiornoPerRischio[]): string[] {
-  const nomi = new Set<string>();
-  for (const giorno of giorni) {
-    for (const pasto of giorno.pasti) {
-      if (pasto.verificare) {
-        for (const n of pasto.ingredienti_a_rischio || []) nomi.add(n.toLowerCase());
-      }
-    }
-  }
-  return [...nomi];
-}
-
 function itemARischio(nome: string, ingredientiARischio: string[]): boolean {
   const lower = nome.toLowerCase();
   return ingredientiARischio.some((r) => lower.includes(r));

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { riepilogoSostituzione, ingredientiARischioSettimana } from "./grocery-list";
+import { riepilogoSostituzione } from "./grocery-list";
+import { ingredientiARischioSettimana } from "./grocery-risk";
 
 type GroceryReparto = Parameters<typeof riepilogoSostituzione>[0][number];
 

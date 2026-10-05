@@ -319,15 +319,19 @@ export function MenuView({
                               <p className="mt-1.5 text-[13px] text-ink/65">
                                 {pasto.ingredienti.map((ing) => ing.nome).join(", ")}
                               </p>
-                              <div className="mt-3.5 flex items-center gap-2 font-mono text-sm text-ink/75">
+                              <div className="mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[13px] text-ink/75">
                                 <span>{pasto.nutrizione.calorie} kcal</span>
-                                {haPreparazione && (
-                                  <span className="ml-auto flex items-center gap-1 font-sans text-xs font-medium text-accent">
-                                    Preparazione
-                                    <ChevronIcon aperto={espanso} />
-                                  </span>
-                                )}
+                                <span>{pasto.nutrizione.proteine_g}g proteine</span>
+                                <span>{pasto.nutrizione.carboidrati_g}g carboidrati</span>
+                                <span>{pasto.nutrizione.grassi_g}g grassi</span>
+                                <span>{pasto.nutrizione.fibre_g}g fibre</span>
                               </div>
+                              {haPreparazione && (
+                                <span className="mt-2 flex items-center gap-1 font-sans text-xs font-medium text-accent">
+                                  Preparazione
+                                  <ChevronIcon aperto={espanso} />
+                                </span>
+                              )}
                             </button>
                             <button
                               onClick={() => handlePastoDiverso(giorno, pasto, chiave)}
