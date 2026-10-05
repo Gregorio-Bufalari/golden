@@ -67,6 +67,64 @@ export async function validaGiorni(
   return giorni.map((g, gi) => ({ giorno: g.giorno, pasti: pasti[gi] }));
 }
 
+const MAX_RIGENERAZIONI_VARIETA = 2;
+
+function chiaveNomePasto(nome: string): string {
+  return nome.trim().toLowerCase();
+}
+
+/**
+ * Controlla che i 14 pasti della settimana siano 14 ricette distinte
+ * (nessuna ripetuta) e rigenera i doppioni, passando all'AI l'elenco dei
+ * piatti già usati da evitare. Senza questo controllo deterministico,
+ * un'istruzione come "obiettivo: ridurre gli sprechi" può spingere l'AI a
+ * collassare il piano su pochissimi piatti ripetuti — qui si tratta come un
+ * vincolo verificato dopo la generazione, stesso pattern del controllo
+ * glutine (static check + rigenerazione mirata, non all'infinito).
+ */
+export async function assicuraVarieta(
+  profilo: ProfiloPerPiano,
+  giorni: GiornoValidato[],
+  dispensa: Map<string, number> = new Map(),
+): Promise<GiornoValidato[]> {
+  const pasti: PastoValidato[][] = giorni.map((g) => [...g.pasti]);
+
+  for (let tentativo = 0; tentativo < MAX_RIGENERAZIONI_VARIETA; tentativo++) {
+    const viste = new Set<string>();
+    const daRigenerare: { gi: number; pi: number }[] = [];
+    for (let gi = 0; gi < pasti.length; gi++) {
+      for (let pi = 0; pi < pasti[gi].length; pi++) {
+        const chiave = chiaveNomePasto(pasti[gi][pi].nome);
+        if (viste.has(chiave)) {
+          daRigenerare.push({ gi, pi });
+        } else {
+          viste.add(chiave);
+        }
+      }
+    }
+
+    if (daRigenerare.length === 0) break;
+
+    const nomiEsistenti = [...new Set(pasti.flat().map((p) => p.nome))];
+
+    await Promise.all(
+      daRigenerare.map(async ({ gi, pi }) => {
+        try {
+          pasti[gi][pi] = await regeneratePasto(profilo, giorni[gi].giorno, pasti[gi][pi], [], dispensa, nomiEsistenti);
+        } catch (err) {
+          console.error("assicuraVarieta regeneratePasto error:", err);
+        }
+      }),
+    );
+  }
+
+  const giorniRigenerati = giorni.map((g, gi) => ({ giorno: g.giorno, pasti: pasti[gi] }));
+  // I pasti appena rigenerati non sono ancora stati controllati per rischio
+  // glutine: riusa validaGiorni (no-op se il profilo non ha quella
+  // restrizione o se non c'era nessun doppione da sostituire).
+  return validaGiorni(profilo, giorniRigenerati as Giorno[], dispensa);
+}
+
 export async function adattaEntroBudget(
   profilo: ProfiloPerPiano,
   giorniIniziali: GiornoValidato[],
