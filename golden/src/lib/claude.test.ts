@@ -73,6 +73,16 @@ describe("generateMealPlan — risposta AI simulata", () => {
     const testoMessaggio = richiesta.messages[0].content as string;
     expect(testoMessaggio).toContain("Glutine (celiachia)");
   });
+
+  it("include nel prompt il criterio di stagionalità per frutta e verdura, con restrizioni/budget sempre sopra", async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: { giorni: creaPianoEsempio() } });
+
+    await generateMealPlan(profiloBase);
+
+    const richiesta = mockParse.mock.calls[0][0];
+    expect(richiesta.system).toMatch(/di stagione/i);
+    expect(richiesta.system).toMatch(/restrizioni.*vincolo più alto/i);
+  });
 });
 
 describe("modificaPiano — risposta AI simulata", () => {
@@ -109,5 +119,16 @@ describe("modificaPiano — risposta AI simulata", () => {
     await expect(
       modificaPiano(profiloBase, creaPianoEsempio(), "qualsiasi richiesta"),
     ).rejects.toThrow("Claude non ha restituito un piano valido.");
+  });
+
+  it("include anche qui il criterio di stagionalità nel prompt", async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+    });
+
+    await modificaPiano(profiloBase, creaPianoEsempio(), "ho già comprato il pollo");
+
+    const richiesta = mockParse.mock.calls[0][0];
+    expect(richiesta.system).toMatch(/di stagione/i);
   });
 });

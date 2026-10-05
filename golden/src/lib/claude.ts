@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { istruzioneStagionalita } from "./stagionalita";
 
 // Sonnet invece di Opus: elencare pasti/ingredienti/prezzi non richiede un
 // ragionamento complesso, e Sonnet genera molto più velocemente — importante
@@ -146,7 +147,8 @@ export async function generateMealPlan(
       "Se è indicato un budget settimanale, è anch'esso un vincolo rigido: il totale stimato della spesa (somma di tutti i prezzo_stimato_eur dell'intero piano) non deve superarlo. " +
       "Rispetta anche obiettivo, preferenze e tempo di preparazione, in questo ordine di priorità, scegliendo ingredienti e porzioni che permettano di rientrare nel budget. " +
       (modalita === "scoperta" ? ISTRUZIONE_SCOPERTA + " " : "") +
-      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE,
+      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
+      istruzioneStagionalita(),
     messages: [
       {
         role: "user",
@@ -202,7 +204,8 @@ export async function modificaPiano(
       "soluzione migliore è quasi sempre cambiare QUALI pasti lo contengono — sostituendo un piatto con un altro " +
       "che usa di più (o di meno) quell'ingrediente — piuttosto che alterare le porzioni di una singola ricetta " +
       "fino a renderle irrealistiche per una persona (es. non proporre mai 800g di pollo in un solo piatto). " +
-      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE,
+      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
+      istruzioneStagionalita(),
     messages: [
       {
         role: "user",
@@ -248,7 +251,8 @@ export async function adattaBudget(
       "Riduci il costo totale stimato sostituendo ingredienti costosi con alternative più economiche (es. proteine " +
       "meno pregiate, prodotti di stagione, porzioni più ragionevoli), mantenendo varietà e qualità nutrizionale. " +
       NOTA_COSTO_CONFEZIONI + " " +
-      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE,
+      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
+      istruzioneStagionalita(),
     messages: [
       {
         role: "user",
@@ -287,7 +291,8 @@ export async function regeneratePasto(
     system:
       "Sei un assistente che rigenera un singolo pasto di un piano settimanale, in italiano. " +
       "Le restrizioni alimentari sono un vincolo rigido: non includere MAI un ingrediente incompatibile. " +
-      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE,
+      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
+      istruzioneStagionalita(),
     messages: [
       {
         role: "user",
