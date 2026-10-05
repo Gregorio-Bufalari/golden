@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { calcolaRiferimentoLARN, confrontaConLARN, DISCLAIMER_LARN, type DatiBiometrici } from "./larn";
+import {
+  calcolaRiferimentoLARN,
+  confrontaConLARN,
+  sommaNutrizioneSettimanale,
+  DISCLAIMER_LARN,
+  type DatiBiometrici,
+} from "./larn";
+import { creaPianoEsempio } from "@/test/fixtures/piano-esempio";
 
 describe("calcolaRiferimentoLARN", () => {
   it("calcola un riferimento settimanale plausibile per un uomo adulto attivo", () => {
@@ -105,6 +112,81 @@ describe("confrontaConLARN", () => {
     expect(confronto.map((n) => n.chiave).sort()).toEqual(
       ["calorie", "carboidrati_g", "fibre_g", "grassi_g", "proteine_g"].sort(),
     );
+  });
+});
+
+describe("sommaNutrizioneSettimanale", () => {
+  it("somma correttamente la nutrizione di tutti i 14 pasti del piano di esempio", () => {
+    // Il piano di esempio usa nutrizione() per ogni pasto, SENZA mai
+    // sovrascriverla (vedi src/test/fixtures/piano-esempio.ts): ogni pasto
+    // vale quindi 500 kcal, 25g proteine, 60g carboidrati, 15g grassi, 5g
+    // fibre. Su 14 pasti (7 giorni x pranzo/cena), i totali attesi sono
+    // esattamente questi, moltiplicati per 14.
+    const totali = sommaNutrizioneSettimanale(creaPianoEsempio());
+
+    expect(totali).toEqual({
+      calorie: 500 * 14,
+      proteine_g: 25 * 14,
+      carboidrati_g: 60 * 14,
+      grassi_g: 15 * 14,
+      fibre_g: 5 * 14,
+    });
+  });
+
+  it("ignora un pasto senza nutrizione invece di far fallire la somma", () => {
+    const giorni = [
+      { pasti: [{ nutrizione: { calorie: 100, proteine_g: 10, carboidrati_g: 10, grassi_g: 5, fibre_g: 2 } }, {}] },
+    ];
+    expect(sommaNutrizioneSettimanale(giorni)).toEqual({
+      calorie: 100,
+      proteine_g: 10,
+      carboidrati_g: 10,
+      grassi_g: 5,
+      fibre_g: 2,
+    });
+  });
+
+  it("un piano senza pasti produce totali tutti a zero", () => {
+    expect(sommaNutrizioneSettimanale([{ pasti: [] }])).toEqual({
+      calorie: 0,
+      proteine_g: 0,
+      carboidrati_g: 0,
+      grassi_g: 0,
+      fibre_g: 0,
+    });
+  });
+});
+
+describe("sommaNutrizioneSettimanale + confrontaConLARN — piano di esempio contro un profilo noto", () => {
+  it("per un adulto moderatamente attivo, il piano di esempio (molto ipocalorico) risulta 'bassa' su tutti i nutrienti", () => {
+    // Profilo di test noto, scelto apposta: il piano di esempio fornisce solo
+    // 1000 kcal/giorno (500 kcal x 2 pasti), ben sotto il fabbisogno di un
+    // adulto medio — quindi ci si aspetta 'bassa' su ogni nutriente, non al
+    // limite della soglia (85%) ma nettamente sotto, per un confronto robusto.
+    const profiloNoto: DatiBiometrici = {
+      sesso: "M",
+      eta: 35,
+      peso_kg: 75,
+      altezza_cm: 175,
+      livello_attivita: "moderato",
+    };
+
+    const totali = sommaNutrizioneSettimanale(creaPianoEsempio());
+    const riferimento = calcolaRiferimentoLARN(profiloNoto);
+    const confronto = confrontaConLARN(totali, riferimento);
+
+    expect(confronto).toHaveLength(5);
+    for (const nutriente of confronto) {
+      expect(nutriente.fascia, `${nutriente.chiave}: ${nutriente.totale}/${nutriente.riferimento}`).toBe(
+        "bassa",
+      );
+      // Il confronto deve riportare la somma REALE del piano, non solo la fascia.
+      expect(nutriente.totale).toBeGreaterThan(0);
+      expect(nutriente.totale).toBeLessThan(nutriente.riferimento);
+    }
+
+    const calorie = confronto.find((n) => n.chiave === "calorie");
+    expect(calorie?.totale).toBe(7000); // 500 kcal x 14 pasti
   });
 });
 
