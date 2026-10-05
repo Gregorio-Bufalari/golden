@@ -1,4 +1,4 @@
-# Golden
+# Groci
 
 Next.js (App Router) + TypeScript + Tailwind CSS, pronto per il deploy su Vercel, con integrazione Supabase già predisposta.
 
@@ -15,7 +15,7 @@ Apri [http://localhost:3000](http://localhost:3000).
 ## Collegare un progetto Supabase (free tier)
 
 1. Vai su [supabase.com](https://supabase.com) e crea un account gratuito (o accedi con GitHub).
-2. Clicca **New project**, scegli un'organizzazione, dai un nome al progetto (es. `golden`), imposta una password per il database e seleziona una region vicina.
+2. Clicca **New project**, scegli un'organizzazione, dai un nome al progetto (es. `groci`), imposta una password per il database e seleziona una region vicina.
 3. Attendi il provisioning del progetto (1-2 minuti).
 4. Vai su **Project Settings > API**: copia `Project URL` e la chiave `anon public`.
 5. Nel progetto Next.js, crea `.env.local` a partire da `.env.example` e incolla i valori:

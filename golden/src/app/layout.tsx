@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Golden",
-  description: "Golden — Next.js app con Supabase",
+  title: "Groci",
+  description: "Groci — Next.js app con Supabase",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

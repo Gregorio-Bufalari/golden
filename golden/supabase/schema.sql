@@ -1,4 +1,4 @@
--- Golden: schema iniziale (profiles, weekly_plans, checkins)
+-- Groci: schema iniziale (profiles, weekly_plans, checkins)
 -- Esegui questo script nel SQL Editor di Supabase (Project > SQL Editor > New query).
 --
 -- Modello di accesso attuale: nessun login, accesso tramite link_token univoco.
