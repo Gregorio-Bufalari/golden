@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { TopNav } from "./top-nav";
+import { BottomNav } from "./bottom-nav";
 
 export default async function PianoLayout({
   children,
@@ -23,9 +23,9 @@ export default async function PianoLayout({
   }
 
   return (
-    <div className="flex min-h-full w-full flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <TopNav token={token} />
-      <div className="flex flex-1 flex-col">{children}</div>
+    <div className="flex min-h-full w-full flex-1 flex-col bg-paper">
+      <div className="flex flex-1 flex-col overflow-y-auto">{children}</div>
+      <BottomNav token={token} />
     </div>
   );
 }

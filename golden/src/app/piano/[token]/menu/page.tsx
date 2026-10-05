@@ -21,9 +21,7 @@ export default async function MenuPage({
     console.error("MenuPage profile fetch error:", profileError);
     return (
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Non sono riuscito a caricare il profilo. Riprova tra poco.
-        </p>
+        <p className="text-sm text-ink/60">Non sono riuscito a caricare il profilo. Riprova tra poco.</p>
       </div>
     );
   }
@@ -38,18 +36,10 @@ export default async function MenuPage({
     .maybeSingle();
 
   return (
-    <div className="flex flex-1 flex-col items-center px-6 py-10 text-center">
-      <h1 className="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">
-        Ciao {profile.nome}!
-      </h1>
-      {profile.restrizioni?.length > 0 && (
-        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-500">
-          Restrizioni: {profile.restrizioni.join(", ")}
-        </p>
-      )}
-
+    <div className="flex flex-1 flex-col">
       <MenuView
         token={token}
+        nome={profile.nome}
         initialModalita={profile.modalita as "routine" | "scoperta"}
         initialGiorni={ultimoPiano?.meal_plan?.giorni || null}
         initialSettimana={ultimoPiano?.settimana || ""}

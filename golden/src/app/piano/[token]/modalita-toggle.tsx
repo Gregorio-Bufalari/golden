@@ -10,36 +10,25 @@ export function ModalitaToggle({
   disabled?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <span className="text-zinc-500 dark:text-zinc-400">Modalità:</span>
-      <div
-        className={`flex rounded-full border border-zinc-200 p-0.5 transition-opacity dark:border-zinc-800 ${
-          disabled ? "opacity-50" : ""
+    <div className={`flex w-full rounded-[10px] bg-panel p-[3px] transition-opacity ${disabled ? "opacity-50" : ""}`}>
+      <button
+        onClick={() => onSwitch("routine")}
+        disabled={disabled}
+        className={`flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition-colors ${
+          modalita === "routine" ? "bg-accent text-accent-fill-text" : "text-ink"
         }`}
       >
-        <button
-          onClick={() => onSwitch("routine")}
-          disabled={disabled}
-          className={`rounded-full px-3 py-1 transition-colors ${
-            modalita === "routine"
-              ? "bg-black text-white dark:bg-white dark:text-black"
-              : "text-zinc-600 dark:text-zinc-400"
-          }`}
-        >
-          Routine
-        </button>
-        <button
-          onClick={() => onSwitch("scoperta")}
-          disabled={disabled}
-          className={`rounded-full px-3 py-1 transition-colors ${
-            modalita === "scoperta"
-              ? "bg-black text-white dark:bg-white dark:text-black"
-              : "text-zinc-600 dark:text-zinc-400"
-          }`}
-        >
-          Scoperta
-        </button>
-      </div>
+        Routine
+      </button>
+      <button
+        onClick={() => onSwitch("scoperta")}
+        disabled={disabled}
+        className={`flex-1 rounded-lg py-2.5 text-[13px] font-medium transition-colors ${
+          modalita === "scoperta" ? "bg-accent text-accent-fill-text" : "text-ink"
+        }`}
+      >
+        Scoperta
+      </button>
     </div>
   );
 }

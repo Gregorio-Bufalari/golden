@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ImpostazioniForm } from "./impostazioni-form";
+import { PageHeader } from "../page-header";
 
 export default async function ImpostazioniPage({
   params,
@@ -21,22 +22,20 @@ export default async function ImpostazioniPage({
     console.error("ImpostazioniPage profile fetch error:", profileError);
     return (
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Non sono riuscito a caricare il profilo. Riprova tra poco.
-        </p>
+        <p className="text-sm text-ink/60">Non sono riuscito a caricare il profilo. Riprova tra poco.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center px-6 py-10">
-      <h1 className="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">Impostazioni</h1>
-      <p className="mt-2 max-w-md text-center text-sm text-zinc-500 dark:text-zinc-400">
-        Restrizioni, obiettivo, preferenze, budget e supermercato — si applicano dal prossimo
-        piano generato.
-      </p>
+    <div className="flex flex-1 flex-col">
+      <PageHeader
+        token={token}
+        title="Profilo"
+        subtitle="Restrizioni, obiettivo, preferenze, budget e supermercato. Si applicano dal prossimo piano generato."
+      />
 
-      <div className="mt-6 w-full max-w-md">
+      <div className="mx-auto w-full max-w-md flex-1 px-5">
         <ImpostazioniForm token={token} profile={profile} />
       </div>
     </div>

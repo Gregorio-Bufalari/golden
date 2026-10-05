@@ -34,6 +34,33 @@ type GroceryListData = {
   fascia: "discount" | "media" | "premium";
 };
 
+type PastoPerRischio = { verificare?: boolean; ingredienti_a_rischio?: string[] };
+type GiornoPerRischio = { pasti: PastoPerRischio[] };
+
+/**
+ * Ingredienti segnalati "da verificare" (rischio glutine) in uno o più
+ * pasti della settimana, in minuscolo — per mostrare lo stesso avviso
+ * anche sulla riga della lista della spesa, non solo sul piatto nel Menu.
+ * Pura funzione di derivazione: nessuna nuova chiamata AI, stessi dati
+ * già calcolati da validaGiorni.
+ */
+export function ingredientiARischioSettimana(giorni: GiornoPerRischio[]): string[] {
+  const nomi = new Set<string>();
+  for (const giorno of giorni) {
+    for (const pasto of giorno.pasti) {
+      if (pasto.verificare) {
+        for (const n of pasto.ingredienti_a_rischio || []) nomi.add(n.toLowerCase());
+      }
+    }
+  }
+  return [...nomi];
+}
+
+function itemARischio(nome: string, ingredientiARischio: string[]): boolean {
+  const lower = nome.toLowerCase();
+  return ingredientiARischio.some((r) => lower.includes(r));
+}
+
 function formatQuantita(quantita: number, unita: GroceryItem["unita"]): string {
   if (unita === "g" && quantita >= 1000) {
     return `${(quantita / 1000).toFixed(quantita % 1000 === 0 ? 0 : 1)} kg`;
@@ -45,25 +72,22 @@ function formatQuantita(quantita: number, unita: GroceryItem["unita"]): string {
   return `${arrotondata} ${unita}`;
 }
 
-function formatRigaLista(item: GroceryItem): string {
+// Metadati della riga (quantità, confezione, avanzo): punto medio tra i
+// pezzi d'informazione, non trattino lungo — si legge come un dato in una
+// lista, non come un titolo di giornale.
+function metadataRiga(item: GroceryItem): string {
   const avanzo = item.quantita - item.quantitaNecessaria;
   if (item.confezione && avanzo > 0) {
-    return `${item.nome} — ${formatQuantita(item.quantitaNecessaria, item.unita)} necessari (confezione ${formatQuantita(item.confezione, item.unita)}, avanzano ${formatQuantita(avanzo, item.unita)})`;
+    return `${formatQuantita(item.quantitaNecessaria, item.unita)} necessari · confezione ${formatQuantita(item.confezione, item.unita)}, avanzano ${formatQuantita(avanzo, item.unita)}`;
   }
-  return `${item.nome} — ${formatQuantita(item.quantita, item.unita)}`;
+  return formatQuantita(item.quantita, item.unita);
 }
 
 // Stessa classificazione di conservazione già usata nella tab Frigo
 // (src/lib/conservazione.ts), riusata qui solo per raggruppare la lista
 // per urgenza d'acquisto — nessuna nuova logica, nessuna AI coinvolta.
-function filtraPerGruppo(reparti: GroceryReparto[], gruppo: GruppoAcquisto): GroceryReparto[] {
-  return reparti
-    .map((r) => ({ ...r, items: r.items.filter((i) => gruppoAcquisto(i.nome) === gruppo) }))
-    .filter((r) => r.items.length > 0);
-}
-
-function sommaPrezzi(reparti: GroceryReparto[]): number {
-  return reparti.flatMap((r) => r.items).reduce((somma, i) => somma + i.prezzo_stimato, 0);
+function filtraPerGruppo(reparti: GroceryReparto[], gruppo: GruppoAcquisto): GroceryItem[] {
+  return reparti.flatMap((r) => r.items.filter((i) => gruppoAcquisto(i.nome) === gruppo));
 }
 
 /**
@@ -84,75 +108,87 @@ export function riepilogoSostituzione(
     return `${prodotto} sostituito con: ${aggiunti.join(", ")}.`;
   }
   if (!nuoviNomi.has(prodotto)) {
-    return `${prodotto} non è più nella lista — il piano è stato aggiornato.`;
+    return `${prodotto} non è più nella lista. Il piano è stato aggiornato.`;
   }
   return `Il piano è stato aggiornato per ${prodotto}.`;
 }
 
+function CheckboxGlyph({ checked }: { checked: boolean }) {
+  if (checked) {
+    return (
+      <span className="flex h-5 w-5 items-center justify-center rounded-[5px] bg-accent">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="text-accent-fill-text">
+          <path d="M5 12.5l4.5 4.5L19 7" />
+        </svg>
+      </span>
+    );
+  }
+  return <span className="block h-5 w-5 rounded-[5px] border-[1.8px] border-ink/70" />;
+}
+
 function renderSezione(
   titolo: string,
-  sottotitolo: string,
-  reparti: GroceryReparto[],
+  items: GroceryItem[],
   statoAcquisti: Record<string, boolean>,
   onToggle: (nome: string) => void,
   itemInCorso: string | null,
   onNonTrovato: (item: GroceryItem) => void,
+  ingredientiARischio: string[],
 ) {
-  if (reparti.length === 0) return null;
+  if (items.length === 0) return null;
 
   return (
-    <div className="mb-6 last:mb-0">
-      <div className="mb-2">
-        <h4 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">{titolo}</h4>
-        <p className="text-xs text-zinc-400">
-          {sottotitolo} — ~€{sommaPrezzi(reparti).toFixed(2)}
-        </p>
-      </div>
-      <div className="flex flex-col gap-4">
-        {reparti.map((reparto) => (
-          <div key={reparto.reparto}>
-            <h5 className="mb-1 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-              {reparto.reparto}
-            </h5>
-            <ul className="flex flex-col gap-1">
-              {reparto.items.map((item) => {
-                const acquistato = Boolean(statoAcquisti[item.nome]);
-                const chiave = `sostituisci__${item.nome}`;
-                const caricando = itemInCorso === chiave;
-                return (
-                  <li
-                    key={item.nome}
-                    className="flex items-center justify-between gap-3 text-sm text-zinc-600 dark:text-zinc-400"
+    <div>
+      <h2 className="mb-0.5 text-[13px] font-semibold text-ink/60">{titolo}</h2>
+      <ul>
+        {items.map((item) => {
+          const acquistato = Boolean(statoAcquisti[item.nome]);
+          const chiave = `sostituisci__${item.nome}`;
+          const caricando = itemInCorso === chiave;
+          const aRischio = itemARischio(item.nome, ingredientiARischio);
+          return (
+            <li key={item.nome} className="flex items-start gap-1 border-t border-ink/10 first:border-t-0">
+              <button
+                type="button"
+                onClick={() => onToggle(item.nome)}
+                aria-label={`Segna come preso: ${item.nome}`}
+                className="flex h-11 w-11 shrink-0 items-center justify-center print:hidden"
+              >
+                <CheckboxGlyph checked={acquistato} />
+              </button>
+              <div className="min-w-0 flex-1 py-3">
+                <div className={`text-[15px] ${acquistato ? "text-ink/40 line-through" : "text-ink"}`}>
+                  {item.nome}
+                </div>
+                <div className={`mt-0.5 font-mono text-[12.5px] ${acquistato ? "text-ink/30" : "text-ink/55"}`}>
+                  {metadataRiga(item)}
+                </div>
+                {aRischio && !acquistato && (
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-honey" />
+                    <span className="text-xs text-honey">Controlla l&apos;etichetta prima di acquistare</span>
+                  </div>
+                )}
+                <span className="mt-0.5 flex items-center gap-2 print:hidden">
+                  <button
+                    onClick={() => onNonTrovato(item)}
+                    disabled={Boolean(itemInCorso)}
+                    className="py-1 text-xs font-semibold text-accent disabled:opacity-40"
                   >
-                    <label className="flex min-w-0 cursor-pointer items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={acquistato}
-                        onChange={() => onToggle(item.nome)}
-                        className="h-4 w-4 shrink-0 print:hidden"
-                      />
-                      <span className={acquistato ? "text-zinc-400 line-through dark:text-zinc-600" : ""}>
-                        {formatRigaLista(item)}
-                      </span>
-                    </label>
-                    <span className="flex shrink-0 items-center gap-2">
-                      <button
-                        onClick={() => onNonTrovato(item)}
-                        disabled={Boolean(itemInCorso)}
-                        className="rounded-full border border-zinc-300 px-2 py-0.5 text-[11px] font-medium text-zinc-500 disabled:opacity-40 print:hidden dark:border-zinc-700 dark:text-zinc-400"
-                      >
-                        Non l&apos;ho trovato
-                      </button>
-                      {caricando && <Spinner className="h-3.5 w-3.5 text-zinc-400 print:hidden" />}
-                      <span className="text-zinc-400">~€{item.prezzo_stimato.toFixed(2)}</span>
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </div>
+                    Non l&apos;ho trovato
+                  </button>
+                  {caricando && <Spinner className="h-3.5 w-3.5 text-ink/50" />}
+                </span>
+              </div>
+              <div
+                className={`shrink-0 py-3 font-mono text-sm ${acquistato ? "text-ink/30" : "text-ink/70"}`}
+              >
+                €{item.prezzo_stimato.toFixed(2)}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
@@ -172,12 +208,12 @@ function stepPer(unita: GroceryItem["unita"]): number {
 }
 
 function buildTestoWhatsApp(data: GroceryListData, settimana: string): string {
-  const righe = [`*Lista della spesa* — settimana del ${settimana}`, ""];
+  const righe = [`*Lista della spesa* · settimana del ${settimana}`, ""];
 
   for (const reparto of data.reparti) {
     righe.push(`*${reparto.reparto}*`);
     for (const item of reparto.items) {
-      righe.push(`- ${formatRigaLista(item)} (~€${item.prezzo_stimato.toFixed(2)})`);
+      righe.push(`- ${item.nome} · ${metadataRiga(item)} (~€${item.prezzo_stimato.toFixed(2)})`);
     }
     righe.push("");
   }
@@ -199,11 +235,15 @@ export function GroceryList({
   initialData,
   settimana,
   initialStatoAcquisti = {},
+  budgetSettimanale,
+  ingredientiARischio = [],
 }: {
   token: string;
   initialData: GroceryListData;
   settimana: string;
   initialStatoAcquisti?: Record<string, boolean>;
+  budgetSettimanale?: number | null;
+  ingredientiARischio?: string[];
 }) {
   const [data, setData] = useState(initialData);
   const [itemInCorso, setItemInCorso] = useState<string | null>(null);
@@ -324,108 +364,102 @@ export function GroceryList({
     window.print();
   }
 
+  const superaBudget = Boolean(budgetSettimanale && data.totale_stimato > budgetSettimanale);
+  const fasciaLabel = data.fascia === "discount" ? "discount" : data.fascia === "premium" ? "premium" : "media";
+
   return (
-    <div className="mt-8 rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-          Lista della spesa
-        </h3>
-        <div className="flex gap-2 print:hidden">
-          <button
-            onClick={handleWhatsApp}
-            className="rounded-full border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
-          >
-            Condividi su WhatsApp
-          </button>
-          <button
-            onClick={handlePrint}
-            className="rounded-full border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
-          >
-            Esporta PDF
-          </button>
+    <div className="flex flex-col gap-5 py-4">
+      <div className="bg-panel rounded-[14px] px-5 py-4">
+        <div className="flex items-baseline justify-between">
+          <div className="text-sm font-medium text-ink/75">Totale stimato</div>
+          <div className="font-mono text-xl font-semibold text-ink">€{data.totale_stimato.toFixed(2)}</div>
+        </div>
+        <div className={`mt-1 text-[13px] ${superaBudget ? "text-honey" : "text-ink/55"}`}>
+          {budgetSettimanale
+            ? superaBudget
+              ? `Supera il budget di €${budgetSettimanale} fissato in Profilo`
+              : `Entro il budget di €${budgetSettimanale} fissato in Profilo`
+            : `Stima sulla fascia ${fasciaLabel}, non il prezzo reale del tuo supermercato`}
         </div>
       </div>
 
-      {errore && <p className="mb-3 text-sm text-red-600 dark:text-red-400 print:hidden">{errore}</p>}
-      {rifiuto && (
-        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 print:hidden dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-          {rifiuto}
-        </div>
-      )}
-      {sostituzioneInfo && (
-        <div className="mb-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 print:hidden dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-          {sostituzioneInfo}
-        </div>
-      )}
-
-      {renderSezione(
-        "Da comprare subito",
-        "Freschi deperibili — frutta, verdura, carne, pesce, latticini",
-        filtraPerGruppo(data.reparti, "subito"),
-        statoAcquisti,
-        handleToggleAcquistato,
-        itemInCorso,
-        handleNonTrovato,
-      )}
-      {renderSezione(
-        "Può aspettare",
-        "Dispensa secca e surgelati — si conservano più a lungo",
-        filtraPerGruppo(data.reparti, "puo_aspettare"),
-        statoAcquisti,
-        handleToggleAcquistato,
-        itemInCorso,
-        handleNonTrovato,
-      )}
-
-      <div className="mt-4 flex items-center justify-between border-t border-zinc-200 pt-3 text-sm font-medium dark:border-zinc-800">
-        <span>Totale stimato</span>
-        <span>~€{data.totale_stimato.toFixed(2)}</span>
+      <div className="flex gap-2 print:hidden">
+        <button onClick={handleWhatsApp} className="rounded-full bg-panel px-4 py-2 text-xs font-semibold text-ink">
+          Condividi su WhatsApp
+        </button>
+        <button onClick={handlePrint} className="rounded-full bg-panel px-4 py-2 text-xs font-semibold text-ink">
+          Esporta PDF
+        </button>
       </div>
-      <p className="mt-1 text-xs text-zinc-400">
-        Le quantità sono arrotondate alla confezione reale (es. 1kg di riso, non 160g) — prezzo
-        stimato sulla fascia {data.fascia === "discount" ? "discount" : data.fascia === "premium" ? "premium" : "media"}, non il prezzo reale del tuo supermercato.
+
+      {errore && <p className="text-sm text-clay print:hidden">{errore}</p>}
+      {rifiuto && <div className="bg-honey-soft px-3.5 py-2.5 text-sm text-ink print:hidden">{rifiuto}</div>}
+      {sostituzioneInfo && <div className="bg-panel px-3.5 py-2.5 text-sm text-ink print:hidden">{sostituzioneInfo}</div>}
+
+      <div className="flex flex-col gap-5">
+        {renderSezione(
+          "Da comprare subito",
+          filtraPerGruppo(data.reparti, "subito"),
+          statoAcquisti,
+          handleToggleAcquistato,
+          itemInCorso,
+          handleNonTrovato,
+          ingredientiARischio,
+        )}
+        {renderSezione(
+          "Può aspettare",
+          filtraPerGruppo(data.reparti, "puo_aspettare"),
+          statoAcquisti,
+          handleToggleAcquistato,
+          itemInCorso,
+          handleNonTrovato,
+          ingredientiARischio,
+        )}
+      </div>
+
+      <p className="text-xs text-ink/45">
+        Le quantità sono arrotondate alla confezione reale (es. 1 kg di riso, non 160 g).
       </p>
 
       {data.rimasto.length > 0 && (
-        <div className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <h4 className="mb-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-            Rimasto in frigo/dispensa
-          </h4>
-          <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
-            Comprando le confezioni intere, questa settimana avanza. Premi + se vuoi che ne avanzi
-            di più (il menu ne userà di meno), o − se vuoi usarne di più e farne avanzare di meno.
-            La quantità già acquistata non cambia.
+        <div className="bg-panel rounded-[14px] p-5">
+          <h3 className="mb-2 text-sm font-semibold text-ink">Rimasto in frigo/dispensa</h3>
+          <p className="mb-2 text-xs text-ink/55">
+            Comprando le confezioni intere, questa settimana avanza. Premi + se vuoi che ne avanzi di più (il
+            menu ne userà di meno), o − se vuoi usarne di più e farne avanzare di meno. La quantità già
+            acquistata non cambia.
           </p>
-          <ul className="flex flex-col gap-1">
+          <ul className="flex flex-col">
             {data.rimasto.map((item) => {
               const chiave = `${item.nome}__${item.unita}`;
               const caricando = itemInCorso === chiave;
               return (
-                <li
-                  key={item.nome}
-                  className="flex items-center justify-between gap-3 text-sm text-zinc-600 dark:text-zinc-400"
-                >
-                  <span>
-                    {item.nome} — {formatQuantita(item.quantita, item.unita)}
+                <li key={item.nome} className="flex items-center justify-between gap-3 border-t border-ink/10 py-1 first:border-t-0">
+                  <span className="text-sm text-ink">
+                    {item.nome} · {formatQuantita(item.quantita, item.unita)}
                   </span>
-                  <span className="flex items-center gap-1 print:hidden">
+                  <span className="flex items-center gap-0.5 print:hidden">
                     <button
                       onClick={() => handleCambiaUso(item, -1)}
                       disabled={Boolean(itemInCorso)}
                       aria-label={`Usa di più ${item.nome} (ne avanza meno)`}
-                      className="flex h-6 w-6 items-center justify-center rounded-full border border-zinc-300 text-xs disabled:opacity-40 dark:border-zinc-700"
+                      className="flex h-11 w-11 items-center justify-center text-ink disabled:opacity-40"
                     >
-                      −
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full border border-ink/20 text-xs">
+                        −
+                      </span>
                     </button>
                     <button
                       onClick={() => handleCambiaUso(item, 1)}
                       disabled={Boolean(itemInCorso)}
                       aria-label={`Fai avanzare di più ${item.nome} (ne usa meno)`}
-                      className="flex h-6 w-6 items-center justify-center rounded-full border border-zinc-300 text-xs disabled:opacity-40 dark:border-zinc-700"
+                      className="flex h-11 w-11 items-center justify-center text-ink disabled:opacity-40"
                     >
-                      +
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full border border-ink/20 text-xs">
+                        +
+                      </span>
                     </button>
-                    {caricando && <Spinner className="h-3.5 w-3.5 text-zinc-400" />}
+                    {caricando && <Spinner className="h-3.5 w-3.5 text-ink/50" />}
                   </span>
                 </li>
               );

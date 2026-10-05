@@ -4,8 +4,50 @@ import { useState } from "react";
 import { submitCheckin } from "./checkin-actions";
 import { Spinner } from "@/components/spinner";
 
-const CATEGORIE_SPRECO = ["Verdura", "Proteine", "Latticini", "Pane", "Altro"];
+const CATEGORIE_SPRECO = ["Verdura", "Proteine", "Latticini", "Pane/pasta", "Altro"];
 const RETAILER_OPTIONS = ["Esselunga", "Coop", "Conad", "Carrefour", "Lidl", "Eurospin", "Altro"];
+
+function SiNoButton({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`min-h-11 flex-1 rounded-[10px] text-sm font-semibold ${
+        selected ? "bg-accent text-accent-fill-text" : "border border-ink/25 text-ink"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function PillOption({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`min-h-11 rounded-full px-3.5 text-[13px] font-semibold ${
+        selected ? "bg-paper text-accent" : "border border-ink/20 text-ink"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
 
 export function CheckinForm({ token }: { token: string }) {
   const [seguitoPiano, setSeguitoPiano] = useState<boolean | null>(null);
@@ -43,125 +85,80 @@ export function CheckinForm({ token }: { token: string }) {
   }
 
   if (inviato) {
-    return (
-      <div className="mt-8 rounded-xl border border-green-200 bg-green-50 p-5 text-center text-sm text-green-700 dark:border-green-900 dark:bg-green-950 dark:text-green-400">
-        Grazie! Check-in salvato.
-      </div>
-    );
+    return <div className="bg-panel px-5 py-6 text-center text-sm font-medium text-ink">Grazie! Check-in salvato.</div>;
   }
 
   return (
-    <div className="mt-8 flex flex-col gap-5 rounded-xl border border-zinc-200 p-5 text-left dark:border-zinc-800 print:hidden">
-      <h3 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-        Check-in della settimana
-      </h3>
-
-      <div>
-        <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">Hai seguito il piano?</p>
-        <div className="flex gap-2">
-          {[
-            { label: "Sì", value: true },
-            { label: "No", value: false },
-          ].map((opt) => (
-            <button
-              key={opt.label}
-              onClick={() => setSeguitoPiano(opt.value)}
-              className={`rounded-full border px-4 py-1.5 text-sm ${
-                seguitoPiano === opt.value
-                  ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
-                  : "border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+    <div className="flex flex-col gap-3 text-left print:hidden">
+      <div className="bg-panel rounded-[14px] px-5 py-[18px]">
+        <p className="text-base font-semibold text-ink">Hai seguito il piano?</p>
+        <div className="mt-3.5 flex gap-2.5">
+          <SiNoButton label="Sì" selected={seguitoPiano === true} onClick={() => setSeguitoPiano(true)} />
+          <SiNoButton label="No" selected={seguitoPiano === false} onClick={() => setSeguitoPiano(false)} />
         </div>
       </div>
 
-      <div>
-        <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">Hai sprecato qualcosa?</p>
-        <div className="flex gap-2">
-          {[
-            { label: "Sì", value: true },
-            { label: "No", value: false },
-          ].map((opt) => (
-            <button
-              key={opt.label}
-              onClick={() => {
-                setSpreco(opt.value);
-                if (!opt.value) setCategoriaSpreco(null);
-              }}
-              className={`rounded-full border px-4 py-1.5 text-sm ${
-                spreco === opt.value
-                  ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
-                  : "border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+      <div className="bg-panel rounded-[14px] px-5 py-[18px]">
+        <p className="text-base font-semibold text-ink">Hai sprecato qualcosa?</p>
+        <div className="mt-3.5 flex gap-2.5">
+          <SiNoButton
+            label="No"
+            selected={spreco === false}
+            onClick={() => {
+              setSpreco(false);
+              setCategoriaSpreco(null);
+            }}
+          />
+          <SiNoButton label="Sì" selected={spreco === true} onClick={() => setSpreco(true)} />
         </div>
 
         {spreco && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {CATEGORIE_SPRECO.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setCategoriaSpreco(cat)}
-                className={`rounded-full border px-3 py-1 text-xs ${
-                  categoriaSpreco === cat
-                    ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
-                    : "border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+          <>
+            <p className="mb-2 mt-3.5 text-[13px] text-ink/65">Cosa, principalmente?</p>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORIE_SPRECO.map((cat) => (
+                <PillOption
+                  key={cat}
+                  label={cat}
+                  selected={categoriaSpreco === cat}
+                  onClick={() => setCategoriaSpreco(cat)}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
 
-      <div>
-        <p className="mb-2 text-sm text-zinc-700 dark:text-zinc-300">
-          Quanto hai speso davvero, e dove? (opzionale)
-        </p>
-        <div className="flex items-center gap-2">
-          <span className="text-zinc-500">€</span>
+      <div className="bg-panel rounded-[14px] px-5 py-[18px]">
+        <p className="text-base font-semibold text-ink">Quanto hai speso davvero, e dove?</p>
+        <p className="mt-0.5 text-xs text-ink/55">Opzionale</p>
+        <div className="mt-3.5 flex items-center gap-2">
+          <span className="text-ink/60">€</span>
           <input
             type="number"
             min={0}
             value={spesaReale}
             onChange={(e) => setSpesaReale(e.target.value)}
             placeholder="0"
-            className="w-24 rounded-lg border border-zinc-300 bg-transparent px-3 py-1.5 text-sm dark:border-zinc-700"
+            className="min-h-11 w-24 rounded-[10px] bg-paper px-3.5 font-mono text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
           />
         </div>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           {RETAILER_OPTIONS.map((r) => (
-            <button
-              key={r}
-              onClick={() => setRetailer(r)}
-              className={`rounded-full border px-3 py-1 text-xs ${
-                retailer === r
-                  ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
-                  : "border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
-              }`}
-            >
-              {r}
-            </button>
+            <PillOption key={r} label={r} selected={retailer === r} onClick={() => setRetailer(r)} />
           ))}
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-sm text-clay">{error}</p>}
 
       <button
         onClick={handleSubmit}
         disabled={!puoInviare || submitting}
-        className="flex items-center gap-2 self-start rounded-full bg-black px-5 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black"
+        className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-accent py-3.5 text-[15px] font-semibold text-accent-fill-text disabled:opacity-40"
       >
         {submitting && <Spinner className="h-4 w-4" />}
-        {submitting ? "Invio..." : "Invia check-in"}
+        {submitting ? "Invio..." : "Conferma"}
       </button>
     </div>
   );

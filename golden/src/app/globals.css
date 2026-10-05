@@ -1,26 +1,54 @@
 @import "tailwindcss";
 
+/*
+ * Palette Groci: Ink e Sage sono campionati esattamente dal logo
+ * (#1C1C16 / #ECF3E0). Moss, Clay e Honey compaiono solo quando c'è
+ * un'azione o un avviso — il resto dell'interfaccia resta neutro.
+ * In dark mode ink e il ruolo di "sage" si scambiano: il verde del
+ * logo diventa il colore del testo, non resta solo uno sfondo.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #fbfbf6; /* sfondo di lettura */
+  --panel: #ecf3e0; /* pannelli, header, nav: il sage del logo */
+  --ink: #1c1c16; /* testo, icone */
+  --accent: #425a30; /* moss: azione primaria */
+  --accent-fill-text: #fbfbf6;
+  --clay: #8c3b32; /* rischio glutine, raro */
+  --clay-soft: #f3e3df;
+  --honey: #a8742a; /* attenzione lieve */
+  --honey-soft: #f4e8d3;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-paper: var(--paper);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-accent: var(--accent);
+  --color-accent-fill-text: var(--accent-fill-text);
+  --color-clay: var(--clay);
+  --color-clay-soft: var(--clay-soft);
+  --color-honey: var(--honey);
+  --color-honey-soft: var(--honey-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #14160f;
+    --panel: #1d2016;
+    --ink: #ecf3e0;
+    --accent: #8fae72;
+    --accent-fill-text: #14160f;
+    --clay: #cb8275;
+    --clay-soft: #2a1d1a;
+    --honey: #d9a855;
+    --honey-soft: #2a2415;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
