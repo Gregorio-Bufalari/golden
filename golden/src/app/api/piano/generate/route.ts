@@ -65,8 +65,8 @@ export async function POST(request: Request) {
 
   async function generaFresco() {
     const dispensa = await leggiDispensa(supabase, profileId);
-    const plan = await generateMealPlan(profiloInput, modalitaProfilo);
-    const giorniBase = await validaGiorni(profiloInput, plan.giorni);
+    const plan = await generateMealPlan(profiloInput, modalitaProfilo, dispensa);
+    const giorniBase = await validaGiorni(profiloInput, plan.giorni, dispensa);
     const risultato = await adattaEntroBudget(
       profiloInput,
       giorniBase,

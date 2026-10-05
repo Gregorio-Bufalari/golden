@@ -4,6 +4,8 @@ import {
   applicaConsumiDispensa,
   dispensaSenzaVersione,
   sostituisciConsumiDispensa,
+  elencoDispensa,
+  istruzioneDispensa,
 } from "./dispensa";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -186,5 +188,59 @@ describe("sostituisciConsumiDispensa", () => {
       { profile_id: "profilo-1", ingrediente: "Pollo", unita: "g", quantita: 200, settimana: "2026-10-05" },
     ]);
     expect(deletes).toEqual([]);
+  });
+});
+
+describe("elencoDispensa", () => {
+  it("ricostruisce nome/unità/quantità dalle chiavi 'nome__unita', in ordine alfabetico", () => {
+    const dispensa = new Map([
+      ["riso__g", 670],
+      ["spinaci__g", 450],
+      ["uova__pz", 1],
+    ]);
+
+    expect(elencoDispensa(dispensa)).toEqual([
+      { nome: "riso", unita: "g", quantita: 670 },
+      { nome: "spinaci", unita: "g", quantita: 450 },
+      { nome: "uova", unita: "pz", quantita: 1 },
+    ]);
+  });
+
+  it("esclude le voci a saldo zero o negativo", () => {
+    const dispensa = new Map([
+      ["riso__g", 0],
+      ["spinaci__g", -5],
+      ["uova__pz", 2],
+    ]);
+
+    expect(elencoDispensa(dispensa)).toEqual([{ nome: "uova", unita: "pz", quantita: 2 }]);
+  });
+
+  it("restituisce un array vuoto per una dispensa vuota", () => {
+    expect(elencoDispensa(new Map())).toEqual([]);
+  });
+});
+
+describe("istruzioneDispensa", () => {
+  it("elenca gli ingredienti avanzati e chiede di usarli attivamente", () => {
+    const dispensa = new Map([
+      ["riso__g", 670],
+      ["spinaci__g", 450],
+    ]);
+
+    const testo = istruzioneDispensa(dispensa);
+
+    expect(testo).toContain("riso (670g)");
+    expect(testo).toContain("spinaci (450g)");
+    expect(testo).toMatch(/usali attivamente/i);
+  });
+
+  it("ricorda che resta un criterio subordinato a restrizioni, sicurezza e budget", () => {
+    const testo = istruzioneDispensa(new Map([["riso__g", 670]]));
+    expect(testo).toMatch(/restrizioni alimentari, sicurezza e budget/i);
+  });
+
+  it("restituisce una stringa vuota per una dispensa vuota (nessun avanzo da segnalare)", () => {
+    expect(istruzioneDispensa(new Map())).toBe("");
   });
 });

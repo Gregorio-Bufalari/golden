@@ -66,12 +66,24 @@ export async function POST(request: Request) {
   let groceryList;
   let budgetSuperato = false;
   let nuoviConsumi: ConsumoDispensa[] = [];
-  let dispensaAttuale: Map<string, number> = new Map();
+
+  // La dispensa attuale include già l'effetto della versione precedente di
+  // QUESTO piano (consumi/avanzi applicati quando fu generato). Per
+  // ricalcolare la nuova lista della spesa — e per segnalare all'AI cosa è
+  // già disponibile — serve la dispensa "vera" di prima, altrimenti gli
+  // avanzi non ancora reali di questa versione verrebbero trattati come
+  // scorte già disponibili. Letta PRIMA di modificaPiano, così anche la
+  // modifica stessa (es. "Proponi un piatto diverso", "Sostituisci X") può
+  // tenerne conto.
+  const dispensaAttuale = await leggiDispensa(supabase, profileId);
+  const dispensaBase = dispensaSenzaVersione(dispensaAttuale, vecchiConsumi, vecchioRimasto);
+
   try {
     const risultato = await modificaPiano(
       profiloInput,
       pianoAttuale.meal_plan.giorni as Giorno[],
       messaggio.trim(),
+      dispensaBase,
     );
 
     if (!risultato.modificaApplicata) {
@@ -85,15 +97,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // La dispensa attuale include già l'effetto della versione precedente di
-    // QUESTO piano (consumi/avanzi applicati quando fu generato). Per
-    // ricalcolare la nuova lista della spesa serve la dispensa "vera" di
-    // prima — altrimenti gli avanzi non ancora reali di questa versione
-    // verrebbero trattati come scorte già disponibili.
-    dispensaAttuale = await leggiDispensa(supabase, profileId);
-    const dispensaBase = dispensaSenzaVersione(dispensaAttuale, vecchiConsumi, vecchioRimasto);
-
-    const giorniBase = await validaGiorni(profiloInput, risultato.giorni);
+    const giorniBase = await validaGiorni(profiloInput, risultato.giorni, dispensaBase);
     const adattato = await adattaEntroBudget(
       profiloInput,
       giorniBase,
