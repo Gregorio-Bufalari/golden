@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { PageHeader } from "../page-header";
 
 type CheckinRow = {
   seguito_piano: boolean | null;
@@ -57,6 +58,17 @@ export default async function AndamentoPage({
         )
       : null;
 
+  // Ultime (al massimo) 6 settimane con un risparmio calcolabile, in ordine
+  // cronologico, per la barra sotto il totale.
+  const ultimeSettimane = [...checkinsConSpesa]
+    .reverse()
+    .slice(-6)
+    .map((c) => ({
+      settimana: c.settimana,
+      risparmio: (c.budget_stimato as number) - (c.spesa_reale as number),
+    }));
+  const massimoRisparmio = Math.max(1, ...ultimeSettimane.map((s) => Math.abs(s.risparmio)));
+
   const checkinsTotali = settimane.flatMap((s) => s.checkins);
   const checkinsConRisposta = checkinsTotali.filter((c) => c.spreco !== null);
   const percentualeSenzaSprechi =
@@ -77,64 +89,81 @@ export default async function AndamentoPage({
     Object.entries(conteggioCategorie).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 
   return (
-    <div className="flex flex-1 flex-col items-center px-6 py-10">
-      <h1 className="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">Il tuo andamento</h1>
-      <p className="mt-2 max-w-md text-center text-sm text-zinc-500 dark:text-zinc-400">
-        Basato sui check-in di fine settimana — nessun dato aggiuntivo da inserire.
-      </p>
+    <div className="flex flex-1 flex-col">
+      <PageHeader token={token} title="Andamento" />
 
-      <div className="mt-6 grid w-full max-w-2xl grid-cols-2 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-zinc-200 p-4 text-center dark:border-zinc-800">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Risparmio cumulativo</p>
-          <p className="mt-1 text-xl font-semibold text-zinc-950 dark:text-zinc-50">
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-5 pb-10">
+        <div className="bg-panel rounded-[14px] px-5 py-[18px]">
+          <div className="text-[13px] font-medium text-ink/65">Risparmiato rispetto al budget</div>
+          <div className="mt-1 font-mono text-[28px] font-semibold text-ink">
             {risparmioCumulativo !== null ? `€${risparmioCumulativo.toFixed(2)}` : "—"}
-          </p>
-        </div>
-        <div className="rounded-xl border border-zinc-200 p-4 text-center dark:border-zinc-800">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Settimane senza sprechi</p>
-          <p className="mt-1 text-xl font-semibold text-zinc-950 dark:text-zinc-50">
-            {percentualeSenzaSprechi !== null ? `${percentualeSenzaSprechi}%` : "—"}
-          </p>
-        </div>
-        <div className="rounded-xl border border-zinc-200 p-4 text-center dark:border-zinc-800">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Categoria più sprecata</p>
-          <p className="mt-1 text-xl font-semibold text-zinc-950 dark:text-zinc-50">
-            {categoriaPiuFrequente || "—"}
-          </p>
-        </div>
-      </div>
+          </div>
+          <div className="mt-0.5 text-xs text-ink/55">
+            {checkinsConSpesa.length > 0
+              ? `Ultime ${checkinsConSpesa.length} settimane con check-in`
+              : "Nessun check-in con spesa reale ancora"}
+          </div>
 
-      <div className="mt-8 w-full max-w-2xl">
-        <h2 className="mb-3 text-left text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-          Spesa stimata vs reale, settimana per settimana
-        </h2>
-        {settimane.length === 0 ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Nessun piano ancora generato.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {settimane.map((s) => {
-              const checkin = s.checkins[0];
-              return (
-                <li
-                  key={s.id}
-                  className="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-2.5 text-sm dark:border-zinc-800"
-                >
-                  <span className="text-zinc-600 dark:text-zinc-400">
-                    Settimana del {s.settimana}
-                  </span>
-                  <span className="text-zinc-800 dark:text-zinc-200">
-                    stimato €{s.budget_stimato?.toFixed(2) ?? "—"}
-                    {checkin?.spesa_reale != null && (
-                      <> · reale €{checkin.spesa_reale.toFixed(2)}</>
-                    )}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+          {ultimeSettimane.length > 1 && (
+            <div className="mt-5 flex h-[110px] items-end gap-2.5">
+              {ultimeSettimane.map((s, i) => {
+                const positivo = s.risparmio >= 0;
+                const altezza = Math.max(6, Math.round((Math.abs(s.risparmio) / massimoRisparmio) * 100));
+                return (
+                  <div key={`${s.settimana}-${i}`} className="flex flex-1 flex-col items-center justify-end gap-1.5">
+                    <div
+                      className={`w-full rounded-t-[3px] ${positivo ? "bg-accent" : "bg-clay"}`}
+                      style={{ height: `${altezza}px` }}
+                      title={`${s.settimana}: €${s.risparmio.toFixed(2)}`}
+                    />
+                    <span className="text-[10px] text-ink/45">{i + 1}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-panel rounded-[14px] px-5 py-[18px]">
+          <div className="text-[13px] font-medium text-ink/65">Sprechi dichiarati</div>
+          <div className="mt-1 text-lg font-bold text-ink">
+            {percentualeSenzaSprechi !== null
+              ? `${percentualeSenzaSprechi}% delle settimane senza sprechi`
+              : "Ancora nessun check-in"}
+          </div>
+          {categoriaPiuFrequente && (
+            <p className="mt-1.5 text-[13px] text-ink/60">
+              Quando capita, è quasi sempre {categoriaPiuFrequente.toLowerCase()}.
+            </p>
+          )}
+        </div>
+
+        <div>
+          <h2 className="mb-0.5 text-[13px] font-semibold text-ink/60">
+            Spesa stimata vs reale, settimana per settimana
+          </h2>
+          {settimane.length === 0 ? (
+            <p className="py-3 text-sm text-ink/55">Nessun piano ancora generato.</p>
+          ) : (
+            <ul>
+              {settimane.map((s) => {
+                const checkin = s.checkins[0];
+                return (
+                  <li
+                    key={s.id}
+                    className="flex items-center justify-between gap-3 border-t border-ink/10 py-3 first:border-t-0"
+                  >
+                    <span className="text-[15px] text-ink">Settimana del {s.settimana}</span>
+                    <span className="font-mono text-sm text-ink/70">
+                      stimato €{s.budget_stimato?.toFixed(2) ?? "—"}
+                      {checkin?.spesa_reale != null && <> · reale €{checkin.spesa_reale.toFixed(2)}</>}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );

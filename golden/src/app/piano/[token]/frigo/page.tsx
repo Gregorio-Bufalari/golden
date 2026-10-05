@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { conservazioneTipica } from "@/lib/conservazione";
+import { conservazioneTipica, gruppoAcquisto } from "@/lib/conservazione";
+import { PageHeader } from "../page-header";
 
 function formatQuantita(quantita: number, unita: string): string {
   if (unita === "g" && quantita >= 1000) {
@@ -10,6 +11,33 @@ function formatQuantita(quantita: number, unita: string): string {
   }
   const arrotondata = Math.round(quantita * 10) / 10;
   return `${arrotondata} ${unita}`;
+}
+
+type Rimanenza = { ingrediente: string; unita: string; quantita: number };
+
+function Sezione({ titolo, righe }: { titolo: string; righe: Rimanenza[] }) {
+  if (righe.length === 0) return null;
+  return (
+    <div>
+      <h2 className="mb-0.5 text-[13px] font-semibold text-ink/60">{titolo}</h2>
+      <ul>
+        {righe.map((r) => (
+          <li
+            key={`${r.ingrediente}-${r.unita}`}
+            className="flex items-start justify-between gap-3 border-t border-ink/10 py-3 first:border-t-0"
+          >
+            <div className="min-w-0">
+              <div className="text-[15px] text-ink">{r.ingrediente}</div>
+              <div className="mt-0.5 text-xs text-ink/55">{conservazioneTipica(r.ingrediente)}</div>
+            </div>
+            <span className="shrink-0 font-mono text-sm text-ink/70">
+              {formatQuantita(r.quantita, r.unita)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export default async function FrigoPage({
@@ -36,40 +64,33 @@ export default async function FrigoPage({
     .eq("profile_id", profile.id)
     .order("ingrediente", { ascending: true });
 
-  return (
-    <div className="flex flex-1 flex-col items-center px-6 py-10">
-      <h1 className="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">Frigo e dispensa</h1>
-      <p className="mt-2 max-w-md text-center text-sm text-zinc-500 dark:text-zinc-400">
-        Quello che è avanzato comprando le confezioni intere nelle settimane scorse — viene
-        sottratto automaticamente dal fabbisogno dei prossimi piani, finché non si esaurisce.
-      </p>
+  const righe: Rimanenza[] = (rimanenze || []).map((r) => ({
+    ingrediente: r.ingrediente,
+    unita: r.unita,
+    quantita: Number(r.quantita),
+  }));
 
-      <div className="mt-6 w-full max-w-md">
-        {rimanenze && rimanenze.length > 0 ? (
-          <ul className="flex flex-col gap-2">
-            {rimanenze.map((r) => (
-              <li
-                key={`${r.ingrediente}-${r.unita}`}
-                className="flex items-start justify-between gap-3 overflow-hidden rounded-lg border border-zinc-200 px-4 py-2.5 text-sm dark:border-zinc-800"
-              >
-                <span className="min-w-0 break-words text-zinc-800 dark:text-zinc-200">
-                  {r.ingrediente}
-                </span>
-                <div className="flex max-w-[55%] shrink-0 flex-col items-end text-right">
-                  <span className="text-zinc-500 dark:text-zinc-400">
-                    {formatQuantita(Number(r.quantita), r.unita)}
-                  </span>
-                  <span className="break-words text-xs text-zinc-400">
-                    {conservazioneTipica(r.ingrediente)}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
+  // Stessa classificazione già usata per dividere la Spesa per urgenza
+  // d'acquisto: qui si traduce in urgenza di consumo.
+  const presto = righe.filter((r) => gruppoAcquisto(r.ingrediente) === "subito");
+  const dopo = righe.filter((r) => gruppoAcquisto(r.ingrediente) === "puo_aspettare");
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <PageHeader
+        token={token}
+        title="Frigo"
+        subtitle="Quello che avanza dalla spesa di questa settimana, calcolato dai formati delle confezioni"
+      />
+
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-5 pb-10">
+        {righe.length > 0 ? (
+          <>
+            <Sezione titolo="Da consumare presto" righe={presto} />
+            <Sezione titolo="Dura più a lungo" righe={dopo} />
+          </>
         ) : (
-          <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
-            Niente in dispensa al momento.
-          </p>
+          <p className="pt-10 text-center text-sm text-ink/55">Niente in dispensa al momento.</p>
         )}
       </div>
     </div>

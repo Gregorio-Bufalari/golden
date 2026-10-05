@@ -1,4 +1,5 @@
 import { CheckinForm } from "../checkin-form";
+import { PageHeader } from "../page-header";
 
 export default async function CheckinPage({
   params,
@@ -8,15 +9,10 @@ export default async function CheckinPage({
   const { token } = await params;
 
   return (
-    <div className="flex flex-1 flex-col items-center px-6 py-10">
-      <h1 className="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">
-        Check-in della settimana
-      </h1>
-      <p className="mt-2 max-w-md text-center text-sm text-zinc-500 dark:text-zinc-400">
-        Due minuti, non un inventario — aiuta a migliorare i prossimi piani.
-      </p>
+    <div className="flex flex-1 flex-col">
+      <PageHeader token={token} title="Check-in" subtitle="Com'è andata questa settimana? Due minuti, non un inventario." />
 
-      <div className="mt-6 w-full max-w-md">
+      <div className="mx-auto w-full max-w-2xl flex-1 px-5 pb-10">
         <CheckinForm token={token} />
       </div>
     </div>
