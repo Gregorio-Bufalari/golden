@@ -86,15 +86,43 @@ const NOTA_COSTO_CONFEZIONI =
   "ingrediente distinto, anche se in ricetta ne servono pochi grammi (es. anche solo 5g di cumino richiedono " +
   "comunque di comprare l'intero barattolo di spezie). Quindi più ingredienti diversi e specifici introduci " +
   "nella settimana, più sale il costo reale, indipendentemente dalle quantità per ricetta. La leva più efficace " +
-  "per restare nel budget è RIUSARE le stesse spezie/condimenti/ingredienti di base in più pasti della settimana " +
-  "invece di introdurne uno nuovo ogni volta, oltre a scegliere ingredienti più economici.";
+  "per restare nel budget è RIUSARE le stesse spezie/condimenti/ingredienti di base in PIÙ RICETTE DIVERSE tra " +
+  "loro (es. lo stesso pollo o lo stesso riso base, cucinati in modi diversi in pasti diversi) invece di " +
+  "introdurre un ingrediente nuovo ogni volta, oltre a scegliere ingredienti più economici. Questo NON significa " +
+  "proporre lo stesso piatto più volte: il piatto (nome, preparazione, combinazione) deve restare distinto da " +
+  "pasto a pasto, è l'ingrediente di base che si ripete tra ricette diverse.";
+
+const ISTRUZIONE_VARIETA =
+  "Varietà (vincolo rigido quanto le restrizioni e il budget, mai sacrificabile per risparmiare o ridurre gli " +
+  "sprechi): i 14 pasti della settimana devono essere 14 ricette DISTINTE, mai lo stesso piatto ripetuto due " +
+  "volte (stesso nome o stessa combinazione con solo variazioni cosmetiche). Varia proteine, tipo di cottura, " +
+  "cucina ed elaborazione dei piatti durante la settimana. Se l'obiettivo è ridurre gli sprechi o il costo, " +
+  "ottienilo riusando gli stessi ingredienti di base in ricette diverse (vedi sopra), MAI riducendo il numero di " +
+  "ricette distinte o ripetendo un piatto già usato in un altro giorno.";
+
+function obiettivoConNota(obiettivo: string | null): string {
+  if (!obiettivo) return "non specificato";
+  if (obiettivo === "Ridurre gli sprechi") {
+    // Senza questa precisazione l'AI tende a interpretare "ridurre gli
+    // sprechi" come "comprare meno ingredienti diversi", collassando le
+    // ricette su pochissimi piatti ripetuti — esattamente l'effetto
+    // opposto a quello voluto: lo spreco si riduce usando bene quello che
+    // si compra, non riducendo la varietà dei pasti.
+    return (
+      `${obiettivo} (significa: non far avanzare ingredienti inutilizzati e usare bene le confezioni intere ` +
+      "comprate, RIUSANDO gli stessi ingredienti di base in ricette diverse — non significa ridurre il numero " +
+      "di ricette distinte o ripetere gli stessi piatti)"
+    );
+  }
+  return obiettivo;
+}
 
 function buildContestoProfilo(profilo: ProfiloPerPiano): string {
   const righe = [
     `Restrizioni alimentari (vincolo rigido, da rispettare SEMPRE senza eccezioni): ${
       profilo.restrizioni.length > 0 ? profilo.restrizioni.join(", ") : "nessuna"
     }`,
-    `Obiettivo: ${profilo.obiettivo || "non specificato"}`,
+    `Obiettivo: ${obiettivoConNota(profilo.obiettivo)}`,
     `Cucina preferita: ${profilo.preferenze?.cucina?.join(", ") || "qualsiasi"}`,
     `Alimenti graditi: ${profilo.preferenze?.graditi || "nessuna preferenza specifica"}`,
     `Alimenti non graditi (da evitare): ${profilo.preferenze?.non_graditi || "nessuno"}`,
@@ -148,6 +176,7 @@ export async function generateMealPlan(
       "Le restrizioni alimentari sono un vincolo rigido e non negoziabile: non includere MAI, nemmeno in tracce dichiarate, un ingrediente incompatibile con le restrizioni indicate. " +
       "Se è indicato un budget settimanale, è anch'esso un vincolo rigido: il totale stimato della spesa (somma di tutti i prezzo_stimato_eur dell'intero piano) non deve superarlo. " +
       "Rispetta anche obiettivo, preferenze e tempo di preparazione, in questo ordine di priorità, scegliendo ingredienti e porzioni che permettano di rientrare nel budget. " +
+      ISTRUZIONE_VARIETA + " " +
       (modalita === "scoperta" ? ISTRUZIONE_SCOPERTA + " " : "") +
       ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
       istruzioneDispensa(dispensa) + " " + istruzioneStagionalita(),
@@ -254,7 +283,7 @@ export async function adattaBudget(
       "senza violare le restrizioni alimentari (vincolo rigido, non negoziabile) e senza stravolgere le preferenze. " +
       "Riduci il costo totale stimato sostituendo ingredienti costosi con alternative più economiche (es. proteine " +
       "meno pregiate, prodotti di stagione, porzioni più ragionevoli), mantenendo varietà e qualità nutrizionale. " +
-      NOTA_COSTO_CONFEZIONI + " " +
+      NOTA_COSTO_CONFEZIONI + " " + ISTRUZIONE_VARIETA + " " +
       ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
       istruzioneDispensa(dispensa) + " " + istruzioneStagionalita(),
     messages: [
@@ -264,8 +293,9 @@ export async function adattaBudget(
           `Profilo:\n${buildContestoProfilo(profilo)}\n\n` +
           `Piano attuale (JSON):\n${JSON.stringify({ giorni: giorniAttuali })}\n\n` +
           `Il costo REALE di questo piano, calcolato dopo l'acquisto (confezioni intere e fascia del supermercato), è €${totaleAttualeEur.toFixed(2)}, ma il budget settimanale è €${budgetEur}. ` +
-          "Il modo più efficace per abbassarlo non è ridurre di poco ogni quantità, ma RIDURRE IL NUMERO DI INGREDIENTI DIVERSI E SPECIFICI usati nella settimana " +
-          "(riusa le stesse spezie/condimenti/basi in più pasti invece di introdurne uno nuovo ogni volta) e sostituire gli ingredienti più costosi. " +
+          "Il modo più efficace per abbassarlo non è ridurre di poco ogni quantità, ma RIDURRE IL NUMERO DI INGREDIENTI DI BASE DIVERSI E SPECIFICI usati nella settimana " +
+          "(riusa le stesse spezie/condimenti/basi in RICETTE DIVERSE invece di introdurre un ingrediente nuovo ogni volta) e sostituire gli ingredienti più costosi — " +
+          "le 14 ricette devono però restare 14 piatti distinti, mai lo stesso piatto ripetuto più volte nella settimana. " +
           "Punta a un costo comodamente sotto il budget (non appena sotto), perché l'arrotondamento alle confezioni reali può far risalire il totale. " +
           "Rivedi il piano per rientrare nel budget, restituendo tutti i 7 giorni.",
       },
@@ -289,6 +319,7 @@ export async function regeneratePasto(
   pasto: Pasto,
   ingredientiDaEvitare: string[],
   dispensa: Map<string, number> = new Map(),
+  nomiDaEvitare: string[] = [],
 ): Promise<Pasto> {
   const response = await client.messages.parse({
     model: MODEL,
@@ -303,7 +334,14 @@ export async function regeneratePasto(
         role: "user",
         content:
           `Rigenera il ${pasto.tipo} di ${giorno} per questo profilo:\n\n${buildContestoProfilo(profilo)}\n\n` +
-          `Il pasto precedente proposto (${pasto.nome}) conteneva questi ingredienti a rischio, da evitare assolutamente nella nuova proposta: ${ingredientiDaEvitare.join(", ")}.`,
+          (ingredientiDaEvitare.length > 0
+            ? `Il pasto precedente proposto (${pasto.nome}) conteneva questi ingredienti a rischio, da evitare assolutamente nella nuova proposta: ${ingredientiDaEvitare.join(", ")}.\n\n`
+            : "") +
+          (nomiDaEvitare.length > 0
+            ? `Questi piatti sono già usati in altri giorni della stessa settimana: ${nomiDaEvitare.join(", ")}. ` +
+              "La nuova proposta deve essere una ricetta distinta da tutte queste, non una variante dello stesso piatto " +
+              "(va bene riusare gli stessi ingredienti di base, ma la ricetta/il piatto dev'essere diverso)."
+            : ""),
       },
     ],
     output_config: {

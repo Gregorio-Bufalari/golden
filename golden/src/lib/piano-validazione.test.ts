@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { creaPianoEsempio, ingrediente, pasto } from "@/test/fixtures/piano-esempio";
 import type { ProfiloPerPiano, Pasto } from "@/lib/claude";
-import { validaGiorni, adattaEntroBudget } from "./piano-validazione";
+import { validaGiorni, assicuraVarieta, adattaEntroBudget } from "./piano-validazione";
 
 // Mock dell'intero modulo claude.ts: questi test verificano che la pipeline
 // di validazione (controllo glutine, adattamento al budget) reagisca
@@ -108,6 +108,79 @@ describe("validaGiorni — controllo glutine con rigenerazione simulata dall'AI"
 
     expect(lunediPranzo.verificare).toBe(true);
     expect(lunediPranzo.nome).toBe("Pasta al pomodoro"); // resta il pasto originale, non sostituito
+  });
+});
+
+describe("assicuraVarieta — niente due pasti con lo stesso nome nella settimana", () => {
+  it("non chiama mai l'AI se i 14 pasti sono già tutti distinti", async () => {
+    const giorni = await validaGiorni(profiloSenzaRestrizioni, creaPianoEsempio());
+    const risultato = await assicuraVarieta(profiloSenzaRestrizioni, giorni);
+
+    expect(mockRegeneratePasto).not.toHaveBeenCalled();
+    expect(risultato).toEqual(giorni);
+  });
+
+  it("rigenera i doppioni mantenendo la prima occorrenza di ogni piatto", async () => {
+    const giorni = await validaGiorni(profiloSenzaRestrizioni, creaPianoEsempio());
+    // Forza un piano degenere come quello segnalato dall'utente: lo stesso
+    // piatto ("Pasta al pomodoro") ripetuto su più pasti della settimana.
+    giorni[1].pasti[0] = { ...giorni[1].pasti[0], nome: "Pasta al pomodoro" };
+    giorni[2].pasti[1] = { ...giorni[2].pasti[1], nome: "Pasta al pomodoro" };
+
+    // Ogni rigenerazione propone un nome diverso dalle altre, come farebbe
+    // l'AI reale conoscendo l'elenco dei piatti da evitare.
+    let contatore = 0;
+    mockRegeneratePasto.mockImplementation(async () => {
+      contatore += 1;
+      return pasto({
+        tipo: "pranzo",
+        nome: `Riso al pomodoro ${contatore}`,
+        ingredienti: [ingrediente({ nome: "Riso", quantita: 100, unita: "g", reparto: "Dispensa" })],
+      });
+    });
+
+    const risultato = await assicuraVarieta(profiloSenzaRestrizioni, giorni);
+
+    // 2 doppioni da sistemare (la prima occorrenza, al Lunedì, resta).
+    expect(mockRegeneratePasto).toHaveBeenCalledTimes(2);
+    expect(risultato[0].pasti[0].nome).toBe("Pasta al pomodoro");
+    expect(risultato[1].pasti[0].nome).toBe("Riso al pomodoro 1");
+    expect(risultato[2].pasti[1].nome).toBe("Riso al pomodoro 2");
+
+    // All'AI viene comunicato l'elenco dei piatti già usati da evitare.
+    const nomiDaEvitare = mockRegeneratePasto.mock.calls[0][5] as string[];
+    expect(nomiDaEvitare).toContain("Pasta al pomodoro");
+  });
+
+  it("si ferma dopo i tentativi massimi se l'AI continua a riproporre doppioni", async () => {
+    const giorni = await validaGiorni(profiloSenzaRestrizioni, creaPianoEsempio());
+    giorni[1].pasti[0] = { ...giorni[1].pasti[0], nome: "Pasta al pomodoro" };
+
+    // L'AI simulata "sbaglia" sempre: ripropone lo stesso nome già in uso.
+    mockRegeneratePasto.mockResolvedValue(
+      pasto({
+        tipo: "pranzo",
+        nome: "Pasta al pomodoro",
+        ingredienti: [ingrediente({ nome: "Pasta", quantita: 100, unita: "g", reparto: "Pane e cereali" })],
+      }),
+    );
+
+    const risultato = await assicuraVarieta(profiloSenzaRestrizioni, giorni);
+
+    // Al massimo 2 tentativi (MAX_RIGENERAZIONI_VARIETA), non all'infinito.
+    expect(mockRegeneratePasto).toHaveBeenCalledTimes(2);
+    expect(risultato[1].pasti[0].nome).toBe("Pasta al pomodoro");
+  });
+
+  it("se la rigenerazione fallisce, lascia il doppione invece di far crashare tutto", async () => {
+    const giorni = await validaGiorni(profiloSenzaRestrizioni, creaPianoEsempio());
+    giorni[1].pasti[0] = { ...giorni[1].pasti[0], nome: "Pasta al pomodoro" };
+
+    mockRegeneratePasto.mockRejectedValue(new Error("rete non disponibile"));
+
+    const risultato = await assicuraVarieta(profiloSenzaRestrizioni, giorni);
+
+    expect(risultato[1].pasti[0].nome).toBe("Pasta al pomodoro");
   });
 });
 

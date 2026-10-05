@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateMealPlan, type ProfiloPerPiano } from "@/lib/claude";
-import { validaGiorni, adattaEntroBudget, type GiornoValidato } from "@/lib/piano-validazione";
+import { validaGiorni, assicuraVarieta, adattaEntroBudget, type GiornoValidato } from "@/lib/piano-validazione";
 import { leggiDispensa, applicaConsumiDispensa } from "@/lib/dispensa";
 import type { GroceryList, ConsumoDispensa } from "@/lib/grocery";
 
@@ -67,9 +67,10 @@ export async function POST(request: Request) {
     const dispensa = await leggiDispensa(supabase, profileId);
     const plan = await generateMealPlan(profiloInput, modalitaProfilo, dispensa);
     const giorniBase = await validaGiorni(profiloInput, plan.giorni, dispensa);
+    const giorniVari = await assicuraVarieta(profiloInput, giorniBase, dispensa);
     const risultato = await adattaEntroBudget(
       profiloInput,
-      giorniBase,
+      giorniVari,
       supermercato,
       budgetSettimanale,
       dispensa,

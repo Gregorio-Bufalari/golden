@@ -15,7 +15,7 @@ import {
   type Pasto,
 } from "./claude";
 import { ingredientiARischio } from "./glutine-check";
-import { validaGiorni } from "./piano-validazione";
+import { validaGiorni, assicuraVarieta, adattaEntroBudget } from "./piano-validazione";
 import { creaPianoEsempio } from "@/test/fixtures/piano-esempio";
 
 const haChiaveApi = Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
@@ -214,6 +214,42 @@ describe.skipIf(!haChiaveApi)("Smoke test — API Anthropic reale", () => {
       }
     },
     30_000,
+  );
+
+  it(
+    // Scenario esatto segnalato dall'utente: profilo celiachia + obiettivo
+    // "Ridurre gli sprechi" produceva praticamente lo stesso piatto
+    // ripetuto tutta la settimana e solo 3 ingredienti da comprare in
+    // tutto. Verifica la pipeline di produzione COMPLETA (generazione +
+    // controllo glutine + controllo varietà + adattamento budget), non solo
+    // generateMealPlan da sola, perché il collasso nasceva dall'interazione
+    // tra "ridurre gli sprechi" e l'adattamento al budget.
+    "profilo celiachia + \"Ridurre gli sprechi\" produce 14 ricette distinte e una spesa con più di 3 ingredienti",
+    async () => {
+      const profiloSprechi: ProfiloPerPiano = {
+        restrizioni: ["Glutine (celiachia)"],
+        obiettivo: "Ridurre gli sprechi",
+        preferenze: null,
+        tempo_max_cucina: 30,
+        household_size: 2,
+        budget_settimanale: 60,
+      };
+
+      const piano = await generateMealPlan(profiloSprechi, "routine");
+      const giorniBase = await validaGiorni(profiloSprechi, piano.giorni);
+      const giorniVari = await assicuraVarieta(profiloSprechi, giorniBase);
+      const risultato = await adattaEntroBudget(profiloSprechi, giorniVari, "Conad", 60);
+
+      const nomi = risultato.giorni.flatMap((g) => g.pasti.map((p) => p.nome));
+      const nomiDistinti = new Set(nomi.map((n) => n.trim().toLowerCase()));
+      expect(nomiDistinti.size, `piatti: ${nomi.join(", ")}`).toBe(nomi.length);
+
+      const ingredientiDistinti = new Set(
+        risultato.groceryList.reparti.flatMap((r) => r.items.map((i) => i.nome.toLowerCase())),
+      );
+      expect(ingredientiDistinti.size, `ingredienti: ${[...ingredientiDistinti].join(", ")}`).toBeGreaterThan(5);
+    },
+    120_000,
   );
 });
 
