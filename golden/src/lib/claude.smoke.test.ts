@@ -144,6 +144,44 @@ describe.skipIf(!haChiaveApi)("Smoke test — API Anthropic reale", () => {
     },
     30_000,
   );
+
+  it(
+    // Stessa pipeline del pulsante "Proponine un altro" nel Menu:
+    // modificaPiano per un piatto diverso sullo stesso giorno/pasto, poi
+    // validaGiorni (sempre, come fa /api/piano/modifica). Punta
+    // deliberatamente al pranzo di Lunedì ("Pasta al pomodoro", a rischio
+    // glutine) per verificare che anche il NUOVO piatto proposto non
+    // reintroduca un rischio senza segnalazione.
+    "\"Proponine un altro\": un piatto diverso per un pasto a rischio passa comunque dalla validazione glutine",
+    async () => {
+      const pianoConRischio = creaPianoEsempio();
+      const risultato = await modificaPiano(
+        profiloCeliaco,
+        pianoConRischio,
+        "Proponi un piatto diverso per Lunedì pranzo, stesse restrizioni e preferenze.",
+      );
+
+      expect(risultato.modificaApplicata).toBe(true);
+
+      const giorniValidati = await validaGiorni(profiloCeliaco, risultato.giorni);
+      const pranzoLunedi = giorniValidati[0].pasti.find((p) => p.tipo === "pranzo")!;
+
+      // Il piatto deve essere stato effettivamente cambiato, non solo
+      // "ri-approvato" uguale a prima.
+      expect(pranzoLunedi.nome).not.toBe("Pasta al pomodoro");
+
+      for (const giorno of giorniValidati) {
+        for (const pasto of giorno.pasti) {
+          const rischi = ingredientiARischio(pasto.ingredienti.map((i) => i.nome));
+          if (rischi.length > 0) {
+            expect(pasto.verificare, `${giorno.giorno} ${pasto.tipo}: ${rischi.join(", ")}`).toBe(true);
+            expect(pasto.ingredienti_a_rischio).toEqual(expect.arrayContaining(rischi));
+          }
+        }
+      }
+    },
+    30_000,
+  );
 });
 
 if (!haChiaveApi) {
