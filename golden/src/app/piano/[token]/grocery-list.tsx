@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Spinner } from "@/components/spinner";
+import { setAcquistato } from "./spesa/actions";
 
 type GroceryItem = {
   nome: string;
@@ -92,15 +93,31 @@ export function GroceryList({
   token,
   initialData,
   settimana,
+  initialStatoAcquisti = {},
 }: {
   token: string;
   initialData: GroceryListData;
   settimana: string;
+  initialStatoAcquisti?: Record<string, boolean>;
 }) {
   const [data, setData] = useState(initialData);
   const [itemInCorso, setItemInCorso] = useState<string | null>(null);
   const [errore, setErrore] = useState<string | null>(null);
   const [rifiuto, setRifiuto] = useState<string | null>(null);
+  const [statoAcquisti, setStatoAcquisti] = useState<Record<string, boolean>>(initialStatoAcquisti);
+
+  // Nessuna AI coinvolta: salva subito su Supabase, con aggiornamento
+  // ottimistico (torna indietro solo se il salvataggio fallisce davvero).
+  async function handleToggleAcquistato(nome: string) {
+    const nuovoValore = !statoAcquisti[nome];
+    setStatoAcquisti((prev) => ({ ...prev, [nome]: nuovoValore }));
+
+    const risultato = await setAcquistato(token, nome, nuovoValore);
+    if ("error" in risultato) {
+      setStatoAcquisti((prev) => ({ ...prev, [nome]: !nuovoValore }));
+      setErrore(risultato.error);
+    }
+  }
 
   // Il numero accanto ai pulsanti è l'avanzo: + deve farlo crescere (si usa
   // MENO dell'ingrediente nel menu, ne resta di più in dispensa), - deve
@@ -193,15 +210,28 @@ export function GroceryList({
               {reparto.reparto}
             </h4>
             <ul className="flex flex-col gap-1">
-              {reparto.items.map((item) => (
-                <li
-                  key={item.nome}
-                  className="flex items-center justify-between gap-3 text-sm text-zinc-600 dark:text-zinc-400"
-                >
-                  <span>{formatRigaLista(item)}</span>
-                  <span className="shrink-0 text-zinc-400">~€{item.prezzo_stimato.toFixed(2)}</span>
-                </li>
-              ))}
+              {reparto.items.map((item) => {
+                const acquistato = Boolean(statoAcquisti[item.nome]);
+                return (
+                  <li
+                    key={item.nome}
+                    className="flex items-center justify-between gap-3 text-sm text-zinc-600 dark:text-zinc-400"
+                  >
+                    <label className="flex min-w-0 cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={acquistato}
+                        onChange={() => handleToggleAcquistato(item.nome)}
+                        className="h-4 w-4 shrink-0 print:hidden"
+                      />
+                      <span className={acquistato ? "text-zinc-400 line-through dark:text-zinc-600" : ""}>
+                        {formatRigaLista(item)}
+                      </span>
+                    </label>
+                    <span className="shrink-0 text-zinc-400">~€{item.prezzo_stimato.toFixed(2)}</span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ))}

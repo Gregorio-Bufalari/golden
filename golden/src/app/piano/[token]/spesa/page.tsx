@@ -21,12 +21,22 @@ export default async function SpesaPage({
 
   const { data: ultimoPiano } = await supabase
     .from("weekly_plans")
-    .select("settimana, grocery_list")
+    .select("id, settimana, grocery_list")
     .eq("profile_id", profile.id)
     .order("settimana", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  let statoAcquisti: Record<string, boolean> = {};
+  if (ultimoPiano?.id) {
+    const { data: righeStato } = await supabase
+      .from("spesa_stato")
+      .select("prodotto, acquistato")
+      .eq("weekly_plan_id", ultimoPiano.id);
+
+    statoAcquisti = Object.fromEntries((righeStato || []).map((r) => [r.prodotto, r.acquistato]));
+  }
 
   return (
     <div className="flex flex-1 flex-col items-center px-6 py-10">
@@ -40,6 +50,7 @@ export default async function SpesaPage({
             token={token}
             initialData={ultimoPiano.grocery_list}
             settimana={ultimoPiano.settimana}
+            initialStatoAcquisti={statoAcquisti}
           />
         ) : (
           <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
