@@ -83,6 +83,30 @@ describe("generateMealPlan — risposta AI simulata", () => {
     expect(richiesta.system).toMatch(/di stagione/i);
     expect(richiesta.system).toMatch(/restrizioni.*vincolo più alto/i);
   });
+
+  it("senza dispensa passata non menziona ingredienti avanzati nel prompt", async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: { giorni: creaPianoEsempio() } });
+
+    await generateMealPlan(profiloBase);
+
+    const richiesta = mockParse.mock.calls[0][0];
+    expect(richiesta.system).not.toMatch(/avanzati in dispensa/i);
+  });
+
+  it("con una dispensa passata, chiede di usare attivamente gli ingredienti avanzati", async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: { giorni: creaPianoEsempio() } });
+
+    const dispensa = new Map([
+      ["spinaci__g", 450],
+      ["riso__g", 670],
+    ]);
+    await generateMealPlan(profiloBase, "routine", dispensa);
+
+    const richiesta = mockParse.mock.calls[0][0];
+    expect(richiesta.system).toMatch(/avanzati in dispensa/i);
+    expect(richiesta.system).toContain("spinaci (450g)");
+    expect(richiesta.system).toContain("riso (670g)");
+  });
 });
 
 describe("modificaPiano — risposta AI simulata", () => {
@@ -130,5 +154,17 @@ describe("modificaPiano — risposta AI simulata", () => {
 
     const richiesta = mockParse.mock.calls[0][0];
     expect(richiesta.system).toMatch(/di stagione/i);
+  });
+
+  it("include anche qui gli ingredienti avanzati in dispensa, quando passati (es. pulsante \"Proponine un altro\")", async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+    });
+
+    const dispensa = new Map([["uova__pz", 1]]);
+    await modificaPiano(profiloBase, creaPianoEsempio(), "proponi un piatto diverso per Lunedì pranzo", dispensa);
+
+    const richiesta = mockParse.mock.calls[0][0];
+    expect(richiesta.system).toContain("uova (1pz)");
   });
 });

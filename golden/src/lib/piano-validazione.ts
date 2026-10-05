@@ -26,6 +26,7 @@ export type GiornoValidato = {
 export async function validaGiorni(
   profilo: ProfiloPerPiano,
   giorni: Giorno[],
+  dispensa: Map<string, number> = new Map(),
 ): Promise<GiornoValidato[]> {
   const richiedeControlloGlutine = profilo.restrizioni?.includes("Glutine (celiachia)");
   const pasti: PastoValidato[][] = giorni.map((g) => [...g.pasti]);
@@ -45,7 +46,7 @@ export async function validaGiorni(
       await Promise.all(
         daRigenerare.map(async ({ gi, pi, rischi }) => {
           try {
-            pasti[gi][pi] = await regeneratePasto(profilo, giorni[gi].giorno, pasti[gi][pi], rischi);
+            pasti[gi][pi] = await regeneratePasto(profilo, giorni[gi].giorno, pasti[gi][pi], rischi, dispensa);
           } catch (err) {
             console.error("regeneratePasto error:", err);
           }
@@ -94,8 +95,9 @@ export async function adattaEntroBudget(
         giorni as Giorno[],
         risultato.groceryList.totale_stimato,
         budget,
+        dispensa,
       );
-      giorni = await validaGiorni(profilo, pianoAdattato.giorni);
+      giorni = await validaGiorni(profilo, pianoAdattato.giorni, dispensa);
       risultato = buildGroceryList(giorni, supermercato, dispensa);
     } catch (err) {
       console.error("adattaBudget error:", err);

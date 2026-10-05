@@ -25,6 +25,43 @@ export async function leggiDispensa(
   return dispensa;
 }
 
+/** Ricostruisce nome/unità/quantità dalle chiavi `nome__unita` della dispensa. */
+export function elencoDispensa(dispensa: Map<string, number>): VoceDispensa[] {
+  const voci: VoceDispensa[] = [];
+  for (const [k, quantita] of dispensa) {
+    if (quantita <= 0) continue;
+    const separatore = k.lastIndexOf("__");
+    if (separatore === -1) continue;
+    voci.push({ nome: k.slice(0, separatore), unita: k.slice(separatore + 2), quantita });
+  }
+  return voci.sort((a, b) => a.nome.localeCompare(b.nome));
+}
+
+function formattaQuantita(quantita: number): string {
+  return String(Math.round(quantita * 100) / 100);
+}
+
+/**
+ * Istruzione da aggiungere al prompt dell'AI: elenca gli ingredienti già
+ * avanzati in dispensa/frigo, da usare attivamente nel nuovo piano invece di
+ * restare inutilizzati — criterio ad alta priorità per ridurre gli sprechi,
+ * ma mai a scapito di restrizioni, sicurezza o budget (ricordato
+ * esplicitamente nel testo stesso).
+ */
+export function istruzioneDispensa(dispensa: Map<string, number>): string {
+  const voci = elencoDispensa(dispensa);
+  if (voci.length === 0) return "";
+
+  const elenco = voci.map((v) => `${v.nome} (${formattaQuantita(v.quantita)}${v.unita})`).join(", ");
+
+  return (
+    "Hai già questi ingredienti avanzati in dispensa/frigo da settimane precedenti: " + elenco + ". " +
+    "Usali ATTIVAMENTE in uno o più pasti di questo piano, invece di introdurne di nuovi che li lascerebbero " +
+    "inutilizzati, quando compatibile con restrizioni, preferenze e obiettivo. È un criterio ad alta priorità " +
+    "per ridurre gli sprechi: subito dopo restrizioni alimentari, sicurezza e budget, e prima della stagionalità."
+  );
+}
+
 async function applicaDelta(
   supabase: SupabaseClient,
   profileId: string,

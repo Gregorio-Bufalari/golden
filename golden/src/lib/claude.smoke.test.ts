@@ -146,6 +146,39 @@ describe.skipIf(!haChiaveApi)("Smoke test — API Anthropic reale", () => {
   );
 
   it(
+    // Scenario reale segnalato dall'utente: spinaci, riso e uova avanzati in
+    // dispensa da settimane precedenti. Verifica che generateMealPlan non si
+    // limiti a menzionare il criterio nel prompt (già coperto dai test con
+    // risposta simulata in claude.test.ts) ma che l'AI reale lo segua
+    // davvero, usando almeno uno di questi ingredienti nel nuovo piano
+    // invece di lasciarli completamente fuori.
+    "generateMealPlan usa davvero gli ingredienti avanzati in dispensa quando possibile (riduzione sprechi)",
+    async () => {
+      const dispensa = new Map([
+        ["spinaci__g", 450],
+        ["riso__g", 670],
+        ["uova__pz", 1],
+      ]);
+
+      const piano = await generateMealPlan(profiloCeliaco, "routine", dispensa);
+
+      const tuttiIngredienti = piano.giorni
+        .flatMap((g) => g.pasti)
+        .flatMap((p) => p.ingredienti.map((i) => i.nome.toLowerCase()));
+
+      const usaAlmenoUnAvanzo =
+        tuttiIngredienti.some((n) => n.includes("spinaci")) ||
+        tuttiIngredienti.some((n) => n.includes("riso")) ||
+        tuttiIngredienti.some((n) => n.includes("uov"));
+
+      expect(usaAlmenoUnAvanzo, `ingredienti nel piano: ${[...new Set(tuttiIngredienti)].join(", ")}`).toBe(
+        true,
+      );
+    },
+    60_000,
+  );
+
+  it(
     // Stessa pipeline del pulsante "Proponine un altro" nel Menu:
     // modificaPiano per un piatto diverso sullo stesso giorno/pasto, poi
     // validaGiorni (sempre, come fa /api/piano/modifica). Punta

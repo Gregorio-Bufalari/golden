@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { istruzioneStagionalita } from "./stagionalita";
+import { istruzioneDispensa } from "./dispensa";
 
 // Sonnet invece di Opus: elencare pasti/ingredienti/prezzi non richiede un
 // ragionamento complesso, e Sonnet genera molto più velocemente — importante
@@ -137,6 +138,7 @@ const ISTRUZIONE_SCOPERTA =
 export async function generateMealPlan(
   profilo: ProfiloPerPiano,
   modalita: "routine" | "scoperta" = "routine",
+  dispensa: Map<string, number> = new Map(),
 ): Promise<MealPlan> {
   const response = await client.messages.parse({
     model: MODEL,
@@ -148,7 +150,7 @@ export async function generateMealPlan(
       "Rispetta anche obiettivo, preferenze e tempo di preparazione, in questo ordine di priorità, scegliendo ingredienti e porzioni che permettano di rientrare nel budget. " +
       (modalita === "scoperta" ? ISTRUZIONE_SCOPERTA + " " : "") +
       ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
-      istruzioneStagionalita(),
+      istruzioneDispensa(dispensa) + " " + istruzioneStagionalita(),
     messages: [
       {
         role: "user",
@@ -186,6 +188,7 @@ export async function modificaPiano(
   profilo: ProfiloPerPiano,
   giorniAttuali: Giorno[],
   messaggioUtente: string,
+  dispensa: Map<string, number> = new Map(),
 ): Promise<RisultatoModifica> {
   const response = await client.messages.parse({
     model: MODEL,
@@ -205,7 +208,7 @@ export async function modificaPiano(
       "che usa di più (o di meno) quell'ingrediente — piuttosto che alterare le porzioni di una singola ricetta " +
       "fino a renderle irrealistiche per una persona (es. non proporre mai 800g di pollo in un solo piatto). " +
       ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
-      istruzioneStagionalita(),
+      istruzioneDispensa(dispensa) + " " + istruzioneStagionalita(),
     messages: [
       {
         role: "user",
@@ -241,6 +244,7 @@ export async function adattaBudget(
   giorniAttuali: Giorno[],
   totaleAttualeEur: number,
   budgetEur: number,
+  dispensa: Map<string, number> = new Map(),
 ): Promise<MealPlan> {
   const response = await client.messages.parse({
     model: MODEL,
@@ -252,7 +256,7 @@ export async function adattaBudget(
       "meno pregiate, prodotti di stagione, porzioni più ragionevoli), mantenendo varietà e qualità nutrizionale. " +
       NOTA_COSTO_CONFEZIONI + " " +
       ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
-      istruzioneStagionalita(),
+      istruzioneDispensa(dispensa) + " " + istruzioneStagionalita(),
     messages: [
       {
         role: "user",
@@ -284,6 +288,7 @@ export async function regeneratePasto(
   giorno: string,
   pasto: Pasto,
   ingredientiDaEvitare: string[],
+  dispensa: Map<string, number> = new Map(),
 ): Promise<Pasto> {
   const response = await client.messages.parse({
     model: MODEL,
@@ -292,7 +297,7 @@ export async function regeneratePasto(
       "Sei un assistente che rigenera un singolo pasto di un piano settimanale, in italiano. " +
       "Le restrizioni alimentari sono un vincolo rigido: non includere MAI un ingrediente incompatibile. " +
       ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
-      istruzioneStagionalita(),
+      istruzioneDispensa(dispensa) + " " + istruzioneStagionalita(),
     messages: [
       {
         role: "user",
