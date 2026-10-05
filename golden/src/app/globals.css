@@ -4,8 +4,10 @@
  * Palette Groci: Ink e Sage sono campionati esattamente dal logo
  * (#1C1C16 / #ECF3E0). Moss, Clay e Honey compaiono solo quando c'è
  * un'azione o un avviso — il resto dell'interfaccia resta neutro.
- * In dark mode ink e il ruolo di "sage" si scambiano: il verde del
- * logo diventa il colore del testo, non resta solo uno sfondo.
+ * Sempre questa combinazione, a prescindere dalla preferenza
+ * chiaro/scuro del dispositivo: è l'unica mai definita e approvata
+ * nel piano di design (sfondo verde chiaro, testo verde scuro) — una
+ * variante scura invertita non è mai stata parte del piano.
  */
 :root {
   --paper: #fbfbf6; /* sfondo di lettura */
@@ -31,20 +33,6 @@
   --color-honey-soft: var(--honey-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #14160f;
-    --panel: #1d2016;
-    --ink: #ecf3e0;
-    --accent: #8fae72;
-    --accent-fill-text: #14160f;
-    --clay: #cb8275;
-    --clay-soft: #2a1d1a;
-    --honey: #d9a855;
-    --honey-soft: #2a2415;
-  }
 }
 
 body {
