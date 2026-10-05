@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { riepilogoSostituzione } from "./grocery-list";
+import { riepilogoSostituzione, ingredientiARischioSettimana } from "./grocery-list";
 
 type GroceryReparto = Parameters<typeof riepilogoSostituzione>[0][number];
 
@@ -35,7 +35,7 @@ describe("riepilogoSostituzione", () => {
     const dopo = [reparto("Frutta e verdura", ["Zucchine"])];
 
     expect(riepilogoSostituzione(prima, dopo, "Pomodoro")).toBe(
-      "Pomodoro non è più nella lista — il piano è stato aggiornato.",
+      "Pomodoro non è più nella lista. Il piano è stato aggiornato.",
     );
   });
 
@@ -46,5 +46,34 @@ describe("riepilogoSostituzione", () => {
     expect(riepilogoSostituzione(prima, dopo, "Mozzarella")).toBe(
       "Il piano è stato aggiornato per Mozzarella.",
     );
+  });
+});
+
+describe("ingredientiARischioSettimana", () => {
+  it("raccoglie, in minuscolo, gli ingredienti a rischio dei soli pasti segnalati 'verificare'", () => {
+    const giorni = [
+      {
+        pasti: [
+          { verificare: true, ingredienti_a_rischio: ["Pasta", "Salsa di soia"] },
+          { verificare: false, ingredienti_a_rischio: ["Farina 00"] },
+        ],
+      },
+      { pasti: [{ verificare: true, ingredienti_a_rischio: ["Pane"] }] },
+    ];
+
+    expect(ingredientiARischioSettimana(giorni).sort()).toEqual(["pane", "pasta", "salsa di soia"]);
+  });
+
+  it("restituisce un array vuoto quando nessun pasto è segnalato", () => {
+    const giorni = [{ pasti: [{ verificare: false, ingredienti_a_rischio: ["Pasta"] }] }];
+    expect(ingredientiARischioSettimana(giorni)).toEqual([]);
+  });
+
+  it("non duplica lo stesso ingrediente visto in più pasti", () => {
+    const giorni = [
+      { pasti: [{ verificare: true, ingredienti_a_rischio: ["Pasta"] }] },
+      { pasti: [{ verificare: true, ingredienti_a_rischio: ["pasta"] }] },
+    ];
+    expect(ingredientiARischioSettimana(giorni)).toEqual(["pasta"]);
   });
 });

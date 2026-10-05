@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ModalitaToggle } from "../modalita-toggle";
+import { PageHeader } from "../page-header";
 import { setModalita } from "../actions";
 import { Spinner } from "@/components/spinner";
 import {
@@ -18,6 +19,7 @@ type Ingrediente = {
   quantita: number;
   unita: "g" | "kg" | "ml" | "l" | "pz" | "confezione";
   reparto: string;
+  prezzo_stimato_eur: number;
 };
 
 type Nutrizione = {
@@ -44,19 +46,40 @@ type Giorno = {
   pasti: Pasto[];
 };
 
-function formatQuantita(quantita: number, unita: Ingrediente["unita"]): string {
-  if (unita === "g" && quantita >= 1000) {
-    return `${(quantita / 1000).toFixed(quantita % 1000 === 0 ? 0 : 1)} kg`;
-  }
-  if (unita === "ml" && quantita >= 1000) {
-    return `${(quantita / 1000).toFixed(quantita % 1000 === 0 ? 0 : 1)} l`;
-  }
-  const arrotondata = Math.round(quantita * 10) / 10;
-  return `${arrotondata} ${unita}`;
+function prezzoPasto(pasto: Pasto): number {
+  return pasto.ingredienti.reduce((somma, i) => somma + i.prezzo_stimato_eur, 0);
+}
+
+function ChevronIcon({ aperto }: { aperto: boolean }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`shrink-0 transition-transform ${aperto ? "rotate-180" : ""}`}
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 4v5h5" />
+      <path d="M4.5 9A8 8 0 1 1 6 16" />
+    </svg>
+  );
 }
 
 export function MenuView({
   token,
+  nome,
   initialModalita,
   initialGiorni,
   initialSettimana,
@@ -65,6 +88,7 @@ export function MenuView({
   datiBiometrici,
 }: {
   token: string;
+  nome: string;
   initialModalita: "routine" | "scoperta";
   initialGiorni: Giorno[] | null;
   initialSettimana: string;
@@ -221,235 +245,221 @@ export function MenuView({
   }
 
   return (
-    <div className="mt-6 w-full max-w-2xl">
-      <div className="mb-4 flex justify-center">
+    <div className="flex flex-1 flex-col">
+      <PageHeader
+        token={token}
+        logo
+        title="Menu"
+        subtitle={giorni ? `Ciao ${nome} · Settimana del ${settimana}${loading ? " · genero il nuovo piano..." : ""}` : `Ciao ${nome}`}
+      />
+
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-5 pb-10">
         <ModalitaToggle
           modalita={modalita}
           onSwitch={handleSwitchModalita}
           disabled={cambiandoModalita || loading}
         />
-      </div>
 
-      {!giorni && (
-        <div className="flex flex-col items-center gap-3">
-          <button
-            onClick={handleGenerate}
-            disabled={loading || cambiandoModalita}
-            className="flex items-center gap-2 rounded-full bg-black px-6 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-          >
-            {loading && <Spinner className="h-4 w-4" />}
-            {loading ? "Genero il piano..." : "Genera il piano della settimana"}
-          </button>
-          {loading && (
-            <p className="text-xs text-zinc-400">Può richiedere qualche secondo...</p>
-          )}
-          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-        </div>
-      )}
+        {!giorni && (
+          <div className="flex flex-col items-center gap-3 py-10">
+            <button
+              onClick={handleGenerate}
+              disabled={loading || cambiandoModalita}
+              className="flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-accent-fill-text disabled:opacity-50"
+            >
+              {loading && <Spinner className="h-4 w-4" />}
+              {loading ? "Genero il piano..." : "Genera il piano della settimana"}
+            </button>
+            {loading && <p className="text-xs text-ink/50">Può richiedere qualche secondo...</p>}
+            {error && <p className="text-sm text-clay">{error}</p>}
+          </div>
+        )}
 
-      {giorni && (
-        <div className="flex flex-col gap-6 text-left">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-zinc-400">
-              Settimana del {settimana}
-              {loading && " · genero il nuovo piano, qualche secondo..."}
-            </p>
+        {giorni && (
+          <div className="flex flex-col gap-6 text-left">
             {modalita === "scoperta" && (
               <button
                 onClick={handleGenerate}
                 disabled={loading || cambiandoModalita}
-                className="flex items-center gap-1.5 rounded-full border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+                className="flex items-center gap-1.5 self-start rounded-full bg-panel px-4 py-2 text-xs font-semibold text-ink disabled:opacity-50"
               >
                 {loading && <Spinner className="h-3.5 w-3.5" />}
                 {loading ? "Genero..." : "Altri suggerimenti"}
               </button>
             )}
-          </div>
-          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+            {error && <p className="text-sm text-clay">{error}</p>}
 
-          {budgetSuperato && budgetSettimanale && budgetStimato && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-              Il piano supera il budget: stimato €{budgetStimato.toFixed(2)} contro €{budgetSettimanale}.
-            </div>
-          )}
+            {budgetSuperato && budgetSettimanale && budgetStimato && (
+              <div className="bg-honey-soft px-4 py-3 text-sm text-ink">
+                Il piano supera il budget: stimato €{budgetStimato.toFixed(2)} contro €{budgetSettimanale}.
+              </div>
+            )}
 
-          <div className="flex flex-col gap-6">
-            {giorni.map((giorno) => (
-              <div
-                key={giorno.giorno}
-                className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800"
-              >
-                <h3 className="mb-3 text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                  {giorno.giorno}
-                </h3>
-                <div className="flex flex-col gap-4">
-                  {giorno.pasti.map((pasto, i) => {
-                    const chiave = `${giorno.giorno}-${i}`;
-                    const espanso = pastoEspanso === chiave;
-                    const haPreparazione = Boolean(pasto.preparazione?.length);
-                    return (
-                      <div key={i}>
-                        <button
-                          type="button"
-                          onClick={() => haPreparazione && setPastoEspanso(espanso ? null : chiave)}
-                          className={`flex w-full flex-wrap items-center gap-2 text-left ${
-                            haPreparazione ? "cursor-pointer" : "cursor-default"
-                          }`}
-                        >
-                          <span className="text-xs font-medium uppercase text-zinc-500 dark:text-zinc-500">
-                            {pasto.tipo}
-                          </span>
-                          <span className="font-medium text-zinc-900 underline decoration-dotted underline-offset-4 dark:text-zinc-100">
-                            {pasto.nome}
-                          </span>
-                          <span className="text-xs text-zinc-400">
-                            ({pasto.tempo_preparazione_min} min)
-                          </span>
-                          {haPreparazione && (
-                            <span className="text-xs text-zinc-400">
-                              {espanso ? "▲ nascondi preparazione" : "▼ vedi preparazione"}
-                            </span>
-                          )}
-                        </button>
-                        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                          {pasto.ingredienti
-                            .map((ing) => `${ing.nome} (${formatQuantita(ing.quantita, ing.unita)})`)
-                            .join(", ")}
-                        </p>
-                        {pasto.nutrizione && (
-                          <p className="mt-1 text-xs text-zinc-400">
-                            {pasto.nutrizione.calorie} kcal · {pasto.nutrizione.proteine_g}g proteine ·{" "}
-                            {pasto.nutrizione.carboidrati_g}g carboidrati · {pasto.nutrizione.grassi_g}g grassi ·{" "}
-                            {pasto.nutrizione.fibre_g}g fibre
-                          </p>
-                        )}
-                        <div className="mt-1.5 flex items-center gap-2">
-                          <button
-                            onClick={() => handlePastoDiverso(giorno, pasto, chiave)}
-                            disabled={azioneInCorso}
-                            className="rounded-full border border-zinc-300 px-2 py-0.5 text-[11px] font-medium text-zinc-500 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-400"
-                          >
-                            Proponine un altro
-                          </button>
-                          {pastoInCorso === chiave && <Spinner className="h-3.5 w-3.5 text-zinc-400" />}
-                        </div>
-                        {espanso && haPreparazione && (
-                          <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5 text-sm text-zinc-600 dark:text-zinc-400">
-                            {pasto.preparazione?.map((passo, j) => (
-                              <li key={j}>{passo}</li>
-                            ))}
-                          </ol>
-                        )}
-                        {pasto.verificare && (
-                          <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
-                            ⚠️ Verifica necessaria: possibili tracce di glutine in{" "}
-                            {pasto.ingredienti_a_rischio?.join(", ")}. Controlla le etichette
-                            prima di procedere.
+            <div className="flex flex-col gap-7">
+              {giorni.map((giorno) => (
+                <div key={giorno.giorno}>
+                  <h3 className="mb-2.5 text-[15px] font-semibold text-ink">{giorno.giorno}</h3>
+                  <div className="flex flex-col gap-3">
+                    {giorno.pasti.map((pasto, i) => {
+                      const chiave = `${giorno.giorno}-${i}`;
+                      const espanso = pastoEspanso === chiave;
+                      const haPreparazione = Boolean(pasto.preparazione?.length);
+                      const caricandoPasto = pastoInCorso === chiave;
+                      return (
+                        <div key={i} className="flex flex-col gap-2">
+                          <div className="flex items-stretch gap-2">
+                            <button
+                              type="button"
+                              onClick={() => haPreparazione && setPastoEspanso(espanso ? null : chiave)}
+                              disabled={!haPreparazione}
+                              className="flex-1 rounded-[14px] bg-panel px-5 py-[18px] text-left disabled:cursor-default"
+                            >
+                              <div className="text-[13px] font-medium text-ink/60">
+                                {pasto.tipo === "pranzo" ? "Pranzo" : "Cena"} · {pasto.tempo_preparazione_min} min
+                              </div>
+                              <div className="mt-1 text-[21px] font-bold leading-tight tracking-tight text-ink">
+                                {pasto.nome}
+                              </div>
+                              <p className="mt-1.5 text-[13px] text-ink/65">
+                                {pasto.ingredienti.map((ing) => ing.nome).join(", ")}
+                              </p>
+                              <div className="mt-3.5 flex items-center gap-2 font-mono text-sm text-ink/75">
+                                <span>€{prezzoPasto(pasto).toFixed(2)}</span>
+                                <span className="text-ink/35">·</span>
+                                <span>{pasto.nutrizione.calorie} kcal</span>
+                                {haPreparazione && (
+                                  <span className="ml-auto flex items-center gap-1 font-sans text-xs font-medium text-accent">
+                                    Preparazione
+                                    <ChevronIcon aperto={espanso} />
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                            <button
+                              onClick={() => handlePastoDiverso(giorno, pasto, chiave)}
+                              disabled={azioneInCorso}
+                              aria-label={`Proponine un altro: ${pasto.tipo}`}
+                              className="flex w-11 shrink-0 items-center justify-center rounded-xl text-accent disabled:opacity-40"
+                            >
+                              {caricandoPasto ? <Spinner className="h-4 w-4" /> : <RefreshIcon />}
+                            </button>
                           </div>
-                        )}
+
+                          {espanso && haPreparazione && (
+                            <ol className="flex list-decimal flex-col gap-1 rounded-[14px] bg-panel px-5 py-4 pl-9 text-sm text-ink/80">
+                              {pasto.preparazione?.map((passo, j) => (
+                                <li key={j}>{passo}</li>
+                              ))}
+                            </ol>
+                          )}
+
+                          {pasto.verificare && (
+                            <div className="flex gap-3 bg-clay-soft px-4 py-3">
+                              <div className="w-1 shrink-0 bg-clay" />
+                              <p className="text-[13px] leading-relaxed text-ink">
+                                <span className="font-semibold text-clay">Verifica necessaria.</span>{" "}
+                                Possibili tracce di glutine in {pasto.ingredienti_a_rischio?.join(", ")}.
+                                Controlla le etichette prima di procedere.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {!confrontoLARN && (
+              <p className="text-xs text-ink/50">
+                Inserisci sesso, età, peso, altezza e livello di attività nel{" "}
+                <a href={`/piano/${token}/impostazioni`} className="text-accent underline">
+                  Profilo
+                </a>{" "}
+                per vedere un confronto indicativo tra il piano e i valori di riferimento nutrizionali.
+              </p>
+            )}
+
+            {confrontoLARN && (
+              <div className="rounded-[14px] bg-panel p-5">
+                <h3 className="mb-3.5 text-sm font-semibold text-ink">Confronto nutrizionale settimanale</h3>
+                <div className="flex flex-col gap-2.5">
+                  {confrontoLARN.map((n) => {
+                    const inCorso = nutrienteInCorso === n.chiave;
+                    const colore = n.fascia === "media" ? "text-accent" : "text-honey";
+                    const puntino = n.fascia === "media" ? "bg-accent" : "bg-honey";
+                    return (
+                      <div key={n.chiave} className="flex items-center gap-2.5">
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${puntino}`} />
+                        <span className="text-[13.5px] text-ink">{n.etichetta}</span>
+                        <span className={`text-[13.5px] font-medium ${colore}`}>{n.fascia}</span>
+                        <span className="font-mono text-[13px] text-ink/60">
+                          {Math.round(n.totale)}/{Math.round(n.riferimento)}
+                          {n.unita}
+                        </span>
+                        <span className="ml-auto flex items-center gap-1">
+                          <button
+                            onClick={() => handleAzioneNutriente(n, "Riduci")}
+                            disabled={azioneInCorso}
+                            aria-label={`Riduci ${n.etichetta.toLowerCase()}`}
+                            className="flex h-11 w-11 items-center justify-center text-ink disabled:opacity-40"
+                          >
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-ink/20 text-sm">
+                              −
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => handleAzioneNutriente(n, "Aumenta")}
+                            disabled={azioneInCorso}
+                            aria-label={`Aumenta ${n.etichetta.toLowerCase()}`}
+                            className="flex h-11 w-11 items-center justify-center text-ink disabled:opacity-40"
+                          >
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-ink/20 text-sm">
+                              +
+                            </span>
+                          </button>
+                          {inCorso && <Spinner className="h-3.5 w-3.5 text-ink/50" />}
+                        </span>
                       </div>
                     );
                   })}
                 </div>
+                <p className="mt-4 text-xs text-ink/50">
+                  Tra parentesi: questa settimana / riferimento. {DISCLAIMER_LARN}
+                </p>
               </div>
-            ))}
-          </div>
+            )}
 
-          {!confrontoLARN && (
-            <p className="text-xs text-zinc-400">
-              Inserisci sesso, età, peso, altezza e livello di attività nelle{" "}
-              <a href={`/piano/${token}/impostazioni`} className="underline">
-                Impostazioni
-              </a>{" "}
-              per vedere un confronto indicativo tra il piano e i valori di riferimento
-              nutrizionali.
-            </p>
-          )}
-
-          {confrontoLARN && (
-            <div className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
-              <h3 className="mb-3 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-                Confronto nutrizionale settimanale
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {confrontoLARN.map((n) => {
-                  const inCorso = nutrienteInCorso === n.chiave;
-                  const coloreFascia =
-                    n.fascia === "media"
-                      ? "text-green-700 dark:text-green-400"
-                      : "text-amber-700 dark:text-amber-400";
-                  return (
-                    <div
-                      key={n.chiave}
-                      className="flex items-center gap-1.5 rounded-full border border-zinc-200 py-1.5 pl-3 pr-1.5 text-xs dark:border-zinc-800"
-                    >
-                      <span className="text-zinc-500 dark:text-zinc-400">{n.etichetta}</span>
-                      <span className={`font-medium ${coloreFascia}`}>{n.fascia}</span>
-                      <span className="text-zinc-400">
-                        ({Math.round(n.totale)}/{Math.round(n.riferimento)}
-                        {n.unita})
-                      </span>
-                      <button
-                        onClick={() => handleAzioneNutriente(n, "Riduci")}
-                        disabled={azioneInCorso}
-                        aria-label={`Riduci ${n.etichetta.toLowerCase()}`}
-                        className="flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300 disabled:opacity-40 dark:border-zinc-700"
-                      >
-                        −
-                      </button>
-                      <button
-                        onClick={() => handleAzioneNutriente(n, "Aumenta")}
-                        disabled={azioneInCorso}
-                        aria-label={`Aumenta ${n.etichetta.toLowerCase()}`}
-                        className="flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300 disabled:opacity-40 dark:border-zinc-700"
-                      >
-                        +
-                      </button>
-                      {inCorso && <Spinner className="h-3.5 w-3.5 text-zinc-400" />}
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="mt-3 text-xs text-zinc-400">
-                Tra parentesi: questa settimana / riferimento. {DISCLAIMER_LARN}
+            <div className="rounded-[14px] bg-panel p-5">
+              <h3 className="mb-1.5 text-sm font-semibold text-ink">Modifica il piano</h3>
+              <p className="mb-3 text-xs text-ink/55">
+                Es. &quot;giovedì mangio fuori&quot;, &quot;ho già comprato il pollo&quot;, &quot;spendi meno
+                questa settimana&quot;.
               </p>
+              <textarea
+                value={messaggio}
+                onChange={(e) => setMessaggio(e.target.value)}
+                rows={2}
+                placeholder="Scrivi qui la modifica..."
+                className="w-full rounded-xl bg-paper px-3.5 py-3 text-sm text-ink placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-accent/40"
+              />
+              {erroreModifica && <p className="mt-2 text-sm text-clay">{erroreModifica}</p>}
+              {rifiutoModifica && (
+                <div className="mt-2 bg-honey-soft px-3.5 py-2.5 text-sm text-ink">{rifiutoModifica}</div>
+              )}
+              <button
+                onClick={handleModifica}
+                disabled={!messaggio.trim() || azioneInCorso}
+                className="mt-3.5 flex min-h-11 items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-accent-fill-text disabled:opacity-40"
+              >
+                {modificando && <Spinner className="h-4 w-4" />}
+                {modificando ? "Applico la modifica..." : "Applica modifica"}
+              </button>
             </div>
-          )}
-
-          <div className="rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
-            <h3 className="mb-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-              Modifica il piano
-            </h3>
-            <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
-              Es. &quot;giovedì mangio fuori&quot;, &quot;ho già comprato il pollo&quot;,
-              &quot;spendi meno questa settimana&quot;.
-            </p>
-            <textarea
-              value={messaggio}
-              onChange={(e) => setMessaggio(e.target.value)}
-              rows={2}
-              placeholder="Scrivi qui la modifica..."
-              className="w-full rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-sm placeholder:text-zinc-400 focus:border-black focus:outline-none dark:border-zinc-700 dark:focus:border-white"
-            />
-            {erroreModifica && (
-              <p className="mt-2 text-sm text-red-600 dark:text-red-400">{erroreModifica}</p>
-            )}
-            {rifiutoModifica && (
-              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-                {rifiutoModifica}
-              </div>
-            )}
-            <button
-              onClick={handleModifica}
-              disabled={!messaggio.trim() || azioneInCorso}
-              className="mt-3 flex items-center gap-2 rounded-full bg-black px-5 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black"
-            >
-              {modificando && <Spinner className="h-4 w-4" />}
-              {modificando ? "Applico la modifica..." : "Applica modifica"}
-            </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
