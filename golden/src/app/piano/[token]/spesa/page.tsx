@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { GroceryList, ingredientiARischioSettimana } from "../grocery-list";
+import { GroceryList } from "../grocery-list";
+import { ingredientiARischioSettimana } from "../grocery-risk";
 import { PageHeader } from "../page-header";
 
 export default async function SpesaPage({
@@ -29,17 +30,30 @@ export default async function SpesaPage({
     .limit(1)
     .maybeSingle();
 
+  // Tollerante a una tabella spesa_stato non ancora creata sul database
+  // (va eseguita a mano in Supabase, vedi supabase/migrations): senza
+  // questo try/catch una query a una tabella mancante farebbe crashare
+  // tutta la pagina invece di mostrare la lista con le spunte azzerate.
   let statoAcquisti: Record<string, boolean> = {};
   if (ultimoPiano?.id) {
-    const { data: righeStato } = await supabase
-      .from("spesa_stato")
-      .select("prodotto, acquistato")
-      .eq("weekly_plan_id", ultimoPiano.id);
+    try {
+      const { data: righeStato } = await supabase
+        .from("spesa_stato")
+        .select("prodotto, acquistato")
+        .eq("weekly_plan_id", ultimoPiano.id);
 
-    statoAcquisti = Object.fromEntries((righeStato || []).map((r) => [r.prodotto, r.acquistato]));
+      statoAcquisti = Object.fromEntries((righeStato || []).map((r) => [r.prodotto, r.acquistato]));
+    } catch {
+      statoAcquisti = {};
+    }
   }
 
-  const ingredientiARischio = ingredientiARischioSettimana(ultimoPiano?.meal_plan?.giorni || []);
+  let ingredientiARischio: string[] = [];
+  try {
+    ingredientiARischio = ingredientiARischioSettimana(ultimoPiano?.meal_plan?.giorni || []);
+  } catch {
+    ingredientiARischio = [];
+  }
 
   return (
     <div className="flex flex-1 flex-col">
