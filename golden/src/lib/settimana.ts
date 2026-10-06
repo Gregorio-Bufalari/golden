@@ -29,6 +29,11 @@ const MESI = [
   "dicembre",
 ];
 
+/** Es. "6 ottobre". */
+export function formattaData(data: Date): string {
+  return `${data.getDate()} ${MESI[data.getMonth()]}`;
+}
+
 /**
  * Data (giorno + mese, es. "6 ottobre") del giorno della settimana indicato,
  * dato il lunedì della settimana (`settimana`, "YYYY-MM-DD"). Null se il
@@ -44,7 +49,7 @@ export function dataDelGiorno(nomeGiorno: string, settimana: string): string | n
 
   const data = new Date(lunedi);
   data.setDate(lunedi.getDate() + indice);
-  return `${data.getDate()} ${MESI[data.getMonth()]}`;
+  return formattaData(data);
 }
 
 /** Es. "Lunedì 6 ottobre". Se la data non si può calcolare, resta solo il nome del giorno. */

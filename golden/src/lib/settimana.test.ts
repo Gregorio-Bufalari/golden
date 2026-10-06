@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { dataDelGiorno, etichettaGiorno } from "./settimana";
+import { dataDelGiorno, etichettaGiorno, formattaData } from "./settimana";
+
+describe("formattaData", () => {
+  it("formatta una data come 'giorno mese'", () => {
+    expect(formattaData(new Date(2026, 9, 7))).toBe("7 ottobre");
+    expect(formattaData(new Date(2026, 0, 1))).toBe("1 gennaio");
+  });
+});
 
 describe("dataDelGiorno", () => {
   it("calcola la data di ogni giorno della settimana a partire dal lunedì", () => {
