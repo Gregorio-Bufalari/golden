@@ -14,7 +14,7 @@ import {
   type ProfiloPerPiano,
   type Pasto,
 } from "./claude";
-import { ingredientiARischio } from "./glutine-check";
+import { ingredientiDaSegnalare } from "./glutine-check";
 import { validaGiorni, assicuraVarieta, adattaEntroBudget } from "./piano-validazione";
 import { creaPianoEsempio } from "@/test/fixtures/piano-esempio";
 
@@ -39,7 +39,7 @@ describe.skipIf(!haChiaveApi)("Smoke test — API Anthropic reale", () => {
       for (const giorno of piano.giorni) {
         expect(giorno.pasti).toHaveLength(2);
         for (const pasto of giorno.pasti) {
-          const rischi = ingredientiARischio(pasto.ingredienti.map((i) => i.nome));
+          const rischi = ingredientiDaSegnalare(pasto.ingredienti.map((i) => i.nome));
           expect(rischi, `${giorno.giorno} ${pasto.tipo} (${pasto.nome}): ${rischi.join(", ")}`).toEqual([]);
         }
       }
@@ -105,7 +105,7 @@ describe.skipIf(!haChiaveApi)("Smoke test — API Anthropic reale", () => {
 
       const nuovoPasto = await regeneratePasto(profiloCeliaco, "Lunedì", pastoRischioso, ["Pasta"]);
 
-      const rischi = ingredientiARischio(nuovoPasto.ingredienti.map((i) => i.nome));
+      const rischi = ingredientiDaSegnalare(nuovoPasto.ingredienti.map((i) => i.nome));
       expect(rischi).toEqual([]);
     },
     30_000,
@@ -131,7 +131,7 @@ describe.skipIf(!haChiaveApi)("Smoke test — API Anthropic reale", () => {
 
       for (const giorno of giorniValidati) {
         for (const pasto of giorno.pasti) {
-          const rischi = ingredientiARischio(pasto.ingredienti.map((i) => i.nome));
+          const rischi = ingredientiDaSegnalare(pasto.ingredienti.map((i) => i.nome));
           if (rischi.length > 0) {
             // Un rischio residuo è accettabile solo se la pipeline di
             // sicurezza lo ha segnalato esplicitamente per la verifica
@@ -205,7 +205,7 @@ describe.skipIf(!haChiaveApi)("Smoke test — API Anthropic reale", () => {
 
       for (const giorno of giorniValidati) {
         for (const pasto of giorno.pasti) {
-          const rischi = ingredientiARischio(pasto.ingredienti.map((i) => i.nome));
+          const rischi = ingredientiDaSegnalare(pasto.ingredienti.map((i) => i.nome));
           if (rischi.length > 0) {
             expect(pasto.verificare, `${giorno.giorno} ${pasto.tipo}: ${rischi.join(", ")}`).toBe(true);
             expect(pasto.ingredienti_a_rischio).toEqual(expect.arrayContaining(rischi));

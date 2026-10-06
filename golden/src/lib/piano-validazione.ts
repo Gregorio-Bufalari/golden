@@ -1,6 +1,6 @@
 import "server-only";
 import { regeneratePasto, adattaBudget, type Pasto, type Giorno, type ProfiloPerPiano } from "./claude";
-import { ingredientiARischio } from "./glutine-check";
+import { ingredientiNonAdatti, ingredientiDaVerificare } from "./glutine-check";
 import { buildGroceryList, type GroceryList, type ConsumoDispensa } from "./grocery";
 
 const MAX_RIGENERAZIONI = 2;
@@ -9,6 +9,10 @@ const MAX_TENTATIVI_BUDGET = 2;
 export type PastoValidato = Pasto & {
   verificare?: boolean;
   ingredienti_a_rischio?: string[];
+  // Sottoinsieme di ingredienti_a_rischio ancora "non adatto" dopo i
+  // tentativi di rigenerazione (vs. solo "da verificare" in etichetta):
+  // distingue in UI un blocco reale da un controllo preventivo.
+  ingredienti_non_adatti?: string[];
 };
 
 export type GiornoValidato = {
@@ -17,11 +21,20 @@ export type GiornoValidato = {
 };
 
 /**
- * Controlla ogni pasto per ingredienti a rischio glutine e rigenera quelli
- * sospetti. Le rigenerazioni di un singolo giro vengono lanciate in
- * parallelo (non un pasto alla volta in sequenza) per restare entro i
- * tempi di esecuzione della funzione su Vercel: con più pasti a rischio
- * contemporaneamente, farli uno alla volta moltiplicava i tempi di attesa.
+ * Controlla ogni pasto con la validazione a quattro livelli (vedi
+ * glutine-check.ts) e rigenera solo quelli con un ingrediente "non
+ * adatto" (glutine senza ambiguità): un ingrediente "da verificare"
+ * (dipende dalla marca, es. dado vegetale) resta nel piano e viene solo
+ * segnalato più sotto, senza sprecare un tentativo dell'AI su un
+ * ingrediente che è spesso comunque sicuro. Le rigenerazioni di un
+ * singolo giro vengono lanciate in parallelo (non un pasto alla volta in
+ * sequenza) per restare entro i tempi di esecuzione della funzione su
+ * Vercel.
+ *
+ * Unica validazione di sicurezza glutine dell'app: ogni punto che
+ * modifica il piano (generazione, "Proponi un piatto diverso",
+ * "Sostituisci"/"Non l'ho trovato" nella lista della spesa, lo scambio
+ * pasti) passa da qui — nessun controllo separato altrove.
  */
 export async function validaGiorni(
   profilo: ProfiloPerPiano,
@@ -33,20 +46,20 @@ export async function validaGiorni(
 
   if (richiedeControlloGlutine) {
     for (let tentativo = 0; tentativo < MAX_RIGENERAZIONI; tentativo++) {
-      const daRigenerare: { gi: number; pi: number; rischi: string[] }[] = [];
+      const daRigenerare: { gi: number; pi: number; nonAdatti: string[] }[] = [];
       for (let gi = 0; gi < pasti.length; gi++) {
         for (let pi = 0; pi < pasti[gi].length; pi++) {
-          const rischi = ingredientiARischio(pasti[gi][pi].ingredienti.map((i) => i.nome));
-          if (rischi.length > 0) daRigenerare.push({ gi, pi, rischi });
+          const nonAdatti = ingredientiNonAdatti(pasti[gi][pi].ingredienti.map((i) => i.nome));
+          if (nonAdatti.length > 0) daRigenerare.push({ gi, pi, nonAdatti });
         }
       }
 
       if (daRigenerare.length === 0) break;
 
       await Promise.all(
-        daRigenerare.map(async ({ gi, pi, rischi }) => {
+        daRigenerare.map(async ({ gi, pi, nonAdatti }) => {
           try {
-            pasti[gi][pi] = await regeneratePasto(profilo, giorni[gi].giorno, pasti[gi][pi], rischi, dispensa);
+            pasti[gi][pi] = await regeneratePasto(profilo, giorni[gi].giorno, pasti[gi][pi], nonAdatti, dispensa);
           } catch (err) {
             console.error("regeneratePasto error:", err);
           }
@@ -56,9 +69,17 @@ export async function validaGiorni(
 
     for (let gi = 0; gi < pasti.length; gi++) {
       for (let pi = 0; pi < pasti[gi].length; pi++) {
-        const rischi = ingredientiARischio(pasti[gi][pi].ingredienti.map((i) => i.nome));
-        if (rischi.length > 0) {
-          pasti[gi][pi] = { ...pasti[gi][pi], verificare: true, ingredienti_a_rischio: rischi };
+        const nomi = pasti[gi][pi].ingredienti.map((i) => i.nome);
+        const nonAdatti = ingredientiNonAdatti(nomi);
+        const daVerificare = ingredientiDaVerificare(nomi);
+        const daSegnalare = [...nonAdatti, ...daVerificare];
+        if (daSegnalare.length > 0) {
+          pasti[gi][pi] = {
+            ...pasti[gi][pi],
+            verificare: true,
+            ingredienti_a_rischio: daSegnalare,
+            ...(nonAdatti.length > 0 ? { ingredienti_non_adatti: nonAdatti } : {}),
+          };
         }
       }
     }

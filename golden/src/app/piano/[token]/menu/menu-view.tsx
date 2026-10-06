@@ -43,6 +43,7 @@ type Pasto = {
   preparazione?: string[];
   verificare?: boolean;
   ingredienti_a_rischio?: string[];
+  ingredienti_non_adatti?: string[];
 };
 
 type Giorno = {
@@ -621,15 +622,26 @@ export function MenuView({
                             </div>
                           )}
 
-                          {pasto.verificare && (
+                          {pasto.verificare && pasto.ingredienti_non_adatti?.length ? (
                             <div className="flex gap-3 bg-clay-soft px-4 py-3">
                               <div className="w-1 shrink-0 bg-clay" />
                               <p className="text-[13px] leading-relaxed text-ink">
-                                <span className="font-semibold text-clay">Verifica necessaria.</span>{" "}
-                                Possibili tracce di glutine in {pasto.ingredienti_a_rischio?.join(", ")}.
-                                Controlla le etichette prima di procedere.
+                                <span className="font-semibold text-clay">Non adatto.</span>{" "}
+                                {pasto.ingredienti_non_adatti.join(", ")} contiene glutine: non sono riuscito a
+                                sostituirlo automaticamente. Modifica questo pasto prima di procedere.
                               </p>
                             </div>
+                          ) : (
+                            pasto.verificare && (
+                              <div className="flex gap-3 bg-honey-soft px-4 py-3">
+                                <div className="w-1 shrink-0 bg-honey" />
+                                <p className="text-[13px] leading-relaxed text-ink">
+                                  <span className="font-semibold text-honey">Da verificare.</span>{" "}
+                                  Il glutine in {pasto.ingredienti_a_rischio?.join(", ")} dipende dalla marca o dalla
+                                  formulazione. Controlla l&apos;etichetta prima di procedere.
+                                </p>
+                              </div>
+                            )
                           )}
                         </div>
                       );
