@@ -7,6 +7,7 @@ import { setModalita, scambiaPasti } from "../actions";
 import { aggiungiPreferito, rimuoviPreferito } from "../preferiti-actions";
 import { etichettaGiorno } from "@/lib/settimana";
 import { conflittiDopoScambio, suggerisciGiornoAlternativo } from "@/lib/varieta-giorno";
+import { formattaQuantita } from "@/lib/quantita";
 import { Spinner } from "@/components/spinner";
 import { HeartIcon } from "@/components/heart-icon";
 import {
@@ -97,6 +98,7 @@ export function MenuView({
   budgetStimatoIniziale,
   datiBiometrici,
   preferitiIniziali,
+  householdSize,
 }: {
   token: string;
   nome: string;
@@ -107,6 +109,7 @@ export function MenuView({
   budgetStimatoIniziale: number | null;
   datiBiometrici: DatiBiometrici | null;
   preferitiIniziali: string[];
+  householdSize: number | null;
 }) {
   const [modalita, setModalitaState] = useState(initialModalita);
   const [cambiandoModalita, setCambiandoModalita] = useState(false);
@@ -121,6 +124,11 @@ export function MenuView({
     Boolean(budgetSettimanale && budgetStimatoIniziale && budgetStimatoIniziale > budgetSettimanale),
   );
   const [budgetStimato, setBudgetStimato] = useState<number | null>(budgetStimatoIniziale);
+  // Stesso fallback usato per generare il piano (vedi buildContestoProfilo
+  // in claude.ts: "Numero di persone per cui cucinare: ... || 1"), così gli
+  // ingredienti del piano restano coerenti con la quantità "a porzione"
+  // mostrata sotto "Preparazione".
+  const persone = householdSize || 1;
 
   const [messaggio, setMessaggio] = useState("");
   const [modificando, setModificando] = useState(false);
@@ -613,11 +621,30 @@ export function MenuView({
 
                           {espanso && haPreparazione && (
                             <div className="flex items-stretch gap-2">
-                              <ol className="flex flex-1 list-decimal flex-col gap-1 rounded-[14px] bg-panel px-5 py-4 pl-9 text-sm text-ink/80">
-                                {pasto.preparazione?.map((passo, j) => (
-                                  <li key={j}>{passo}</li>
-                                ))}
-                              </ol>
+                              <div className="flex-1 rounded-[14px] bg-panel px-5 py-4">
+                                <h4 className="mb-2 text-sm font-semibold text-ink">
+                                  Ingredienti {persone > 1 ? `· per ${persone} persone` : ""}
+                                </h4>
+                                <ul className="flex flex-col gap-1 text-sm text-ink/80">
+                                  {pasto.ingredienti.map((ing, k) => (
+                                    <li key={k} className="flex items-start justify-between gap-3">
+                                      <span>{ing.nome}</span>
+                                      <span className="shrink-0 whitespace-nowrap font-mono text-xs text-ink/60">
+                                        {formattaQuantita(ing.quantita, ing.unita)}
+                                        {persone > 1 &&
+                                          ` · ${formattaQuantita(ing.quantita / persone, ing.unita)} a porzione`}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+
+                                <h4 className="mb-1 mt-4 text-sm font-semibold text-ink">Preparazione</h4>
+                                <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm text-ink/80">
+                                  {pasto.preparazione?.map((passo, j) => (
+                                    <li key={j}>{passo}</li>
+                                  ))}
+                                </ol>
+                              </div>
                               <div className="w-11 shrink-0" aria-hidden="true" />
                             </div>
                           )}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Spinner } from "@/components/spinner";
 import { setAcquistato } from "./spesa/actions";
 import { gruppoAcquisto, type GruppoAcquisto } from "@/lib/conservazione";
+import { formattaQuantita } from "@/lib/quantita";
 
 type GroceryItem = {
   nome: string;
@@ -39,16 +40,6 @@ function itemARischio(nome: string, ingredientiARischio: string[]): boolean {
   return ingredientiARischio.some((r) => lower.includes(r));
 }
 
-function formatQuantita(quantita: number, unita: GroceryItem["unita"]): string {
-  if (unita === "g" && quantita >= 1000) {
-    return `${(quantita / 1000).toFixed(quantita % 1000 === 0 ? 0 : 1)} kg`;
-  }
-  if (unita === "ml" && quantita >= 1000) {
-    return `${(quantita / 1000).toFixed(quantita % 1000 === 0 ? 0 : 1)} l`;
-  }
-  const arrotondata = Math.round(quantita * 10) / 10;
-  return `${arrotondata} ${unita}`;
-}
 
 // Metadati della riga (quantità, confezione, avanzo): punto medio tra i
 // pezzi d'informazione, non trattino lungo — si legge come un dato in una
@@ -56,9 +47,9 @@ function formatQuantita(quantita: number, unita: GroceryItem["unita"]): string {
 function metadataRiga(item: GroceryItem): string {
   const avanzo = item.quantita - item.quantitaNecessaria;
   if (item.confezione && avanzo > 0) {
-    return `${formatQuantita(item.quantitaNecessaria, item.unita)} necessari · confezione ${formatQuantita(item.confezione, item.unita)}, avanzano ${formatQuantita(avanzo, item.unita)}`;
+    return `${formattaQuantita(item.quantitaNecessaria, item.unita)} necessari · confezione ${formattaQuantita(item.confezione, item.unita)}, avanzano ${formattaQuantita(avanzo, item.unita)}`;
   }
-  return formatQuantita(item.quantita, item.unita);
+  return formattaQuantita(item.quantita, item.unita);
 }
 
 // Stessa classificazione di conservazione già usata nella tab Frigo
@@ -201,7 +192,7 @@ function buildTestoWhatsApp(data: GroceryListData, settimana: string): string {
   if (data.rimasto.length > 0) {
     righe.push("", "*Rimasto in frigo/dispensa*");
     for (const item of data.rimasto) {
-      righe.push(`- ${item.nome}: ${formatQuantita(item.quantita, item.unita)}`);
+      righe.push(`- ${item.nome}: ${formattaQuantita(item.quantita, item.unita)}`);
     }
   }
 
@@ -414,7 +405,7 @@ export function GroceryList({
               return (
                 <li key={item.nome} className="flex items-center justify-between gap-3 border-t border-ink/10 py-1 first:border-t-0">
                   <span className="text-sm text-ink">
-                    {item.nome} · {formatQuantita(item.quantita, item.unita)}
+                    {item.nome} · {formattaQuantita(item.quantita, item.unita)}
                   </span>
                   <span className="flex items-center gap-0.5 print:hidden">
                     <button
