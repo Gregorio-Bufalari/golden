@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ModalitaToggle } from "../modalita-toggle";
 import { PageHeader } from "../page-header";
-import { setModalita } from "../actions";
+import { setModalita, scambiaPasti } from "../actions";
 import { Spinner } from "@/components/spinner";
 import {
   calcolaRiferimentoLARN,
@@ -73,6 +73,15 @@ function RefreshIcon() {
   );
 }
 
+function SwapIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 7h12l-3.5-3.5" />
+      <path d="M17 17H5l3.5 3.5" />
+    </svg>
+  );
+}
+
 export function MenuView({
   token,
   nome,
@@ -109,9 +118,16 @@ export function MenuView({
   const [rifiutoModifica, setRifiutoModifica] = useState<string | null>(null);
   const [nutrienteInCorso, setNutrienteInCorso] = useState<string | null>(null);
   const [pastoInCorso, setPastoInCorso] = useState<string | null>(null);
-  const azioneInCorso = Boolean(nutrienteInCorso) || Boolean(pastoInCorso) || modificando;
+  const [scambioInCorso, setScambioInCorso] = useState(false);
+  const azioneInCorso = Boolean(nutrienteInCorso) || Boolean(pastoInCorso) || modificando || scambioInCorso;
 
   const [pastoEspanso, setPastoEspanso] = useState<string | null>(null);
+  const [pastoSelezionato, setPastoSelezionato] = useState<{
+    giorno: string;
+    indice: number;
+    nome: string;
+  } | null>(null);
+  const [erroreScambio, setErroreScambio] = useState<string | null>(null);
 
   const confrontoLARN = useMemo(() => {
     if (!giorni || !datiBiometrici) return null;
@@ -240,6 +256,37 @@ export function MenuView({
     setPastoInCorso(null);
   }
 
+  // Scambio tra due pasti di giorni diversi: puro riordino dei dati già nel
+  // piano (stessi 14 pasti, stesso totale ingredienti), nessuna chiamata AI
+  // — il tocco su un secondo pasto in un altro giorno conclude lo scambio;
+  // un secondo tocco sullo stesso giorno sposta semplicemente la selezione.
+  async function handleTapScambia(giorno: Giorno, indice: number, pasto: Pasto) {
+    if (azioneInCorso) return;
+    setErroreScambio(null);
+
+    if (!pastoSelezionato) {
+      setPastoSelezionato({ giorno: giorno.giorno, indice, nome: pasto.nome });
+      return;
+    }
+
+    if (pastoSelezionato.giorno === giorno.giorno) {
+      setPastoSelezionato(
+        pastoSelezionato.indice === indice ? null : { giorno: giorno.giorno, indice, nome: pasto.nome },
+      );
+      return;
+    }
+
+    setScambioInCorso(true);
+    const result = await scambiaPasti(token, pastoSelezionato.giorno, pastoSelezionato.indice, giorno.giorno, indice);
+    if ("error" in result) {
+      setErroreScambio(result.error);
+    } else {
+      setGiorni(result.giorni as Giorno[]);
+    }
+    setPastoSelezionato(null);
+    setScambioInCorso(false);
+  }
+
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
@@ -291,6 +338,23 @@ export function MenuView({
               </div>
             )}
 
+            {pastoSelezionato && (
+              <div className="flex items-center justify-between gap-3 bg-panel px-4 py-3 text-sm text-ink">
+                <span>
+                  Tocca un pasto in un altro giorno per scambiarlo con{" "}
+                  <strong className="font-semibold">{pastoSelezionato.nome}</strong>.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPastoSelezionato(null)}
+                  className="shrink-0 text-xs font-semibold text-accent"
+                >
+                  Annulla
+                </button>
+              </div>
+            )}
+            {erroreScambio && <p className="text-sm text-clay">{erroreScambio}</p>}
+
             <div className="flex flex-col gap-7">
               {giorni.map((giorno) => (
                 <div key={giorno.giorno}>
@@ -301,6 +365,8 @@ export function MenuView({
                       const espanso = pastoEspanso === chiave;
                       const haPreparazione = Boolean(pasto.preparazione?.length);
                       const caricandoPasto = pastoInCorso === chiave;
+                      const selezionatoPerScambio =
+                        pastoSelezionato?.giorno === giorno.giorno && pastoSelezionato?.indice === i;
                       return (
                         <div key={i} className="flex flex-col gap-2">
                           <div className="flex items-stretch gap-2">
@@ -308,7 +374,9 @@ export function MenuView({
                               type="button"
                               onClick={() => haPreparazione && setPastoEspanso(espanso ? null : chiave)}
                               disabled={!haPreparazione}
-                              className="flex-1 rounded-[14px] bg-panel px-5 py-[18px] text-left disabled:cursor-default"
+                              className={`flex-1 rounded-[14px] bg-panel px-5 py-[18px] text-left disabled:cursor-default ${
+                                selezionatoPerScambio ? "ring-2 ring-accent" : ""
+                              }`}
                             >
                               <div className="text-[13px] font-medium text-ink/60">
                                 {pasto.tipo === "pranzo" ? "Pranzo" : "Cena"} · {pasto.tempo_preparazione_min} min
@@ -333,14 +401,27 @@ export function MenuView({
                                 </span>
                               )}
                             </button>
-                            <button
-                              onClick={() => handlePastoDiverso(giorno, pasto, chiave)}
-                              disabled={azioneInCorso}
-                              aria-label={`Proponine un altro: ${pasto.tipo}`}
-                              className="flex w-11 shrink-0 items-center justify-center rounded-xl text-accent disabled:opacity-40"
-                            >
-                              {caricandoPasto ? <Spinner className="h-4 w-4" /> : <RefreshIcon />}
-                            </button>
+                            <div className="flex w-11 shrink-0 flex-col gap-2">
+                              <button
+                                onClick={() => handlePastoDiverso(giorno, pasto, chiave)}
+                                disabled={azioneInCorso}
+                                aria-label={`Proponine un altro: ${pasto.tipo}`}
+                                className="flex flex-1 items-center justify-center rounded-xl text-accent disabled:opacity-40"
+                              >
+                                {caricandoPasto ? <Spinner className="h-4 w-4" /> : <RefreshIcon />}
+                              </button>
+                              <button
+                                onClick={() => handleTapScambia(giorno, i, pasto)}
+                                disabled={azioneInCorso}
+                                aria-label={`Scambia ${pasto.tipo} di ${giorno.giorno} con un altro giorno`}
+                                aria-pressed={selezionatoPerScambio}
+                                className={`flex flex-1 items-center justify-center rounded-xl disabled:opacity-40 ${
+                                  selezionatoPerScambio ? "bg-accent text-accent-fill-text" : "text-accent"
+                                }`}
+                              >
+                                <SwapIcon />
+                              </button>
+                            </div>
                           </div>
 
                           {espanso && haPreparazione && (
