@@ -37,14 +37,6 @@ export function RiepilogoProfilo({
 }) {
   return (
     <div className="flex flex-col gap-6 pb-10 text-left">
-      <button
-        type="button"
-        onClick={onModifica}
-        className="flex min-h-11 items-center justify-center self-start rounded-full bg-accent px-6 text-sm font-semibold text-accent-fill-text"
-      >
-        Modifica
-      </button>
-
       <div className="bg-panel rounded-[14px] p-5">
         <Riga label="Nome" value={profile.nome || NON_IMPOSTATO} />
         <Riga
@@ -84,6 +76,14 @@ export function RiepilogoProfilo({
           <Riga label="Livello di attività fisica" value={formattaLivelloAttivita(profile.livello_attivita)} />
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={onModifica}
+        className="flex min-h-11 items-center justify-center self-start rounded-full bg-accent px-6 text-sm font-semibold text-accent-fill-text"
+      >
+        Modifica
+      </button>
     </div>
   );
 }

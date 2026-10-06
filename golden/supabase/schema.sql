@@ -95,8 +95,23 @@ create table if not exists spesa_stato (
 
 create index if not exists spesa_stato_weekly_plan_id_idx on spesa_stato(weekly_plan_id);
 
+-- Feedback rapido (pollice su/giù + commento facoltativo), mostrato di
+-- rado dopo un'azione chiave o a fine check-in. Dato a uso interno, mai
+-- mostrato come punteggio all'utente.
+create table if not exists feedback_rapido (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references profiles(id) on delete cascade,
+  contesto text not null,
+  risposta boolean not null,
+  commento text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists feedback_rapido_profile_id_idx on feedback_rapido(profile_id);
+
 alter table profiles enable row level security;
 alter table weekly_plans enable row level security;
 alter table checkins enable row level security;
 alter table rimanenze enable row level security;
 alter table spesa_stato enable row level security;
+alter table feedback_rapido enable row level security;
