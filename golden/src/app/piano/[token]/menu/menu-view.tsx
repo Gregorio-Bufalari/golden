@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ModalitaToggle } from "../modalita-toggle";
 import { PageHeader } from "../page-header";
 import { setModalita, scambiaPasti } from "../actions";
+import { etichettaGiorno } from "@/lib/settimana";
 import { Spinner } from "@/components/spinner";
 import {
   calcolaRiferimentoLARN,
@@ -358,7 +359,9 @@ export function MenuView({
             <div className="flex flex-col gap-7">
               {giorni.map((giorno) => (
                 <div key={giorno.giorno}>
-                  <h3 className="mb-2.5 text-[15px] font-semibold text-ink">{giorno.giorno}</h3>
+                  <h3 className="mb-2.5 text-[15px] font-semibold text-ink">
+                    {etichettaGiorno(giorno.giorno, settimana)}
+                  </h3>
                   <div className="flex flex-col gap-3">
                     {giorno.pasti.map((pasto, i) => {
                       const chiave = `${giorno.giorno}-${i}`;
