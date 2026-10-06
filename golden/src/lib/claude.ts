@@ -100,6 +100,20 @@ const ISTRUZIONE_VARIETA =
   "ottienilo riusando gli stessi ingredienti di base in ricette diverse (vedi sopra), MAI riducendo il numero di " +
   "ricette distinte o ripetendo un piatto già usato in un altro giorno.";
 
+// Criterio di scelta aggiuntivo, non un vincolo: entra in gioco solo
+// quando più combinazioni di ricette sono già altrettanto valide secondo
+// le priorità sopra (restrizioni, budget, obiettivo/preferenze/tempo,
+// varietà) — tra quelle, premia il batch cooking.
+const ISTRUZIONE_BATCH_COOKING =
+  "Criterio aggiuntivo, da applicare solo a parità delle priorità sopra (mai sopra restrizioni, budget, " +
+  "obiettivo, preferenze o varietà): quando più combinazioni di ricette sono altrettanto valide, preferisci " +
+  "quelle che permettono il batch cooking — condividere lo stesso ingrediente principale (una proteina o un " +
+  "altro ingrediente centrale della ricetta, es. lo stesso taglio di pollo, lo stesso pesce, gli stessi legumi) " +
+  "tra due o più ricette DIVERSE della settimana, così da comprarne una quantità maggiore in un'unica volta " +
+  "invece di tante quantità piccole di ingredienti diversi — riduce sia il costo reale (meno confezioni aperte " +
+  "e sprecate in parte) sia lo spreco alimentare. Le ricette restano comunque distinte tra loro (vedi varietà " +
+  "sopra): cambia la preparazione o il resto del piatto, non l'ingrediente principale condiviso.";
+
 function obiettivoConNota(obiettivo: string | null): string {
   if (!obiettivo) return "non specificato";
   if (obiettivo === "Ridurre gli sprechi") {
@@ -176,7 +190,7 @@ export async function generateMealPlan(
       "Le restrizioni alimentari sono un vincolo rigido e non negoziabile: non includere MAI, nemmeno in tracce dichiarate, un ingrediente incompatibile con le restrizioni indicate. " +
       "Se è indicato un budget settimanale, è anch'esso un vincolo rigido: il totale stimato della spesa (somma di tutti i prezzo_stimato_eur dell'intero piano) non deve superarlo. " +
       "Rispetta anche obiettivo, preferenze e tempo di preparazione, in questo ordine di priorità, scegliendo ingredienti e porzioni che permettano di rientrare nel budget. " +
-      ISTRUZIONE_VARIETA + " " +
+      ISTRUZIONE_VARIETA + " " + ISTRUZIONE_BATCH_COOKING + " " +
       (modalita === "scoperta" ? ISTRUZIONE_SCOPERTA + " " : "") +
       ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
       istruzioneDispensa(dispensa) + " " + istruzioneStagionalita(),
@@ -283,7 +297,7 @@ export async function adattaBudget(
       "senza violare le restrizioni alimentari (vincolo rigido, non negoziabile) e senza stravolgere le preferenze. " +
       "Riduci il costo totale stimato sostituendo ingredienti costosi con alternative più economiche (es. proteine " +
       "meno pregiate, prodotti di stagione, porzioni più ragionevoli), mantenendo varietà e qualità nutrizionale. " +
-      NOTA_COSTO_CONFEZIONI + " " + ISTRUZIONE_VARIETA + " " +
+      NOTA_COSTO_CONFEZIONI + " " + ISTRUZIONE_VARIETA + " " + ISTRUZIONE_BATCH_COOKING + " " +
       ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
       istruzioneDispensa(dispensa) + " " + istruzioneStagionalita(),
     messages: [

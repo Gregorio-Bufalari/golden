@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { conservazioneTipica, gruppoAcquisto, coloreScadenza, type ColoreScadenza } from "@/lib/conservazione";
+import { formattaQuantita } from "@/lib/quantita";
 import { PageHeader } from "../page-header";
 
 const DOT_PER_COLORE: Record<ColoreScadenza, string> = {
@@ -7,17 +8,6 @@ const DOT_PER_COLORE: Record<ColoreScadenza, string> = {
   arancione: "bg-honey",
   verde: "bg-accent",
 };
-
-function formatQuantita(quantita: number, unita: string): string {
-  if (unita === "g" && quantita >= 1000) {
-    return `${(quantita / 1000).toFixed(quantita % 1000 === 0 ? 0 : 1)} kg`;
-  }
-  if (unita === "ml" && quantita >= 1000) {
-    return `${(quantita / 1000).toFixed(quantita % 1000 === 0 ? 0 : 1)} l`;
-  }
-  const arrotondata = Math.round(quantita * 10) / 10;
-  return `${arrotondata} ${unita}`;
-}
 
 type Rimanenza = { ingrediente: string; unita: string; quantita: number };
 
@@ -43,7 +33,7 @@ function Sezione({ titolo, righe }: { titolo: string; righe: Rimanenza[] }) {
               <div className="mt-0.5 text-xs text-ink/55">{conservazioneTipica(r.ingrediente)}</div>
             </div>
             <span className="shrink-0 font-mono text-sm text-ink/70">
-              {formatQuantita(r.quantita, r.unita)}
+              {formattaQuantita(r.quantita, r.unita)}
             </span>
           </li>
         ))}

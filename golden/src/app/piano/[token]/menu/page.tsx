@@ -12,7 +12,7 @@ export default async function MenuPage({
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select(
-      "id, nome, restrizioni, modalita, budget_settimanale, sesso, eta, peso_kg, altezza_cm, livello_attivita",
+      "id, nome, restrizioni, modalita, budget_settimanale, household_size, sesso, eta, peso_kg, altezza_cm, livello_attivita",
     )
     .eq("link_token", token)
     .single();
@@ -46,6 +46,7 @@ export default async function MenuPage({
         initialGiorni={ultimoPiano?.meal_plan?.giorni || null}
         initialSettimana={ultimoPiano?.settimana || ""}
         preferitiIniziali={(preferiti || []).map((p) => p.nome)}
+        householdSize={profile.household_size}
         budgetSettimanale={profile.budget_settimanale}
         budgetStimatoIniziale={ultimoPiano?.budget_stimato ?? null}
         datiBiometrici={
