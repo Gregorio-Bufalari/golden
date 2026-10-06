@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { submitCheckin } from "./checkin-actions";
 import { Spinner } from "@/components/spinner";
+import { FeedbackPopup } from "@/components/feedback-popup";
 
 const CATEGORIE_SPRECO = ["Verdura", "Proteine", "Latticini", "Pane/pasta", "Altro"];
 const RETAILER_OPTIONS = ["Esselunga", "Coop", "Conad", "Carrefour", "Lidl", "Eurospin", "Altro"];
@@ -85,7 +86,16 @@ export function CheckinForm({ token }: { token: string }) {
   }
 
   if (inviato) {
-    return <div className="bg-panel px-5 py-6 text-center text-sm font-medium text-ink">Grazie! Check-in salvato.</div>;
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="bg-panel px-5 py-6 text-center text-sm font-medium text-ink">Grazie! Check-in salvato.</div>
+        <FeedbackPopup
+          token={token}
+          contesto="checkin"
+          domanda="Il check-in ti aiuta a tenere traccia della settimana?"
+        />
+      </div>
+    );
   }
 
   return (

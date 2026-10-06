@@ -5,6 +5,7 @@ import { ModalitaToggle } from "../modalita-toggle";
 import { PageHeader } from "../page-header";
 import { setModalita, scambiaPasti } from "../actions";
 import { etichettaGiorno } from "@/lib/settimana";
+import { conflittiDopoScambio, suggerisciGiornoAlternativo } from "@/lib/varieta-giorno";
 import { Spinner } from "@/components/spinner";
 import {
   calcolaRiferimentoLARN,
@@ -128,6 +129,15 @@ export function MenuView({
   const [pastoSelezionato, setPastoSelezionato] = useState<SelezionePasto | null>(null);
   const [pastoProposto, setPastoProposto] = useState<SelezionePasto | null>(null);
   const [erroreScambio, setErroreScambio] = useState<string | null>(null);
+  // Esito del controllo varietà leggero (nessuna AI) eseguito sui dati già
+  // caricati, prima di mostrare la conferma dello scambio: se lo scambio
+  // proposto farebbe finire lo stesso ingrediente principale sia a pranzo
+  // che a cena in uno dei due giorni, lo segnala invece di proporre subito
+  // la conferma normale.
+  const [conflittoScambio, setConflittoScambio] = useState<{
+    messaggio: string;
+    alternativa: string | null;
+  } | null>(null);
   const scambioInAttesaConferma = Boolean(pastoSelezionato) && Boolean(pastoProposto);
 
   const azioneInCorso =
@@ -266,6 +276,21 @@ export function MenuView({
   // banner con istruzioni); un secondo tocco sullo stesso giorno sposta
   // semplicemente la selezione; un tocco su un giorno diverso propone lo
   // scambio e mostra una conferma esplicita prima di applicarlo davvero.
+  function valutaProposta(giornoA: string, indiceA: number, giornoB: string, indiceB: number) {
+    if (!giorni) return;
+    const conflitti = conflittiDopoScambio(giorni, giornoA, indiceA, giornoB, indiceB);
+    if (conflitti.length === 0) {
+      setConflittoScambio(null);
+      return;
+    }
+    const alternativa = suggerisciGiornoAlternativo(giorni, giornoA, indiceA, giornoB, indiceB);
+    const messaggio =
+      conflitti
+        .map((c) => `${c.giorno} avrebbe ${c.ingredienti.join(", ")} sia a pranzo che a cena`)
+        .join("; ") + ".";
+    setConflittoScambio({ messaggio, alternativa });
+  }
+
   function handleTapScambia(giorno: Giorno, indice: number, pasto: Pasto) {
     if (azioneInCorso) return;
     setErroreScambio(null);
@@ -283,12 +308,28 @@ export function MenuView({
     }
 
     setPastoProposto({ giorno: giorno.giorno, indice, nome: pasto.nome });
+    valutaProposta(pastoSelezionato.giorno, pastoSelezionato.indice, giorno.giorno, indice);
+  }
+
+  // Passa alla proposta alternativa suggerita (stesso tipo di pasto, es.
+  // pranzo con pranzo): il controllo varietà si rivaluta sul nuovo giorno.
+  function handleProvaAlternativa(nomeGiorno: string) {
+    if (!giorni || !pastoProposto) return;
+    const record = giorni.find((g) => g.giorno === nomeGiorno);
+    const pasto = record?.pasti[pastoProposto.indice];
+    if (!record || !pasto) return;
+
+    setPastoProposto({ giorno: nomeGiorno, indice: pastoProposto.indice, nome: pasto.nome });
+    if (pastoSelezionato) {
+      valutaProposta(pastoSelezionato.giorno, pastoSelezionato.indice, nomeGiorno, pastoProposto.indice);
+    }
   }
 
   function handleAnnullaScambio() {
     setPastoSelezionato(null);
     setPastoProposto(null);
     setErroreScambio(null);
+    setConflittoScambio(null);
   }
 
   async function handleConfermaScambio() {
@@ -308,6 +349,7 @@ export function MenuView({
     }
     setPastoSelezionato(null);
     setPastoProposto(null);
+    setConflittoScambio(null);
     setScambioInCorso(false);
   }
 
@@ -379,7 +421,42 @@ export function MenuView({
               </div>
             )}
 
-            {pastoSelezionato && pastoProposto && (
+            {pastoSelezionato && pastoProposto && conflittoScambio && (
+              <div className="flex flex-col gap-3 bg-honey-soft px-4 py-4 text-sm text-ink">
+                <p>
+                  <strong className="font-semibold text-honey">Attenzione:</strong> questo scambio ridurrebbe la
+                  varietà del piano. {conflittoScambio.messaggio}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {conflittoScambio.alternativa && (
+                    <button
+                      type="button"
+                      onClick={() => handleProvaAlternativa(conflittoScambio.alternativa as string)}
+                      className="flex min-h-11 items-center justify-center rounded-full bg-accent px-5 text-sm font-semibold text-accent-fill-text"
+                    >
+                      Prova {conflittoScambio.alternativa} invece
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleAnnullaScambio}
+                    className="flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-semibold text-ink"
+                  >
+                    Annulla
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfermaScambio}
+                    disabled={scambioInCorso}
+                    className="flex min-h-11 items-center justify-center text-xs font-medium text-ink/60 underline disabled:opacity-50"
+                  >
+                    {scambioInCorso ? "Scambio..." : "Scambia comunque"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {pastoSelezionato && pastoProposto && !conflittoScambio && (
               <div className="flex flex-col gap-3 bg-panel px-4 py-4 text-sm text-ink">
                 <p>
                   Scambiare <strong className="font-semibold">{pastoSelezionato.nome}</strong> (
