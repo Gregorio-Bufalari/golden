@@ -13,7 +13,7 @@ import {
   LIVELLO_ATTIVITA_OPTIONS,
 } from "@/lib/opzioni-profilo";
 
-type ProfileData = {
+export type ProfileData = {
   nome: string;
   restrizioni: string[];
   household_size: number | null;
@@ -33,7 +33,17 @@ function toggleInArray(list: string[], value: string): string[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 }
 
-export function ImpostazioniForm({ token, profile }: { token: string; profile: ProfileData }) {
+export function ImpostazioniForm({
+  token,
+  profile,
+  onSalvato,
+  onAnnulla,
+}: {
+  token: string;
+  profile: ProfileData;
+  onSalvato: (profilo: ProfileData) => void;
+  onAnnulla: () => void;
+}) {
   const [nome, setNome] = useState(profile.nome);
   const [restrizioni, setRestrizioni] = useState<string[]>(profile.restrizioni || []);
   const [householdSize, setHouseholdSize] = useState(
@@ -58,7 +68,6 @@ export function ImpostazioniForm({ token, profile }: { token: string; profile: P
 
   const [salvando, setSalvando] = useState(false);
   const [errore, setErrore] = useState<string | null>(null);
-  const [salvato, setSalvato] = useState(false);
 
   function toggleRestrizione(value: string) {
     setRestrizioni((prev) => {
@@ -73,30 +82,49 @@ export function ImpostazioniForm({ token, profile }: { token: string; profile: P
   async function handleSalva() {
     setSalvando(true);
     setErrore(null);
-    setSalvato(false);
+
+    const householdSizeNum = householdSize ? Number(householdSize) : null;
+    const budgetNum = budgetSettimanale ? Number(budgetSettimanale) : null;
+    const etaNum = eta ? Number(eta) : null;
+    const pesoNum = pesoKg ? Number(pesoKg) : null;
+    const altezzaNum = altezzaCm ? Number(altezzaCm) : null;
 
     const result = await updateProfilo(token, {
       nome,
       restrizioni,
-      household_size: householdSize ? Number(householdSize) : null,
+      household_size: householdSizeNum,
       obiettivo,
       preferenze: { cucina, graditi, non_graditi: nonGraditi },
       tempo_max_cucina: tempoMaxCucina,
-      budget_settimanale: budgetSettimanale ? Number(budgetSettimanale) : null,
+      budget_settimanale: budgetNum,
       supermercato,
       sesso: sesso || null,
-      eta: eta ? Number(eta) : null,
-      peso_kg: pesoKg ? Number(pesoKg) : null,
-      altezza_cm: altezzaCm ? Number(altezzaCm) : null,
+      eta: etaNum,
+      peso_kg: pesoNum,
+      altezza_cm: altezzaNum,
       livello_attivita: livelloAttivita || null,
     });
 
     if ("error" in result) {
       setErrore(result.error);
+      setSalvando(false);
     } else {
-      setSalvato(true);
+      onSalvato({
+        nome,
+        restrizioni,
+        household_size: householdSizeNum,
+        obiettivo: obiettivo || null,
+        preferenze: { cucina, graditi, non_graditi: nonGraditi },
+        tempo_max_cucina: tempoMaxCucina,
+        budget_settimanale: budgetNum,
+        supermercato: supermercato || null,
+        sesso: sesso || null,
+        eta: etaNum,
+        peso_kg: pesoNum,
+        altezza_cm: altezzaNum,
+        livello_attivita: livelloAttivita || null,
+      });
     }
-    setSalvando(false);
   }
 
   return (
@@ -285,16 +313,25 @@ export function ImpostazioniForm({ token, profile }: { token: string; profile: P
       </div>
 
       {errore && <p className="text-sm text-clay">{errore}</p>}
-      {salvato && <p className="text-sm font-medium text-accent">Impostazioni salvate.</p>}
 
-      <button
-        onClick={handleSalva}
-        disabled={salvando}
-        className="flex min-h-11 items-center justify-center gap-2 self-start rounded-full bg-accent px-6 text-sm font-semibold text-accent-fill-text disabled:opacity-50"
-      >
-        {salvando && <Spinner className="h-4 w-4" />}
-        {salvando ? "Salvo..." : "Salva impostazioni"}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleSalva}
+          disabled={salvando}
+          className="flex min-h-11 items-center justify-center gap-2 self-start rounded-full bg-accent px-6 text-sm font-semibold text-accent-fill-text disabled:opacity-50"
+        >
+          {salvando && <Spinner className="h-4 w-4" />}
+          {salvando ? "Salvo..." : "Salva impostazioni"}
+        </button>
+        <button
+          type="button"
+          onClick={onAnnulla}
+          disabled={salvando}
+          className="flex min-h-11 items-center justify-center self-start rounded-full px-6 text-sm font-semibold text-ink disabled:opacity-50"
+        >
+          Annulla
+        </button>
+      </div>
     </div>
   );
 }
