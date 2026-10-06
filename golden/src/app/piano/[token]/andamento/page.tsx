@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PageHeader } from "../page-header";
+import { calcolaSprechiEvitati } from "@/lib/sprechi-evitati";
 
 type CheckinRow = {
   seguito_piano: boolean | null;
@@ -88,6 +89,14 @@ export default async function AndamentoPage({
   const categoriaPiuFrequente =
     Object.entries(conteggioCategorie).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 
+  const { data: rimanenze } = await supabase
+    .from("rimanenze")
+    .select("ingrediente, unita, quantita")
+    .eq("profile_id", profile.id);
+
+  const settimaneSenzaSpreco = checkinsConRisposta.filter((c) => c.spreco === false).length;
+  const sprechiEvitati = calcolaSprechiEvitati(settimaneSenzaSpreco, rimanenze || []);
+
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader token={token} title="Andamento" />
@@ -136,6 +145,17 @@ export default async function AndamentoPage({
               Quando capita, è quasi sempre {categoriaPiuFrequente.toLowerCase()}.
             </p>
           )}
+        </div>
+
+        <div className="bg-panel rounded-[14px] px-5 py-[18px]">
+          <div className="text-[13px] font-medium text-ink/65">Sprechi evitati</div>
+          <div className="mt-1 font-mono text-[28px] font-semibold text-ink">
+            €{sprechiEvitati.totale.toFixed(2)}
+          </div>
+          <div className="mt-0.5 text-xs text-ink/55">
+            Stima indicativa: cibo nel Frigo non buttato (€{sprechiEvitati.valoreFrigo.toFixed(2)}) + settimane
+            senza sprechi dichiarati nei check-in (€{sprechiEvitati.valoreCheckin.toFixed(2)}).
+          </div>
         </div>
 
         <div>
