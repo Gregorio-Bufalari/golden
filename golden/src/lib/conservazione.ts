@@ -2,7 +2,7 @@
 // parole chiave nel nome dell'ingrediente — nessuna data precisa, nessuna
 // notifica, solo testo informativo accanto a ogni voce della dispensa.
 
-type Categoria = "fresco" | "frigo_aperto" | "surgelato" | "dispensa";
+export type Categoria = "fresco" | "frigo_aperto" | "surgelato" | "dispensa";
 
 const TESTO_PER_CATEGORIA: Record<Categoria, string> = {
   fresco: "Fresco deperibile — consuma entro 2-4 giorni",
