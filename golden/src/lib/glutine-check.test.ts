@@ -1,42 +1,81 @@
 import { describe, it, expect } from "vitest";
-import { isIngredienteARischio, ingredientiARischio } from "./glutine-check";
+import {
+  categorizzaIngrediente,
+  ingredientiNonAdatti,
+  ingredientiDaVerificare,
+  ingredientiDaSegnalare,
+} from "./glutine-check";
 
-describe("isIngredienteARischio", () => {
-  it("segnala gli ingredienti con glutine evidente", () => {
-    expect(isIngredienteARischio("Pasta")).toBe(true);
-    expect(isIngredienteARischio("Farina di frumento")).toBe(true);
-    expect(isIngredienteARischio("Pane")).toBe(true);
-    expect(isIngredienteARischio("Salsa di soia")).toBe(true);
-    expect(isIngredienteARischio("Dado vegetale")).toBe(true);
+describe("categorizzaIngrediente", () => {
+  it("segnala 'non_adatto' per ingredienti con glutine senza ambiguità", () => {
+    expect(categorizzaIngrediente("Pasta")).toBe("non_adatto");
+    expect(categorizzaIngrediente("Farina di frumento")).toBe("non_adatto");
+    expect(categorizzaIngrediente("Pane")).toBe("non_adatto");
+    expect(categorizzaIngrediente("Farro")).toBe("non_adatto");
   });
 
-  it("non segnala ingredienti chiaramente senza glutine", () => {
-    expect(isIngredienteARischio("Petto di pollo")).toBe(false);
-    expect(isIngredienteARischio("Pomodoro")).toBe(false);
-    expect(isIngredienteARischio("Riso")).toBe(false);
-    expect(isIngredienteARischio("Uova")).toBe(false);
+  it("segnala 'da_verificare' per ingredienti il cui glutine dipende dalla marca", () => {
+    expect(categorizzaIngrediente("Salsa di soia")).toBe("da_verificare");
+    expect(categorizzaIngrediente("Dado vegetale")).toBe("da_verificare");
+    expect(categorizzaIngrediente("Besciamella")).toBe("da_verificare");
+    expect(categorizzaIngrediente("Avena")).toBe("da_verificare");
   });
 
-  it("non segnala un ingrediente a rischio se ha un qualificatore sicuro", () => {
-    expect(isIngredienteARischio("Pasta di riso")).toBe(false);
-    expect(isIngredienteARischio("Farina di mais")).toBe(false);
-    expect(isIngredienteARischio("Pasta senza glutine")).toBe(false);
-    expect(isIngredienteARischio("Cuscus di quinoa")).toBe(false);
+  it("segnala 'informazioni_sufficienti' per ingredienti chiaramente senza glutine", () => {
+    expect(categorizzaIngrediente("Petto di pollo")).toBe("informazioni_sufficienti");
+    expect(categorizzaIngrediente("Pomodoro")).toBe("informazioni_sufficienti");
+    expect(categorizzaIngrediente("Riso")).toBe("informazioni_sufficienti");
+    expect(categorizzaIngrediente("Uova")).toBe("informazioni_sufficienti");
+  });
+
+  it("segnala 'informazioni_sufficienti' per una base alternativa intrinsecamente senza glutine", () => {
+    expect(categorizzaIngrediente("Pasta di riso")).toBe("informazioni_sufficienti");
+    expect(categorizzaIngrediente("Farina di mais")).toBe("informazioni_sufficienti");
+    expect(categorizzaIngrediente("Cuscus di quinoa")).toBe("informazioni_sufficienti");
+  });
+
+  it("segnala 'verificato' solo per una certificazione esplicita", () => {
+    expect(categorizzaIngrediente("Pasta senza glutine")).toBe("verificato");
+    expect(categorizzaIngrediente("Pane gluten free")).toBe("verificato");
+    expect(categorizzaIngrediente("Farina certificata senza glutine")).toBe("verificato");
+  });
+
+  it("i qualificatori hanno priorità sulle parole chiave di rischio", () => {
+    // "pasta" matcherebbe non_adatto, ma il qualificatore esplicito vince.
+    expect(categorizzaIngrediente("Pasta di riso certificata")).toBe("verificato");
   });
 
   it("non è sensibile a maiuscole/minuscole", () => {
-    expect(isIngredienteARischio("PASTA")).toBe(true);
-    expect(isIngredienteARischio("fRuMeNtO")).toBe(true);
+    expect(categorizzaIngrediente("PASTA")).toBe("non_adatto");
+    expect(categorizzaIngrediente("fRuMeNtO")).toBe("non_adatto");
   });
 });
 
-describe("ingredientiARischio", () => {
-  it("filtra solo gli ingredienti a rischio da una lista", () => {
-    const risultato = ingredientiARischio(["Petto di pollo", "Pasta", "Pomodoro", "Farro"]);
+describe("ingredientiNonAdatti", () => {
+  it("filtra solo gli ingredienti non adatto, non quelli da verificare", () => {
+    const risultato = ingredientiNonAdatti(["Pollo", "Pasta", "Dado vegetale", "Pomodoro", "Farro"]);
     expect(risultato).toEqual(["Pasta", "Farro"]);
   });
 
-  it("restituisce un array vuoto se nessun ingrediente è a rischio", () => {
-    expect(ingredientiARischio(["Riso", "Pollo", "Pasta di riso"])).toEqual([]);
+  it("restituisce un array vuoto se nessun ingrediente è non adatto", () => {
+    expect(ingredientiNonAdatti(["Riso", "Pollo", "Dado vegetale", "Pasta di riso"])).toEqual([]);
+  });
+});
+
+describe("ingredientiDaVerificare", () => {
+  it("filtra solo gli ingredienti da verificare, non quelli non adatto", () => {
+    const risultato = ingredientiDaVerificare(["Pollo", "Pasta", "Dado vegetale", "Salsa di soia"]);
+    expect(risultato).toEqual(["Dado vegetale", "Salsa di soia"]);
+  });
+});
+
+describe("ingredientiDaSegnalare", () => {
+  it("unisce non adatto e da verificare", () => {
+    const risultato = ingredientiDaSegnalare(["Pollo", "Pasta", "Dado vegetale", "Pomodoro"]);
+    expect(risultato).toEqual(["Pasta", "Dado vegetale"]);
+  });
+
+  it("restituisce un array vuoto se nessun ingrediente merita attenzione", () => {
+    expect(ingredientiDaSegnalare(["Riso", "Pollo", "Pasta di riso"])).toEqual([]);
   });
 });

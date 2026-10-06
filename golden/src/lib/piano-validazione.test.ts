@@ -109,6 +109,52 @@ describe("validaGiorni — controllo glutine con rigenerazione simulata dall'AI"
     expect(lunediPranzo.verificare).toBe(true);
     expect(lunediPranzo.nome).toBe("Pasta al pomodoro"); // resta il pasto originale, non sostituito
   });
+
+  it("segnala un ingrediente 'da verificare' (es. dado vegetale) senza chiamare l'AI per rigenerarlo", async () => {
+    const giorni = [
+      {
+        giorno: "Lunedì" as const,
+        pasti: [
+          pasto({
+            tipo: "pranzo",
+            nome: "Zuppa di verdure",
+            ingredienti: [ingrediente({ nome: "Dado vegetale", quantita: 10, unita: "g", reparto: "Dispensa" })],
+          }),
+          pasto({
+            tipo: "cena",
+            nome: "Insalata",
+            ingredienti: [ingrediente({ nome: "Insalata mista", quantita: 100, unita: "g", reparto: "Frutta e verdura" })],
+          }),
+        ],
+      },
+    ];
+
+    const risultato = await validaGiorni(profiloCeliaco, giorni);
+    const pranzo = risultato[0].pasti[0];
+
+    // "Da verificare" non blocca il pasto: nessun tentativo di rigenerazione.
+    expect(mockRegeneratePasto).not.toHaveBeenCalled();
+    expect(pranzo.nome).toBe("Zuppa di verdure");
+    expect(pranzo.verificare).toBe(true);
+    expect(pranzo.ingredienti_a_rischio).toContain("Dado vegetale");
+    // Non è "non adatto": è solo da controllare in etichetta.
+    expect(pranzo.ingredienti_non_adatti).toBeUndefined();
+  });
+
+  it("imposta ingredienti_non_adatti solo per la categoria 'non adatto', dopo i tentativi massimi", async () => {
+    mockRegeneratePasto.mockResolvedValue(
+      pasto({
+        tipo: "pranzo",
+        nome: "Pasta al pesto (tentativo fallito)",
+        ingredienti: [ingrediente({ nome: "Pasta", quantita: 100, unita: "g", reparto: "Pane e cereali" })],
+      }),
+    );
+
+    const risultato = await validaGiorni(profiloCeliaco, creaPianoEsempio());
+    const lunediPranzo = risultato[0].pasti[0];
+
+    expect(lunediPranzo.ingredienti_non_adatti).toEqual(["Pasta"]);
+  });
 });
 
 describe("assicuraVarieta — niente due pasti con lo stesso nome nella settimana", () => {

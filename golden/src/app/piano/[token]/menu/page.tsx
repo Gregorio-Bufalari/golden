@@ -35,6 +35,8 @@ export default async function MenuPage({
     .limit(1)
     .maybeSingle();
 
+  const { data: preferiti } = await supabase.from("preferiti").select("nome").eq("profile_id", profile.id);
+
   return (
     <div className="flex flex-1 flex-col">
       <MenuView
@@ -43,6 +45,7 @@ export default async function MenuPage({
         initialModalita={profile.modalita as "routine" | "scoperta"}
         initialGiorni={ultimoPiano?.meal_plan?.giorni || null}
         initialSettimana={ultimoPiano?.settimana || ""}
+        preferitiIniziali={(preferiti || []).map((p) => p.nome)}
         budgetSettimanale={profile.budget_settimanale}
         budgetStimatoIniziale={ultimoPiano?.budget_stimato ?? null}
         datiBiometrici={
