@@ -4,9 +4,11 @@ import { useMemo, useState } from "react";
 import { ModalitaToggle } from "../modalita-toggle";
 import { PageHeader } from "../page-header";
 import { setModalita, scambiaPasti } from "../actions";
+import { aggiungiPreferito, rimuoviPreferito } from "../preferiti-actions";
 import { etichettaGiorno } from "@/lib/settimana";
 import { conflittiDopoScambio, suggerisciGiornoAlternativo } from "@/lib/varieta-giorno";
 import { Spinner } from "@/components/spinner";
+import { HeartIcon } from "@/components/heart-icon";
 import {
   calcolaRiferimentoLARN,
   confrontaConLARN,
@@ -93,6 +95,7 @@ export function MenuView({
   budgetSettimanale,
   budgetStimatoIniziale,
   datiBiometrici,
+  preferitiIniziali,
 }: {
   token: string;
   nome: string;
@@ -102,10 +105,14 @@ export function MenuView({
   budgetSettimanale: number | null;
   budgetStimatoIniziale: number | null;
   datiBiometrici: DatiBiometrici | null;
+  preferitiIniziali: string[];
 }) {
   const [modalita, setModalitaState] = useState(initialModalita);
   const [cambiandoModalita, setCambiandoModalita] = useState(false);
   const [giorni, setGiorni] = useState<Giorno[] | null>(initialGiorni);
+  const [preferiti, setPreferiti] = useState<Set<string>>(
+    () => new Set(preferitiIniziali.map((n) => n.trim().toLowerCase())),
+  );
   const [settimana, setSettimana] = useState(initialSettimana);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -353,6 +360,35 @@ export function MenuView({
     setScambioInCorso(false);
   }
 
+  // Preferiti (versione semplice): salva solo un'istantanea del piatto per
+  // consultarla nella vista Preferiti, nessuna influenza sul motore di
+  // generazione. Aggiornamento ottimistico, come lo stato "acquistato"
+  // nella lista della spesa.
+  async function handleToggleFavorito(pasto: Pasto) {
+    const chiave = pasto.nome.trim().toLowerCase();
+    const eraPreferito = preferiti.has(chiave);
+
+    setPreferiti((prev) => {
+      const next = new Set(prev);
+      if (eraPreferito) next.delete(chiave);
+      else next.add(chiave);
+      return next;
+    });
+
+    const result = eraPreferito
+      ? await rimuoviPreferito(token, pasto.nome)
+      : await aggiungiPreferito(token, pasto);
+
+    if ("error" in result) {
+      setPreferiti((prev) => {
+        const next = new Set(prev);
+        if (eraPreferito) next.add(chiave);
+        else next.delete(chiave);
+        return next;
+      });
+    }
+  }
+
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
@@ -501,40 +537,56 @@ export function MenuView({
                       const selezionatoPerScambio =
                         (pastoSelezionato?.giorno === giorno.giorno && pastoSelezionato?.indice === i) ||
                         (pastoProposto?.giorno === giorno.giorno && pastoProposto?.indice === i);
+                      const preferito = preferiti.has(pasto.nome.trim().toLowerCase());
                       return (
                         <div key={i} className="flex flex-col gap-2">
                           <div className="flex items-stretch gap-2">
-                            <button
-                              type="button"
-                              onClick={() => haPreparazione && setPastoEspanso(espanso ? null : chiave)}
-                              disabled={!haPreparazione}
-                              className={`flex-1 rounded-[14px] bg-panel px-5 py-[18px] text-left disabled:cursor-default ${
-                                selezionatoPerScambio ? "ring-2 ring-accent" : ""
-                              }`}
-                            >
-                              <div className="text-[13px] font-medium text-ink/60">
-                                {pasto.tipo === "pranzo" ? "Pranzo" : "Cena"} · {pasto.tempo_preparazione_min} min
-                              </div>
-                              <div className="mt-1 text-[21px] font-bold leading-tight tracking-tight text-ink">
-                                {pasto.nome}
-                              </div>
-                              <p className="mt-1.5 text-[13px] text-ink/65">
-                                {pasto.ingredienti.map((ing) => ing.nome).join(", ")}
-                              </p>
-                              <div className="mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[13px] text-ink/75">
-                                <span>{pasto.nutrizione.calorie} kcal</span>
-                                <span>{pasto.nutrizione.proteine_g}g proteine</span>
-                                <span>{pasto.nutrizione.carboidrati_g}g carboidrati</span>
-                                <span>{pasto.nutrizione.grassi_g}g grassi</span>
-                                <span>{pasto.nutrizione.fibre_g}g fibre</span>
-                              </div>
-                              {haPreparazione && (
-                                <span className="mt-2 flex items-center gap-1 font-sans text-xs font-medium text-accent">
-                                  Preparazione
-                                  <ChevronIcon aperto={espanso} />
-                                </span>
-                              )}
-                            </button>
+                            <div className="relative flex-1">
+                              <button
+                                type="button"
+                                onClick={() => haPreparazione && setPastoEspanso(espanso ? null : chiave)}
+                                disabled={!haPreparazione}
+                                className={`block w-full rounded-[14px] bg-panel px-5 py-[18px] pr-14 text-left disabled:cursor-default ${
+                                  selezionatoPerScambio ? "ring-2 ring-accent" : ""
+                                }`}
+                              >
+                                <div className="text-[13px] font-medium text-ink/60">
+                                  {pasto.tipo === "pranzo" ? "Pranzo" : "Cena"} · {pasto.tempo_preparazione_min} min
+                                </div>
+                                <div className="mt-1 text-[21px] font-bold leading-tight tracking-tight text-ink">
+                                  {pasto.nome}
+                                </div>
+                                <p className="mt-1.5 text-[13px] text-ink/65">
+                                  {pasto.ingredienti.map((ing) => ing.nome).join(", ")}
+                                </p>
+                                <div className="mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[13px] text-ink/75">
+                                  <span>{pasto.nutrizione.calorie} kcal</span>
+                                  <span>{pasto.nutrizione.proteine_g}g proteine</span>
+                                  <span>{pasto.nutrizione.carboidrati_g}g carboidrati</span>
+                                  <span>{pasto.nutrizione.grassi_g}g grassi</span>
+                                  <span>{pasto.nutrizione.fibre_g}g fibre</span>
+                                </div>
+                                {haPreparazione && (
+                                  <span className="mt-2 flex items-center gap-1 font-sans text-xs font-medium text-accent">
+                                    Preparazione
+                                    <ChevronIcon aperto={espanso} />
+                                  </span>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleFavorito(pasto)}
+                                aria-label={
+                                  preferito ? `Rimuovi ${pasto.nome} dai preferiti` : `Aggiungi ${pasto.nome} ai preferiti`
+                                }
+                                aria-pressed={preferito}
+                                className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center ${
+                                  preferito ? "text-accent" : "text-ink/35"
+                                }`}
+                              >
+                                <HeartIcon pieno={preferito} />
+                              </button>
+                            </div>
                             <div className="flex w-11 shrink-0 flex-col gap-2">
                               <button
                                 onClick={() => handlePastoDiverso(giorno, pasto, chiave)}
