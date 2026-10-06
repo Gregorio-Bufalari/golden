@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ImpostazioniForm } from "./impostazioni-form";
+import { ImpostazioniView } from "./impostazioni-view";
 import { PageHeader } from "../page-header";
 
 export default async function ImpostazioniPage({
@@ -36,7 +36,7 @@ export default async function ImpostazioniPage({
       />
 
       <div className="mx-auto w-full max-w-md flex-1 px-5">
-        <ImpostazioniForm token={token} profile={profile} />
+        <ImpostazioniView token={token} profile={profile} />
       </div>
     </div>
   );
