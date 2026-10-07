@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Giorno, Pasto } from "./claude";
+import type { Pasto } from "./claude";
+import type { GiornoValidato, PastoValidato } from "./piano-validazione";
 
 export type PreferitoPerRotazione = {
   id: string;
@@ -42,15 +43,21 @@ export function sceglieFavoritoScoperta(
 }
 
 /**
- * Sostituisce, nel piano appena generato, il primo pasto dello stesso tipo
- * (pranzo/cena) del Preferito scelto con l'istantanea salvata — così il
- * piatto incluso è esattamente quello che l'utente aveva messo tra i
- * preferiti, non una reinterpretazione dell'AI. Il pasto sostituito passa
- * comunque, come ogni altro, dalla normale validazione di sicurezza e dal
- * budget più avanti nella pipeline (va chiamata PRIMA di validaGiorni).
+ * Sostituisce, nel piano, il primo pasto dello stesso tipo (pranzo/cena)
+ * del Preferito scelto con l'istantanea salvata — così il piatto incluso è
+ * esattamente quello che l'utente aveva messo tra i preferiti, non una
+ * reinterpretazione dell'AI. Va chiamata DOPO l'adattamento budget (non
+ * prima): l'AI che riduce il costo rivede liberamente tutti i pasti e
+ * potrebbe alterare anche questo se fosse già presente in quel passaggio.
+ * Il chiamante deve poi ricontrollare la sicurezza sul pasto appena
+ * inserito e ricalcolare la lista della spesa, dato che il suo costo non
+ * ha partecipato all'ottimizzazione budget.
  */
-export function includiFavoritoNelPiano(giorni: Giorno[], favorito: PreferitoPerRotazione): Giorno[] {
-  const pastoFavorito: Pasto = {
+export function includiFavoritoNelPiano(
+  giorni: GiornoValidato[],
+  favorito: PreferitoPerRotazione,
+): GiornoValidato[] {
+  const pastoFavorito: PastoValidato = {
     tipo: favorito.tipo,
     nome: favorito.nome,
     ingredienti: favorito.ingredienti,

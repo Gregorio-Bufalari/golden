@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { modificaPiano, type ProfiloPerPiano, type Giorno } from "@/lib/claude";
 import { validaGiorni, adattaEntroBudget } from "@/lib/piano-validazione";
 import { leggiDispensa, dispensaSenzaVersione, sostituisciConsumiDispensa } from "@/lib/dispensa";
-import { fattoreCalibrazione, type CheckinPerCalibrazione } from "@/lib/calibrazione-prezzi";
+import { calcolaFattoreCalibrazionePerProfilo } from "@/lib/calibrazione-prezzi";
 import type { GroceryList, ConsumoDispensa } from "@/lib/grocery";
 
 // Vedi la stessa impostazione in /api/piano/generate: più chiamate a Claude
@@ -99,19 +99,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const { data: storicoPiani } = await supabase
-      .from("weekly_plans")
-      .select("budget_stimato, checkins(retailer_usato, spesa_reale)")
-      .eq("profile_id", profileId);
-
-    const checkinsStorico: CheckinPerCalibrazione[] = (storicoPiani || []).flatMap((p) =>
-      (p.checkins || []).map((c) => ({
-        retailer_usato: c.retailer_usato,
-        spesa_reale: c.spesa_reale,
-        budget_stimato: p.budget_stimato,
-      })),
-    );
-    const fattore = fattoreCalibrazione(checkinsStorico, profile.supermercato);
+    const fattore = await calcolaFattoreCalibrazionePerProfilo(supabase, profileId, profile.supermercato);
 
     const giorniBase = await validaGiorni(profiloInput, risultato.giorni, dispensaBase);
     const adattato = await adattaEntroBudget(
