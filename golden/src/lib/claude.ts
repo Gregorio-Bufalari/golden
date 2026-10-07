@@ -62,7 +62,12 @@ const GiornoSchema = z.object({
   pasti: z.array(PastoSchema).length(2),
 });
 
-const MealPlanSchema = z.object({
+// Esportato (non solo il tipo inferito) perché /api/piano/conferma lo
+// riusa per validare la forma di uno scenario "echeggiato" dal client
+// prima di fidarsene — l'utente lo ha solo scelto tra quelli generati, non
+// modificato, ma è comunque la prima volta che un piano arriva dal client
+// invece che da Claude.
+export const MealPlanSchema = z.object({
   giorni: z.array(GiornoSchema).length(7),
 });
 

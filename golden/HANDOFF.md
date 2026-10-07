@@ -158,14 +158,28 @@ src/lib/scadenza-frigo.ts    — data di scadenza stimata per voce del Frigo (eu
                                 categoria ingrediente) + giorni mancanti, per il banner
 src/lib/calibrazione-prezzi.ts — "learning loop" prezzi: fattore correttivo derivato dai
                                 check-in passati (spesa_reale vs budget_stimato) PER
-                                SUPERMERCATO, applicato sopra la fascia statica in grocery.ts
+                                SUPERMERCATO, applicato sopra la fascia statica in grocery.ts.
+                                calcolaFattoreCalibrazionePerProfilo() centralizza la lettura
+                                Supabase, riusata da generate/modifica/conferma — non duplicarla.
 src/lib/preferiti-scoperta.ts — in modalità Scoperta, sceglie se e quale Preferito includere
                                 nel piano di questa settimana (a rotazione, mai lo stesso finché
-                                ce n'è un altro in attesa) e lo sostituisce nel piano generato
-                                PRIMA di validaGiorni/assicuraVarieta
+                                ce n'è un altro in attesa) e lo sostituisce nel piano generato.
+                                includiFavoritoNelPiano() va chiamata DOPO adattaEntroBudget
+                                (non prima): l'AI che riduce il costo rivede liberamente tutti i
+                                pasti e potrebbe alterare il Preferito se fosse già presente.
 
 src/app/api/piano/generate/route.ts  — genera un piano nuovo (o riusa l'ultimo in modalità
-                                        "routine"), orchestration completa
+                                        "routine"). Se c'è un piano routine riusabile, salva
+                                        subito come prima; altrimenti genera TRE scenari a
+                                        budget diverso (vedi "Scenari multipli di budget" più
+                                        sotto) e li restituisce SENZA salvarli — li salva solo
+                                        /api/piano/conferma, quando l'utente ne sceglie uno.
+src/app/api/piano/conferma/route.ts  — salva lo scenario scelto dall'utente: riceve dal client
+                                        solo `giorni`, ricalcola SEMPRE lato server lista della
+                                        spesa e consumi dispensa (mai fidarsi di quelli mostrati
+                                        nel confronto) e ri-passa da validaGiorni — prima volta
+                                        in cui un piano arriva "echeggiato" dal client invece che
+                                        da Claude, quindi prima volta in cui si rivalida.
 src/app/api/piano/modifica/route.ts  — UNICO endpoint per ogni modifica in linguaggio naturale
                                         al piano: "Proponi un piatto diverso", +/- nutrienti,
                                         "Sostituisci"/"Non l'ho trovato", ecc. Passa sempre da
@@ -211,10 +225,15 @@ src/components/supermercato-selector.tsx — componente condiviso di scelta supe
 - **Splice deterministico, non istruzione all'AI, quando serve riusare un dato esatto già noto**:
   quando l'obiettivo è includere QUALCOSA DI GIÀ NOTO per intero (es. un piatto salvato nei
   Preferiti, istantanea completa di ingredienti/nutrizione/preparazione), si sostituisce
-  direttamente nel piano generato PRIMA di `validaGiorni`/`assicuraVarieta` (che lo trattano come
-  ogni altro pasto, stessa sicurezza/varietà), invece di chiedere all'AI di "includere questo
-  piatto" nel prompt — più affidabile, e il pasto resta esattamente quello salvato, non una
-  reinterpretazione del modello. Vedi `includiFavoritoNelPiano` in `preferiti-scoperta.ts`.
+  direttamente nel piano generato invece di chiedere all'AI di "includere questo piatto" nel
+  prompt — più affidabile, e il pasto resta esattamente quello salvato, non una reinterpretazione
+  del modello. Va fatto DOPO `adattaEntroBudget`, non prima: l'AI che riduce il costo rivede
+  liberamente tutti i pasti e potrebbe alterare anche questo se fosse già presente in quel
+  passaggio (bug corretto nella sessione "Scenari multipli di budget" — il codice precedente lo
+  inseriva prima). Dopo lo splice va ripetuto `validaGiorni` (il pasto appena inserito potrebbe
+  non essere mai stato controllato con le restrizioni ATTUALI) e ricalcolato `buildGroceryList`
+  (il suo costo non ha partecipato all'ottimizzazione budget). Vedi `includiFavoritoNelPiano` in
+  `preferiti-scoperta.ts` e come viene usata in `generate/route.ts`.
 - **Stime esplicitamente etichettate come tali** nella UI quando non sono dati precisi (budget
   stimato, confronto LARN, sprechi evitati €) — mai presentare una stima come un dato esatto.
 - **Supermercato: due significati diversi, mai confusi.** In Onboarding/Profilo, `profile.supermercato`
@@ -228,6 +247,16 @@ src/components/supermercato-selector.tsx — componente condiviso di scelta supe
   calibrazione prezzi) è una funzione pura e deterministica su dati già raccolti, con soglia minima di
   campioni e range di clamping per non farsi distorcere da un singolo valore anomalo — stesso spirito
   di `sprechi-evitati.ts` e `varieta-giorno.ts`, niente nuove chiamate Claude per queste stime.
+- **Generare ≠ salvare, quando l'utente deve prima scegliere.** Introdotto con "Scenari multipli di
+  budget": `/api/piano/generate` può restituire più proposte SENZA scrivere nulla (niente
+  `weekly_plans`, niente consumo dispensa, niente rotazione Preferiti) — qualunque effetto
+  collaterale di una generazione che potrebbe essere scartata va rimandato a un secondo endpoint
+  dedicato (`/api/piano/conferma`), chiamato solo quando l'utente conferma davvero. Quel secondo
+  endpoint è anche la prima volta che un piano arriva "echeggiato" dal client invece che generato
+  da Claude in quella stessa richiesta: non fidarsi dei valori derivati (lista della spesa, consumi
+  dispensa) che il client rimanda indietro, RICALCOLARLI sempre lato server da `giorni` (validato
+  con `MealPlanSchema.safeParse` prima di tutto) — fidarsi solo del contenuto dei pasti in sé, già
+  scelto dall'utente tra alternative mostrate, mai modificato a mano.
 
 ## Validazione sicurezza glutine — a 4 livelli (cambiata di recente)
 
@@ -243,7 +272,7 @@ src/components/supermercato-selector.tsx — componente condiviso di scelta supe
 Il banner nel Menu ("Verifica necessaria" di una volta) ora distingue rosso/clay ("Non adatto",
 rigenerazione fallita) da ambra/honey ("Da verificare", solo da controllare in etichetta).
 
-## Ordine cronologico di cosa è stato costruito (PR #16 → #50, tutte mergiate)
+## Ordine cronologico di cosa è stato costruito (PR #16 → #51, tutte mergiate)
 
 Le PR più vecchie (16-31) sono di una sessione precedente: setup iniziale, generazione piano,
 fix vari, lista spesa con "Non l'ho trovato"/"Proponine un altro", stagionalità, dispensa.
@@ -290,15 +319,27 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     `obiettiviNutrizionaliTesto` in `claude.ts`). Non aggiunto in Onboarding (richiesto solo per
     Profilo), nessuna validazione post-generazione (a differenza del glutine): è un'istruzione nel
     prompt, non un vincolo rigido verificato dopo
-16. **(questa sessione)**: **Preferiti che influenzano Scoperta** — in modalità Scoperta, circa
-    una settimana su tre include un piatto dai Preferiti invece di puntare solo a varietà pura
+16. **#51**: **Preferiti che influenzano Scoperta** — in modalità Scoperta, circa una settimana su
+    tre include un piatto dai Preferiti invece di puntare solo a varietà pura
     (`sceglieFavoritoScoperta` in `preferiti-scoperta.ts`), scegliendo sempre quello riproposto
     meno di recente (rotazione, colonna `preferiti.ultima_proposta`) così nessuno si ripete finché
     ce n'è un altro in attesa. Il piatto scelto viene sostituito direttamente nel piano generato
-    (non chiesto all'AI nel prompt) PRIMA di `validaGiorni`/`assicuraVarieta`, così passa dalla
-    stessa sicurezza/varietà di ogni altro pasto. Prima eccezione al principio "Preferiti è sola
-    lettura" (vedi Pattern ricorrenti) — resta vero che nessuna funzionalità tocca il motore senza
-    che sia stato chiesto esplicitamente
+    (non chiesto all'AI nel prompt), così passa dalla stessa sicurezza/varietà di ogni altro
+    pasto. Prima eccezione al principio "Preferiti è sola lettura" (vedi Pattern ricorrenti) —
+    resta vero che nessuna funzionalità tocca il motore senza che sia stato chiesto esplicitamente
+17. **(questa sessione)**: **Scenari multipli di budget** — `/api/piano/generate`, quando genera
+    fresco (non riusa un piano routine), produce TRE scenari ("Risparmio" -20%, "Equilibrato",
+    "Più abbondante" +20%, percentuali relative al costo EFFETTIVO dell'equilibrato, non al budget
+    nominale) invece di salvare subito un piano solo — ciascuno è un piano generato da zero per
+    quel target (piatti/ingredienti diversi, non lo stesso piano ridimensionato), con lo stesso
+    eventuale Preferito (Scoperta) per restare confrontabili. Introduce lo split generare/salvare
+    (vedi Pattern ricorrenti) e il nuovo `/api/piano/conferma`, che salva solo lo scenario scelto
+    dall'utente in Menu (nuova schermata di confronto in `menu-view.tsx`, con "Annulla, mantieni
+    il piano attuale" se c'era già un piano). Nello stesso lavoro, **corretto un bug** nella
+    feature precedente: `includiFavoritoNelPiano` veniva chiamata PRIMA di `adattaEntroBudget`,
+    rischiando che l'AI del retry budget alterasse il Preferito appena inserito — ora va dopo
+    (vedi Pattern ricorrenti). `calcolaFattoreCalibrazionePerProfilo` estratta in
+    `calibrazione-prezzi.ts`, centralizzando una lettura Supabase finora duplicata in due route
 
 ## Cose da sapere / residuo noto
 

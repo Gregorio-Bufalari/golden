@@ -52,6 +52,35 @@ type Giorno = {
   pasti: Pasto[];
 };
 
+type Scenario = {
+  chiave: "risparmio" | "equilibrato" | "abbondante";
+  etichetta: string;
+  budget_target: number | null;
+  giorni: Giorno[];
+  grocery_list: { totale_stimato: number };
+  budget_superato: boolean;
+};
+
+// Due piatti di assaggio per scenario, non l'intera settimana: il
+// confronto serve a farsi un'idea veloce, non a leggere 14 pasti tre
+// volte — il piano completo si vede solo dopo aver confermato.
+export function anteprimaPiatti(giorni: Giorno[]): string {
+  const nomi = giorni.flatMap((g) => g.pasti.map((p) => p.nome));
+  const primi = nomi.slice(0, 2);
+  const restanti = nomi.length - primi.length;
+  return restanti > 0 ? `${primi.join(", ")} +${restanti} altri` : primi.join(", ");
+}
+
+// Variazione reale rispetto allo scenario equilibrato (non il ±20%
+// nominale usato per generarlo): ogni scenario è un piano generato da
+// zero, il costo effettivo può discostarsi dal target.
+export function percentualeSuBase(totale: number, base: number): string {
+  if (base <= 0) return "";
+  const delta = Math.round(((totale - base) / base) * 100);
+  if (delta === 0) return "";
+  return delta > 0 ? `+${delta}%` : `${delta}%`;
+}
+
 function ChevronIcon({ aperto }: { aperto: boolean }) {
   return (
     <svg
@@ -124,6 +153,15 @@ export function MenuView({
     Boolean(budgetSettimanale && budgetStimatoIniziale && budgetStimatoIniziale > budgetSettimanale),
   );
   const [budgetStimato, setBudgetStimato] = useState<number | null>(budgetStimatoIniziale);
+  // Scenari a budget diverso in attesa di conferma (vedi "Scenari multipli
+  // di budget"): null quando non c'è una generazione fresca in corso di
+  // scelta — in quel caso resta visibile il piano già confermato in
+  // `giorni`, invariato, così l'utente può sempre tornare indietro.
+  const [scenari, setScenari] = useState<Scenario[] | null>(null);
+  const [settimanaScenari, setSettimanaScenari] = useState("");
+  const [favoritoInclusoId, setFavoritoInclusoId] = useState<string | null>(null);
+  const [confermandoScenario, setConfermandoScenario] = useState<string | null>(null);
+  const [erroreConferma, setErroreConferma] = useState<string | null>(null);
   // Stesso fallback usato per generare il piano (vedi buildContestoProfilo
   // in claude.ts: "Numero di persone per cui cucinare: ... || 1"), così gli
   // ingredienti del piano restano coerenti con la quantità "a porzione"
@@ -170,6 +208,7 @@ export function MenuView({
   async function handleGenerate() {
     setLoading(true);
     setError(null);
+    setErroreConferma(null);
 
     try {
       const res = await fetch("/api/piano/generate", {
@@ -184,14 +223,61 @@ export function MenuView({
         return;
       }
 
-      setGiorni(data.giorni);
-      setSettimana(data.settimana);
-      setBudgetSuperato(Boolean(data.budget_superato));
-      setBudgetStimato(data.grocery_list?.totale_stimato ?? null);
+      // Routine con un piano già riusabile: nessuno scenario da scegliere,
+      // il piano è già salvato esattamente come prima.
+      if (data.riusato) {
+        setGiorni(data.giorni);
+        setSettimana(data.settimana);
+        setBudgetSuperato(Boolean(data.budget_superato));
+        setBudgetStimato(data.grocery_list?.totale_stimato ?? null);
+        return;
+      }
+
+      // Generazione fresca: tre scenari a budget diverso in attesa di
+      // conferma. `giorni` resta quello di prima (se c'era), così l'utente
+      // può sempre annullare e mantenerlo.
+      setScenari(data.scenari || []);
+      setSettimanaScenari(data.settimana);
+      setFavoritoInclusoId(data.favorito_incluso_id ?? null);
     } catch {
       setError("Qualcosa è andato storto. Riprova.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleConfermaScenario(scenario: Scenario) {
+    setConfermandoScenario(scenario.chiave);
+    setErroreConferma(null);
+
+    try {
+      const res = await fetch("/api/piano/conferma", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          settimana: settimanaScenari,
+          giorni: scenario.giorni,
+          favorito_incluso_id: favoritoInclusoId,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErroreConferma(data.error || "Qualcosa è andato storto.");
+        return;
+      }
+
+      setGiorni(data.giorni);
+      setSettimana(data.settimana);
+      setBudgetSuperato(Boolean(data.budget_superato));
+      setBudgetStimato(data.grocery_list?.totale_stimato ?? null);
+      setScenari(null);
+      setFavoritoInclusoId(null);
+    } catch {
+      setErroreConferma("Qualcosa è andato storto. Riprova.");
+    } finally {
+      setConfermandoScenario(null);
     }
   }
 
@@ -414,7 +500,7 @@ export function MenuView({
           disabled={cambiandoModalita || loading}
         />
 
-        {!giorni && (
+        {!giorni && !scenari && (
           <div className="flex flex-col items-center gap-3 py-10">
             <button
               onClick={handleGenerate}
@@ -429,7 +515,68 @@ export function MenuView({
           </div>
         )}
 
-        {giorni && (
+        {scenari && (
+          <div className="flex flex-col gap-4 py-6 text-left">
+            <div>
+              <h2 className="text-base font-semibold text-ink">Scegli il piano per questa settimana</h2>
+              <p className="mt-1 text-xs text-ink/55">
+                Tre scenari a budget diverso, pensati su misura per ciascuno — non lo stesso piano ridimensionato.
+                Conferma quello che preferisci.
+              </p>
+            </div>
+
+            {erroreConferma && <p className="text-sm text-clay">{erroreConferma}</p>}
+
+            <div className="flex flex-col gap-3">
+              {scenari.map((scenario) => {
+                const base = scenari.find((s) => s.chiave === "equilibrato")?.grocery_list.totale_stimato ?? 0;
+                const percentuale =
+                  scenario.chiave === "equilibrato" ? "" : percentualeSuBase(scenario.grocery_list.totale_stimato, base);
+                const confermando = confermandoScenario === scenario.chiave;
+                return (
+                  <div key={scenario.chiave} className="rounded-[14px] bg-panel p-5">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <h3 className="text-sm font-semibold text-ink">
+                        {scenario.etichetta}
+                        {percentuale && <span className="ml-1.5 text-xs font-medium text-ink/50">{percentuale}</span>}
+                      </h3>
+                      <span className="shrink-0 font-mono text-lg font-semibold text-ink">
+                        €{scenario.grocery_list.totale_stimato.toFixed(2)}
+                      </span>
+                    </div>
+                    {scenario.chiave === "equilibrato" &&
+                      budgetSettimanale &&
+                      scenario.grocery_list.totale_stimato > budgetSettimanale && (
+                        <p className="mt-1 text-xs text-honey">Supera il budget di €{budgetSettimanale} fissato in Profilo</p>
+                      )}
+                    <p className="mt-2 text-[13px] text-ink/65">{anteprimaPiatti(scenario.giorni)}</p>
+                    <button
+                      onClick={() => handleConfermaScenario(scenario)}
+                      disabled={Boolean(confermandoScenario)}
+                      className="mt-3.5 flex min-h-11 items-center justify-center gap-2 rounded-full bg-accent px-5 text-sm font-semibold text-accent-fill-text disabled:opacity-50"
+                    >
+                      {confermando && <Spinner className="h-4 w-4" />}
+                      {confermando ? "Confermo..." : "Conferma questo piano"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {giorni && (
+              <button
+                type="button"
+                onClick={() => setScenari(null)}
+                disabled={Boolean(confermandoScenario)}
+                className="self-start text-xs font-semibold text-ink/60 underline disabled:opacity-50"
+              >
+                Annulla, mantieni il piano attuale
+              </button>
+            )}
+          </div>
+        )}
+
+        {giorni && !scenari && (
           <div className="flex flex-col gap-6 text-left">
             {modalita === "scoperta" && (
               <button

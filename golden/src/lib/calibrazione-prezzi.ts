@@ -1,3 +1,6 @@
+import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 // Impara dai check-in passati quanto le stime prezzo si discostano dalla
 // spesa reale PER IL SUPERMERCATO DI RIFERIMENTO del profilo (non per un
 // retailer qualsiasi usato una tantum — vedi fattoreCalibrazione), e
@@ -50,4 +53,32 @@ export function fattoreCalibrazione(
 
   const media = rapporti.reduce((sum, r) => sum + r, 0) / rapporti.length;
   return Math.min(FATTORE_MAX, Math.max(FATTORE_MIN, media));
+}
+
+/**
+ * Legge lo storico check-in del profilo da Supabase e calcola il fattore
+ * di calibrazione per il retailer indicato — stesso identico calcolo
+ * finora duplicato in /api/piano/generate e /api/piano/modifica,
+ * centralizzato qui perché serve anche a /api/piano/conferma (ricalcola
+ * la lista della spesa dello scenario scelto prima di salvarla).
+ */
+export async function calcolaFattoreCalibrazionePerProfilo(
+  supabase: SupabaseClient,
+  profileId: string,
+  retailer: string | null,
+): Promise<number> {
+  const { data: storicoPiani } = await supabase
+    .from("weekly_plans")
+    .select("budget_stimato, checkins(retailer_usato, spesa_reale)")
+    .eq("profile_id", profileId);
+
+  const checkinsStorico: CheckinPerCalibrazione[] = (storicoPiani || []).flatMap((p) =>
+    (p.checkins || []).map((c: { retailer_usato: string | null; spesa_reale: number | null }) => ({
+      retailer_usato: c.retailer_usato,
+      spesa_reale: c.spesa_reale,
+      budget_stimato: p.budget_stimato,
+    })),
+  );
+
+  return fattoreCalibrazione(checkinsStorico, retailer);
 }
