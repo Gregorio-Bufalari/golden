@@ -74,6 +74,40 @@ describe("generateMealPlan — risposta AI simulata", () => {
     expect(testoMessaggio).toContain("Glutine (celiachia)");
   });
 
+  it("senza obiettivi nutrizionali per pasto impostati, li segnala come non specificati", async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: { giorni: creaPianoEsempio() } });
+
+    await generateMealPlan(profiloBase);
+
+    const richiesta = mockParse.mock.calls[0][0];
+    const testoMessaggio = richiesta.messages[0].content as string;
+    expect(testoMessaggio).toMatch(/Obiettivi nutrizionali per pasto.*non specificati/);
+  });
+
+  it("include nel messaggio solo gli obiettivi nutrizionali per pasto effettivamente impostati", async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: { giorni: creaPianoEsempio() } });
+
+    await generateMealPlan({
+      ...profiloBase,
+      obiettivi_nutrizionali: { calorie_min: null, calorie_max: 700, proteine_min_g: 30, carboidrati_max_g: null, grassi_max_g: null },
+    });
+
+    const richiesta = mockParse.mock.calls[0][0];
+    const testoMessaggio = richiesta.messages[0].content as string;
+    expect(testoMessaggio).toContain("al massimo 700 kcal");
+    expect(testoMessaggio).toContain("almeno 30g di proteine");
+    expect(testoMessaggio).not.toContain("carboidrati");
+  });
+
+  it("nel prompt di generazione, gli obiettivi nutrizionali per pasto hanno la stessa priorità dell'obiettivo generale", async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: { giorni: creaPianoEsempio() } });
+
+    await generateMealPlan(profiloBase);
+
+    const richiesta = mockParse.mock.calls[0][0];
+    expect(richiesta.system).toMatch(/obiettivi nutrizionali per pasto.*stessa priorità/i);
+  });
+
   it("include nel prompt il criterio di stagionalità per frutta e verdura, con restrizioni/budget sempre sopra", async () => {
     mockParse.mockResolvedValueOnce({ parsed_output: { giorni: creaPianoEsempio() } });
 

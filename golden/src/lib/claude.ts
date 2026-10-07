@@ -72,6 +72,19 @@ export type Pasto = z.infer<typeof PastoSchema>;
 export type Giorno = z.infer<typeof GiornoSchema>;
 export type MealPlan = z.infer<typeof MealPlanSchema>;
 
+// Target nutrizionali per singolo pasto, impostati esplicitamente
+// dall'utente in Profilo — diversi dal confronto LARN (automatico, dai
+// dati biometrici, solo informativo): questi sono un vincolo che entra nel
+// prompt di generazione. Tutti i campi opzionali: solo quelli impostati
+// vengono passati come vincolo.
+export type ObiettiviNutrizionaliPerPasto = {
+  calorie_min: number | null;
+  calorie_max: number | null;
+  proteine_min_g: number | null;
+  carboidrati_max_g: number | null;
+  grassi_max_g: number | null;
+};
+
 export type ProfiloPerPiano = {
   restrizioni: string[];
   obiettivo: string | null;
@@ -79,6 +92,7 @@ export type ProfiloPerPiano = {
   tempo_max_cucina: number | null;
   household_size: number | null;
   budget_settimanale: number | null;
+  obiettivi_nutrizionali?: ObiettiviNutrizionaliPerPasto | null;
 };
 
 const NOTA_COSTO_CONFEZIONI =
@@ -114,6 +128,19 @@ const ISTRUZIONE_BATCH_COOKING =
   "e sprecate in parte) sia lo spreco alimentare. Le ricette restano comunque distinte tra loro (vedi varietà " +
   "sopra): cambia la preparazione o il resto del piatto, non l'ingrediente principale condiviso.";
 
+function obiettiviNutrizionaliTesto(obiettivi: ObiettiviNutrizionaliPerPasto | null | undefined): string {
+  if (!obiettivi) return "non specificati";
+
+  const parti: string[] = [];
+  if (obiettivi.calorie_min != null) parti.push(`almeno ${obiettivi.calorie_min} kcal`);
+  if (obiettivi.calorie_max != null) parti.push(`al massimo ${obiettivi.calorie_max} kcal`);
+  if (obiettivi.proteine_min_g != null) parti.push(`almeno ${obiettivi.proteine_min_g}g di proteine`);
+  if (obiettivi.carboidrati_max_g != null) parti.push(`al massimo ${obiettivi.carboidrati_max_g}g di carboidrati`);
+  if (obiettivi.grassi_max_g != null) parti.push(`al massimo ${obiettivi.grassi_max_g}g di grassi`);
+
+  return parti.length > 0 ? parti.join(", ") : "non specificati";
+}
+
 function obiettivoConNota(obiettivo: string | null): string {
   if (!obiettivo) return "non specificato";
   if (obiettivo === "Ridurre gli sprechi") {
@@ -137,6 +164,9 @@ function buildContestoProfilo(profilo: ProfiloPerPiano): string {
       profilo.restrizioni.length > 0 ? profilo.restrizioni.join(", ") : "nessuna"
     }`,
     `Obiettivo: ${obiettivoConNota(profilo.obiettivo)}`,
+    `Obiettivi nutrizionali per pasto (vincolo aggiuntivo, stessa priorità dell'obiettivo generale — sempre ` +
+      `sotto restrizioni alimentari e budget, da rispettare quando possibile senza violarli): ` +
+      obiettiviNutrizionaliTesto(profilo.obiettivi_nutrizionali),
     `Cucina preferita: ${profilo.preferenze?.cucina?.join(", ") || "qualsiasi"}`,
     `Alimenti graditi: ${profilo.preferenze?.graditi || "nessuna preferenza specifica"}`,
     `Alimenti non graditi (da evitare): ${profilo.preferenze?.non_graditi || "nessuno"}`,
@@ -189,7 +219,9 @@ export async function generateMealPlan(
       "Sei un assistente che genera piani settimanali di pasti (pranzo e cena, 7 giorni) in italiano. " +
       "Le restrizioni alimentari sono un vincolo rigido e non negoziabile: non includere MAI, nemmeno in tracce dichiarate, un ingrediente incompatibile con le restrizioni indicate. " +
       "Se è indicato un budget settimanale, è anch'esso un vincolo rigido: il totale stimato della spesa (somma di tutti i prezzo_stimato_eur dell'intero piano) non deve superarlo. " +
-      "Rispetta anche obiettivo, preferenze e tempo di preparazione, in questo ordine di priorità, scegliendo ingredienti e porzioni che permettano di rientrare nel budget. " +
+      "Rispetta anche l'obiettivo generale e gli eventuali obiettivi nutrizionali per pasto (stessa priorità " +
+      "dell'obiettivo, mai sopra restrizioni o budget), poi preferenze e tempo di preparazione, in questo ordine " +
+      "di priorità, scegliendo ingredienti e porzioni che permettano di rientrare nel budget. " +
       ISTRUZIONE_VARIETA + " " + ISTRUZIONE_BATCH_COOKING + " " +
       (modalita === "scoperta" ? ISTRUZIONE_SCOPERTA + " " : "") +
       ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +

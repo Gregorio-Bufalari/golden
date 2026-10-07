@@ -27,6 +27,13 @@ export type ProfileData = {
   peso_kg: number | null;
   altezza_cm: number | null;
   livello_attivita: "sedentario" | "moderato" | "attivo" | null;
+  obiettivi_nutrizionali: {
+    calorie_min?: number | null;
+    calorie_max?: number | null;
+    proteine_min_g?: number | null;
+    carboidrati_max_g?: number | null;
+    grassi_max_g?: number | null;
+  } | null;
 };
 
 function toggleInArray(list: string[], value: string): string[] {
@@ -65,6 +72,23 @@ export function ImpostazioniForm({
   const [livelloAttivita, setLivelloAttivita] = useState<
     "sedentario" | "moderato" | "attivo" | ""
   >(profile.livello_attivita || "");
+  const [calorieMin, setCalorieMin] = useState(
+    profile.obiettivi_nutrizionali?.calorie_min ? String(profile.obiettivi_nutrizionali.calorie_min) : "",
+  );
+  const [calorieMax, setCalorieMax] = useState(
+    profile.obiettivi_nutrizionali?.calorie_max ? String(profile.obiettivi_nutrizionali.calorie_max) : "",
+  );
+  const [proteineMinG, setProteineMinG] = useState(
+    profile.obiettivi_nutrizionali?.proteine_min_g ? String(profile.obiettivi_nutrizionali.proteine_min_g) : "",
+  );
+  const [carboidratiMaxG, setCarboidratiMaxG] = useState(
+    profile.obiettivi_nutrizionali?.carboidrati_max_g
+      ? String(profile.obiettivi_nutrizionali.carboidrati_max_g)
+      : "",
+  );
+  const [grassiMaxG, setGrassiMaxG] = useState(
+    profile.obiettivi_nutrizionali?.grassi_max_g ? String(profile.obiettivi_nutrizionali.grassi_max_g) : "",
+  );
 
   const [salvando, setSalvando] = useState(false);
   const [errore, setErrore] = useState<string | null>(null);
@@ -88,6 +112,13 @@ export function ImpostazioniForm({
     const etaNum = eta ? Number(eta) : null;
     const pesoNum = pesoKg ? Number(pesoKg) : null;
     const altezzaNum = altezzaCm ? Number(altezzaCm) : null;
+    const obiettiviNutrizionali = {
+      calorie_min: calorieMin ? Number(calorieMin) : null,
+      calorie_max: calorieMax ? Number(calorieMax) : null,
+      proteine_min_g: proteineMinG ? Number(proteineMinG) : null,
+      carboidrati_max_g: carboidratiMaxG ? Number(carboidratiMaxG) : null,
+      grassi_max_g: grassiMaxG ? Number(grassiMaxG) : null,
+    };
 
     const result = await updateProfilo(token, {
       nome,
@@ -103,6 +134,7 @@ export function ImpostazioniForm({
       peso_kg: pesoNum,
       altezza_cm: altezzaNum,
       livello_attivita: livelloAttivita || null,
+      obiettivi_nutrizionali: obiettiviNutrizionali,
     });
 
     if ("error" in result) {
@@ -123,6 +155,7 @@ export function ImpostazioniForm({
         peso_kg: pesoNum,
         altezza_cm: altezzaNum,
         livello_attivita: livelloAttivita || null,
+        obiettivi_nutrizionali: obiettiviNutrizionali,
       });
     }
   }
@@ -306,6 +339,73 @@ export function ImpostazioniForm({
                   {opt.label}
                 </label>
               ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-ink/10 pt-6">
+        <h3 className="mb-1 text-sm font-semibold text-ink">Obiettivi nutrizionali per pasto</h3>
+        <p className="mb-4 text-xs text-ink/55">
+          Opzionali. Un vincolo in più per il motore, con la stessa priorità dell&apos;obiettivo generale: viene
+          rispettato quando possibile, ma mai a scapito delle restrizioni alimentari o del budget.
+        </p>
+
+        <div className="flex flex-col gap-4">
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className={labelClass}>Calorie minime (kcal)</label>
+              <input
+                type="number"
+                min={0}
+                value={calorieMin}
+                onChange={(e) => setCalorieMin(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div className="flex-1">
+              <label className={labelClass}>Calorie massime (kcal)</label>
+              <input
+                type="number"
+                min={0}
+                value={calorieMax}
+                onChange={(e) => setCalorieMax(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>Proteine minime (g)</label>
+            <input
+              type="number"
+              min={0}
+              value={proteineMinG}
+              onChange={(e) => setProteineMinG(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className={labelClass}>Carboidrati massimi (g)</label>
+              <input
+                type="number"
+                min={0}
+                value={carboidratiMaxG}
+                onChange={(e) => setCarboidratiMaxG(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div className="flex-1">
+              <label className={labelClass}>Grassi massimi (g)</label>
+              <input
+                type="number"
+                min={0}
+                value={grassiMaxG}
+                onChange={(e) => setGrassiMaxG(e.target.value)}
+                className={inputClass}
+              />
             </div>
           </div>
         </div>

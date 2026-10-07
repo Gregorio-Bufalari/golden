@@ -19,6 +19,19 @@ function formattaSesso(sesso: ProfileData["sesso"]): string {
   return NON_IMPOSTATO;
 }
 
+function formattaObiettiviNutrizionali(obiettivi: ProfileData["obiettivi_nutrizionali"]): string {
+  if (!obiettivi) return NON_IMPOSTATO;
+
+  const parti: string[] = [];
+  if (obiettivi.calorie_min != null) parti.push(`min ${obiettivi.calorie_min} kcal`);
+  if (obiettivi.calorie_max != null) parti.push(`max ${obiettivi.calorie_max} kcal`);
+  if (obiettivi.proteine_min_g != null) parti.push(`min ${obiettivi.proteine_min_g}g proteine`);
+  if (obiettivi.carboidrati_max_g != null) parti.push(`max ${obiettivi.carboidrati_max_g}g carboidrati`);
+  if (obiettivi.grassi_max_g != null) parti.push(`max ${obiettivi.grassi_max_g}g grassi`);
+
+  return parti.length > 0 ? parti.join(" · ") : NON_IMPOSTATO;
+}
+
 function Riga({ label, value }: { label: string; value: string }) {
   return (
     <div className="border-t border-ink/10 py-3 first:border-t-0 first:pt-0">
@@ -74,6 +87,17 @@ export function RiepilogoProfilo({
           <Riga label="Peso" value={profile.peso_kg ? `${profile.peso_kg} kg` : NON_IMPOSTATO} />
           <Riga label="Altezza" value={profile.altezza_cm ? `${profile.altezza_cm} cm` : NON_IMPOSTATO} />
           <Riga label="Livello di attività fisica" value={formattaLivelloAttivita(profile.livello_attivita)} />
+        </div>
+      </div>
+
+      <div>
+        <h3 className="mb-1 text-sm font-semibold text-ink">Obiettivi nutrizionali per pasto</h3>
+        <p className="mb-3 text-xs text-ink/55">
+          Opzionali. Un vincolo in più per il motore, con la stessa priorità dell&apos;obiettivo generale — sempre
+          sotto restrizioni alimentari e budget.
+        </p>
+        <div className="bg-panel rounded-[14px] p-5">
+          <Riga label="Target per pasto" value={formattaObiettiviNutrizionali(profile.obiettivi_nutrizionali)} />
         </div>
       </div>
 
