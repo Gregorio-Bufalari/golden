@@ -13,7 +13,7 @@ export default async function ImpostazioniPage({
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select(
-      "nome, restrizioni, household_size, obiettivo, preferenze, tempo_max_cucina, budget_settimanale, supermercato, sesso, eta, peso_kg, altezza_cm, livello_attivita",
+      "nome, restrizioni, household_size, obiettivo, preferenze, tempo_max_cucina, budget_settimanale, supermercato, sesso, eta, peso_kg, altezza_cm, livello_attivita, obiettivi_nutrizionali",
     )
     .eq("link_token", token)
     .single();

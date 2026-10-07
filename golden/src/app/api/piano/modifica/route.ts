@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select(
-      "id, restrizioni, obiettivo, preferenze, tempo_max_cucina, household_size, supermercato, budget_settimanale",
+      "id, restrizioni, obiettivo, preferenze, tempo_max_cucina, household_size, supermercato, budget_settimanale, obiettivi_nutrizionali",
     )
     .eq("link_token", token)
     .single();
@@ -57,6 +57,7 @@ export async function POST(request: Request) {
     tempo_max_cucina: profile.tempo_max_cucina,
     household_size: profile.household_size,
     budget_settimanale: profile.budget_settimanale,
+    obiettivi_nutrizionali: profile.obiettivi_nutrizionali,
   };
 
   const profileId: string = profile.id;

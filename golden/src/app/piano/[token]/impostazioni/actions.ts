@@ -16,6 +16,13 @@ export type ImpostazioniInput = {
   peso_kg: number | null;
   altezza_cm: number | null;
   livello_attivita: "sedentario" | "moderato" | "attivo" | null;
+  obiettivi_nutrizionali: {
+    calorie_min?: number | null;
+    calorie_max?: number | null;
+    proteine_min_g?: number | null;
+    carboidrati_max_g?: number | null;
+    grassi_max_g?: number | null;
+  };
 };
 
 export async function updateProfilo(
@@ -47,6 +54,7 @@ export async function updateProfilo(
       peso_kg: input.peso_kg,
       altezza_cm: input.altezza_cm,
       livello_attivita: input.livello_attivita,
+      obiettivi_nutrizionali: input.obiettivi_nutrizionali,
     })
     .eq("link_token", token);
 

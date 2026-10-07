@@ -230,7 +230,7 @@ src/components/supermercato-selector.tsx — componente condiviso di scelta supe
 Il banner nel Menu ("Verifica necessaria" di una volta) ora distingue rosso/clay ("Non adatto",
 rigenerazione fallita) da ambra/honey ("Da verificare", solo da controllare in etichetta).
 
-## Ordine cronologico di cosa è stato costruito (PR #16 → #45, tutte mergiate)
+## Ordine cronologico di cosa è stato costruito (PR #16 → #49, tutte mergiate)
 
 Le PR più vecchie (16-31) sono di una sessione precedente: setup iniziale, generazione piano,
 fix vari, lista spesa con "Non l'ho trovato"/"Proponine un altro", stagionalità, dispensa.
@@ -263,12 +263,20 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     ridurre costo/spreco)
 13. **#48**: data di scadenza stimata per voce del Frigo (`scadenza-frigo.ts`) + banner un
     giorno prima della scadenza
-14. **(questa sessione)**: comportamento del selettore supermercato chiarito/completato — in
-    Onboarding/Profilo resta solo riferimento per tarare le stime prezzo (già così, verificato);
-    nel Check-in il retailer dichiarato alimenta un vero **learning loop** (`calibrazione-prezzi.ts`,
-    nuovo) che corregge le stime prezzo nel tempo in base allo scostamento storico
-    spesa_reale/budget_stimato per quel supermercato; componente di selezione unificato
-    (`SupermercatoSelector`) riusato in tutti e tre i punti al posto di liste/stili duplicati
+14. **#49**: comportamento del selettore supermercato chiarito/completato — in Onboarding/Profilo
+    resta solo riferimento per tarare le stime prezzo (già così, verificato); nel Check-in il
+    retailer dichiarato alimenta un vero **learning loop** (`calibrazione-prezzi.ts`, nuovo) che
+    corregge le stime prezzo nel tempo in base allo scostamento storico spesa_reale/budget_stimato
+    per quel supermercato; componente di selezione unificato (`SupermercatoSelector`) riusato in
+    tutti e tre i punti al posto di liste/stili duplicati
+15. **(questa sessione)**: **Obiettivi nutrizionali per pasto** in Profilo (nuova sezione:
+    calorie min/max, proteine minime, carboidrati/grassi massimi per pasto, tutti opzionali) —
+    diversi dal confronto LARN (automatico, dai dati biometrici, solo informativo): questi sono
+    un target esplicito passato al motore come vincolo aggiuntivo, **stessa priorità
+    dell'obiettivo generale**, sempre sotto restrizioni alimentari e budget (vedi
+    `obiettiviNutrizionaliTesto` in `claude.ts`). Non aggiunto in Onboarding (richiesto solo per
+    Profilo), nessuna validazione post-generazione (a differenza del glutine): è un'istruzione nel
+    prompt, non un vincolo rigido verificato dopo
 
 ## Cose da sapere / residuo noto
 

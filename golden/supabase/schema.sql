@@ -27,6 +27,13 @@ create table if not exists profiles (
   peso_kg numeric(5, 2),
   altezza_cm numeric(5, 1),
   livello_attivita text check (livello_attivita in ('sedentario', 'moderato', 'attivo')),
+  -- Obiettivi nutrizionali per singolo pasto, impostati esplicitamente
+  -- dall'utente in Profilo (diversi dal confronto LARN sopra, che è
+  -- derivato automaticamente dai dati biometrici): usati dal motore come
+  -- vincolo aggiuntivo, stessa priorità dell'obiettivo generale, sempre
+  -- sotto restrizioni alimentari e validazione di sicurezza (vedi
+  -- buildContestoProfilo in src/lib/claude.ts). Tutti i campi opzionali.
+  obiettivi_nutrizionali jsonb not null default '{}'::jsonb,
   link_token text not null unique default encode(gen_random_bytes(16), 'hex'),
   created_at timestamptz not null default now()
 );
