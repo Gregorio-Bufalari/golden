@@ -6,12 +6,12 @@ import { useRouter } from "next/navigation";
 import { createProfile, type OnboardingInput } from "./actions";
 import { Spinner } from "@/components/spinner";
 import { inputClass, labelClass, checkboxClass, optionRowClass, Pill } from "@/components/form-kit";
+import { SupermercatoSelector } from "@/components/supermercato-selector";
 import {
   RESTRIZIONI_OPTIONS,
   OBIETTIVO_OPTIONS,
   CUCINA_OPTIONS,
   TEMPO_OPTIONS,
-  SUPERMERCATO_OPTIONS,
   LIVELLO_ATTIVITA_OPTIONS,
 } from "@/lib/opzioni-profilo";
 
@@ -296,16 +296,10 @@ export default function OnboardingPage() {
                   Opzionale. Ci serve solo per stimare meglio i prezzi, mai per favorirlo.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {SUPERMERCATO_OPTIONS.map((opt) => (
-                  <Pill
-                    key={opt}
-                    label={opt}
-                    selected={form.supermercato === opt}
-                    onClick={() => setForm((p) => ({ ...p, supermercato: opt }))}
-                  />
-                ))}
-              </div>
+              <SupermercatoSelector
+                value={form.supermercato}
+                onChange={(opt) => setForm((p) => ({ ...p, supermercato: opt }))}
+              />
             </div>
           )}
 

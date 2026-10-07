@@ -32,6 +32,10 @@ export type GroceryList = {
   rimasto: RimastoItem[];
   totale_stimato: number;
   fascia: "discount" | "media" | "premium";
+  // true quando la stima è stata corretta in base ai check-in passati
+  // dell'utente per questo stesso supermercato (vedi calibrazione-prezzi.ts),
+  // non solo sulla fascia statica.
+  calibrato: boolean;
 };
 
 export type ConsumoDispensa = {
@@ -139,14 +143,19 @@ function trovaConfezione(
  * @param dispensa Saldo disponibile in dispensa, chiave `nome__unita` (minuscolo) -> quantità.
  *   Viene sottratto dal fabbisogno PRIMA di arrotondare alla confezione: se la
  *   dispensa copre già tutto il necessario, l'ingrediente non compare nella lista.
+ * @param fattoreCalibrazione Correzione imparata dai check-in passati per questo
+ *   stesso supermercato (vedi calibrazione-prezzi.ts), applicata sopra la fascia
+ *   statica. 1 = nessuna correzione (valore di default, usato finché non ci sono
+ *   abbastanza check-in).
  */
 export function buildGroceryList(
   giorni: GiornoConIngredienti[],
   supermercato: string | null,
   dispensa: Map<string, number> = new Map(),
+  fattoreCalibrazione: number = 1,
 ): RisultatoGroceryList {
   const fascia = fasciaDaSupermercato(supermercato);
-  const moltiplicatore = TIER_MOLTIPLICATORE[fascia];
+  const moltiplicatore = TIER_MOLTIPLICATORE[fascia] * fattoreCalibrazione;
 
   // Aggrega per (reparto, nome, unita): somma sia la quantità usata nelle
   // ricette sia il prezzo stimato da Claude per ogni occorrenza.
@@ -236,6 +245,7 @@ export function buildGroceryList(
       rimasto: rimasto.sort((a, b) => a.nome.localeCompare(b.nome)),
       totale_stimato,
       fascia,
+      calibrato: fattoreCalibrazione !== 1,
     },
     consumiDispensa,
   };

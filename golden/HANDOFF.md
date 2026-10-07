@@ -153,6 +153,12 @@ src/lib/sprechi-evitati.ts   — stima € "sprechi evitati" (Andamento)
 src/lib/varieta-giorno.ts    — controllo leggero post-scambio pasti (stesso ingrediente
                                 "principale" a pranzo e cena dello stesso giorno?)
 src/lib/settimana.ts         — data reale di un giorno della settimana, solo per display
+src/lib/quantita.ts          — formattazione quantità per porzione, scalata su household_size
+src/lib/scadenza-frigo.ts    — data di scadenza stimata per voce del Frigo (euristica per
+                                categoria ingrediente) + giorni mancanti, per il banner
+src/lib/calibrazione-prezzi.ts — "learning loop" prezzi: fattore correttivo derivato dai
+                                check-in passati (spesa_reale vs budget_stimato) PER
+                                SUPERMERCATO, applicato sopra la fascia statica in grocery.ts
 
 src/app/api/piano/generate/route.ts  — genera un piano nuovo (o riusa l'ultimo in modalità
                                         "routine"), orchestration completa
@@ -173,6 +179,10 @@ src/app/piano/[token]/
   impostazioni/         — Profilo: riepilogo in sola lettura + pulsante Modifica in fondo
   preferiti/            — lista consultabile dei piatti salvati come preferiti
   actions.ts            — server action scambiaPasti() + setModalita()
+
+src/components/supermercato-selector.tsx — componente condiviso di scelta supermercato,
+  riusato in Onboarding, Profilo (Impostazioni) e Check-in: stessa lista
+  (SUPERMERCATO_OPTIONS) e stesso stile pillola ovunque, nessuna duplicazione.
 ```
 
 ## Pattern ricorrenti da rispettare
@@ -194,6 +204,17 @@ src/app/piano/[token]/
   generazione ("versione semplice" richiesta esplicitamente).
 - **Stime esplicitamente etichettate come tali** nella UI quando non sono dati precisi (budget
   stimato, confronto LARN, sprechi evitati €) — mai presentare una stima come un dato esatto.
+- **Supermercato: due significati diversi, mai confusi.** In Onboarding/Profilo, `profile.supermercato`
+  è solo il riferimento per tarare la fascia prezzo statica (`fasciaDaSupermercato` in grocery.ts) —
+  non raggiunge mai il prompt AI (vedi `buildContestoProfilo` in claude.ts). Nel Check-in,
+  `retailer_usato` è il negozio **davvero** usato quella settimana e può differire dal riferimento:
+  alimenta `fattoreCalibrazione` (calibrazione-prezzi.ts), che confronta `spesa_reale`/`budget_stimato`
+  solo sui check-in dove il retailer coincide col supermercato di riferimento interrogato — mai mescolare
+  dati di retailer diversi nella stessa media.
+- **"Learning loop" derivato, non AI**: ogni correzione imparata dai dati storici (es. il fattore di
+  calibrazione prezzi) è una funzione pura e deterministica su dati già raccolti, con soglia minima di
+  campioni e range di clamping per non farsi distorcere da un singolo valore anomalo — stesso spirito
+  di `sprechi-evitati.ts` e `varieta-giorno.ts`, niente nuove chiamate Claude per queste stime.
 
 ## Validazione sicurezza glutine — a 4 livelli (cambiata di recente)
 
@@ -235,6 +256,19 @@ Questa sessione (dalla PR #32 in poi), in ordine:
    alternativo prima di applicare)
 10. **#45**: Preferiti (icona cuore, vista dedicata, versione semplice) + **validazione
     sicurezza a 4 livelli** (vedi sopra)
+11. **#46**: `HANDOFF.md` iniziale (questo documento)
+12. **#47**: dettaglio ingredienti/quantità per singola porzione (scalato su household_size,
+    pulsante "Preparazione" per piatto) + priorità batch cooking nel motore (a parità di altre
+    priorità, preferisce combinazioni di piatti che condividono ingredienti principali, per
+    ridurre costo/spreco)
+13. **#48**: data di scadenza stimata per voce del Frigo (`scadenza-frigo.ts`) + banner un
+    giorno prima della scadenza
+14. **(questa sessione)**: comportamento del selettore supermercato chiarito/completato — in
+    Onboarding/Profilo resta solo riferimento per tarare le stime prezzo (già così, verificato);
+    nel Check-in il retailer dichiarato alimenta un vero **learning loop** (`calibrazione-prezzi.ts`,
+    nuovo) che corregge le stime prezzo nel tempo in base allo scostamento storico
+    spesa_reale/budget_stimato per quel supermercato; componente di selezione unificato
+    (`SupermercatoSelector`) riusato in tutti e tre i punti al posto di liste/stili duplicati
 
 ## Cose da sapere / residuo noto
 
