@@ -4,12 +4,12 @@ import { useState } from "react";
 import { updateProfilo } from "./actions";
 import { Spinner } from "@/components/spinner";
 import { inputClass, labelClass, checkboxClass, optionRowClass, Pill } from "@/components/form-kit";
+import { SupermercatoSelector } from "@/components/supermercato-selector";
 import {
   RESTRIZIONI_OPTIONS,
   OBIETTIVO_OPTIONS,
   CUCINA_OPTIONS,
   TEMPO_OPTIONS,
-  SUPERMERCATO_OPTIONS,
   LIVELLO_ATTIVITA_OPTIONS,
 } from "@/lib/opzioni-profilo";
 
@@ -233,11 +233,10 @@ export function ImpostazioniForm({
 
       <div>
         <label className={labelClass}>Supermercato</label>
-        <div className="flex flex-wrap gap-2">
-          {SUPERMERCATO_OPTIONS.map((opt) => (
-            <Pill key={opt} label={opt} selected={supermercato === opt} onClick={() => setSupermercato(opt)} />
-          ))}
-        </div>
+        <p className="mb-2 text-xs text-ink/55">
+          Opzionale. Ci serve solo per stimare meglio i prezzi, mai per favorirlo.
+        </p>
+        <SupermercatoSelector value={supermercato || null} onChange={setSupermercato} />
       </div>
 
       <div className="border-t border-ink/10 pt-6">

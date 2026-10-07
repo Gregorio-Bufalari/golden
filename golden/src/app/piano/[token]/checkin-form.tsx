@@ -4,9 +4,9 @@ import { useState } from "react";
 import { submitCheckin } from "./checkin-actions";
 import { Spinner } from "@/components/spinner";
 import { FeedbackPopup } from "@/components/feedback-popup";
+import { SupermercatoSelector } from "@/components/supermercato-selector";
 
 const CATEGORIE_SPRECO = ["Verdura", "Proteine", "Latticini", "Pane/pasta", "Altro"];
-const RETAILER_OPTIONS = ["Esselunga", "Coop", "Conad", "Carrefour", "Lidl", "Eurospin", "Altro"];
 
 function SiNoButton({
   label,
@@ -141,7 +141,10 @@ export function CheckinForm({ token }: { token: string }) {
 
       <div className="bg-panel rounded-[14px] px-5 py-[18px]">
         <p className="text-base font-semibold text-ink">Quanto hai speso davvero, e dove?</p>
-        <p className="mt-0.5 text-xs text-ink/55">Opzionale</p>
+        <p className="mt-0.5 text-xs text-ink/55">
+          Opzionale. Ci aiuta a migliorare le stime dei prezzi nel tempo: il supermercato scelto qui
+          è quello usato davvero questa settimana, anche se diverso da quello di riferimento in Profilo.
+        </p>
         <div className="mt-3.5 flex items-center gap-2">
           <span className="text-ink/60">€</span>
           <input
@@ -153,10 +156,8 @@ export function CheckinForm({ token }: { token: string }) {
             className="min-h-11 w-24 rounded-[10px] bg-paper px-3.5 font-mono text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
           />
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {RETAILER_OPTIONS.map((r) => (
-            <PillOption key={r} label={r} selected={retailer === r} onClick={() => setRetailer(r)} />
-          ))}
+        <div className="mt-3">
+          <SupermercatoSelector value={retailer} onChange={setRetailer} />
         </div>
       </div>
 

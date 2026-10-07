@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { generateMealPlan, type ProfiloPerPiano } from "@/lib/claude";
 import { validaGiorni, assicuraVarieta, adattaEntroBudget, type GiornoValidato } from "@/lib/piano-validazione";
 import { leggiDispensa, applicaConsumiDispensa } from "@/lib/dispensa";
+import { fattoreCalibrazione, type CheckinPerCalibrazione } from "@/lib/calibrazione-prezzi";
 import type { GroceryList, ConsumoDispensa } from "@/lib/grocery";
 
 // Generare un piano può richiedere diverse chiamate a Claude in sequenza
@@ -63,8 +64,30 @@ export async function POST(request: Request) {
   // riusa un piano routine già esistente senza toccare la dispensa.
   let consumiDispensaSalvati: ConsumoDispensa[] | null = null;
 
+  // Impara dai check-in passati quanto la stima per fascia si discosta
+  // dalla spesa reale dichiarata PER QUESTO supermercato (vedi
+  // calibrazione-prezzi.ts) — nessun check-in ancora, o troppo pochi,
+  // nessuna correzione (fattore 1).
+  async function calcolaFattoreCalibrazione(): Promise<number> {
+    const { data: storicoPiani } = await supabase
+      .from("weekly_plans")
+      .select("budget_stimato, checkins(retailer_usato, spesa_reale)")
+      .eq("profile_id", profileId);
+
+    const checkinsStorico: CheckinPerCalibrazione[] = (storicoPiani || []).flatMap((p) =>
+      (p.checkins || []).map((c) => ({
+        retailer_usato: c.retailer_usato,
+        spesa_reale: c.spesa_reale,
+        budget_stimato: p.budget_stimato,
+      })),
+    );
+
+    return fattoreCalibrazione(checkinsStorico, supermercato);
+  }
+
   async function generaFresco() {
     const dispensa = await leggiDispensa(supabase, profileId);
+    const fattore = await calcolaFattoreCalibrazione();
     const plan = await generateMealPlan(profiloInput, modalitaProfilo, dispensa);
     const giorniBase = await validaGiorni(profiloInput, plan.giorni, dispensa);
     const giorniVari = await assicuraVarieta(profiloInput, giorniBase, dispensa);
@@ -74,6 +97,7 @@ export async function POST(request: Request) {
       supermercato,
       budgetSettimanale,
       dispensa,
+      fattore,
     );
     await applicaConsumiDispensa(
       supabase,

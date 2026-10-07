@@ -152,6 +152,7 @@ export async function adattaEntroBudget(
   supermercato: string | null,
   budget: number | null,
   dispensa: Map<string, number> = new Map(),
+  fattoreCalibrazione: number = 1,
 ): Promise<{
   giorni: GiornoValidato[];
   groceryList: GroceryList;
@@ -159,7 +160,7 @@ export async function adattaEntroBudget(
   budgetSuperato: boolean;
 }> {
   let giorni = giorniIniziali;
-  let risultato = buildGroceryList(giorni, supermercato, dispensa);
+  let risultato = buildGroceryList(giorni, supermercato, dispensa, fattoreCalibrazione);
 
   if (!budget) {
     return { giorni, groceryList: risultato.groceryList, consumiDispensa: risultato.consumiDispensa, budgetSuperato: false };
@@ -177,7 +178,7 @@ export async function adattaEntroBudget(
         dispensa,
       );
       giorni = await validaGiorni(profilo, pianoAdattato.giorni, dispensa);
-      risultato = buildGroceryList(giorni, supermercato, dispensa);
+      risultato = buildGroceryList(giorni, supermercato, dispensa, fattoreCalibrazione);
     } catch (err) {
       console.error("adattaBudget error:", err);
       break;

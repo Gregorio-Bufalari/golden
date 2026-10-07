@@ -33,6 +33,7 @@ type GroceryListData = {
   rimasto: RimastoItem[];
   totale_stimato: number;
   fascia: "discount" | "media" | "premium";
+  calibrato: boolean;
 };
 
 function itemARischio(nome: string, ingredientiARischio: string[]): boolean {
@@ -350,6 +351,11 @@ export function GroceryList({
               : `Entro il budget di €${budgetSettimanale} fissato in Profilo`
             : `Stima sulla fascia ${fasciaLabel}, non il prezzo reale del tuo supermercato`}
         </div>
+        {data.calibrato && (
+          <div className="mt-1 text-[13px] text-ink/55">
+            Corretta in base alla tua spesa reale nei check-in passati
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2 print:hidden">

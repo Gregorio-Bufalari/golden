@@ -150,6 +150,26 @@ describe("buildGroceryList — prezzi e fasce di supermercato", () => {
     ];
     expect(buildGroceryList(giorni, "Un supermercato qualsiasi").groceryList.fascia).toBe("media");
   });
+
+  it("applica il fattore di calibrazione sopra la fascia statica", () => {
+    const giorni = [
+      giornoCon([ingrediente({ nome: "Pomodoro", quantita: 100, unita: "g", reparto: "Frutta e verdura", prezzo_stimato_eur: 1 })]),
+    ];
+
+    const { groceryList } = buildGroceryList(giorni, "Conad", new Map(), 1.2);
+
+    expect(groceryList.totale_stimato).toBeCloseTo(1.2, 5); // 1.0 (media) * 1.2
+    expect(groceryList.calibrato).toBe(true);
+  });
+
+  it("senza un fattore esplicito (o uguale a 1) la lista non risulta calibrata", () => {
+    const giorni = [
+      giornoCon([ingrediente({ nome: "Pomodoro", quantita: 100, unita: "g", reparto: "Frutta e verdura", prezzo_stimato_eur: 1 })]),
+    ];
+
+    expect(buildGroceryList(giorni, "Conad").groceryList.calibrato).toBe(false);
+    expect(buildGroceryList(giorni, "Conad", new Map(), 1).groceryList.calibrato).toBe(false);
+  });
 });
 
 describe("buildGroceryList — scenario end-to-end sul piano di esempio", () => {
