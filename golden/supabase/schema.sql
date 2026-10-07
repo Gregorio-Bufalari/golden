@@ -131,6 +131,12 @@ create table if not exists preferiti (
   nutrizione jsonb,
   preparazione jsonb,
   created_at timestamptz not null default now(),
+  -- Ultima volta che questo Preferito è stato incluso in un piano Scoperta
+  -- (vedi src/lib/preferiti-scoperta.ts) — null se non è mai stato
+  -- riproposto. Usato per la rotazione: a parità di altre condizioni, si
+  -- preferisce sempre il Preferito riproposto meno di recente, così nessuno
+  -- si ripete finché ce n'è un altro in attesa.
+  ultima_proposta timestamptz,
   unique (profile_id, nome)
 );
 

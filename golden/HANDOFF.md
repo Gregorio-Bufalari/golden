@@ -159,6 +159,10 @@ src/lib/scadenza-frigo.ts    — data di scadenza stimata per voce del Frigo (eu
 src/lib/calibrazione-prezzi.ts — "learning loop" prezzi: fattore correttivo derivato dai
                                 check-in passati (spesa_reale vs budget_stimato) PER
                                 SUPERMERCATO, applicato sopra la fascia statica in grocery.ts
+src/lib/preferiti-scoperta.ts — in modalità Scoperta, sceglie se e quale Preferito includere
+                                nel piano di questa settimana (a rotazione, mai lo stesso finché
+                                ce n'è un altro in attesa) e lo sostituisce nel piano generato
+                                PRIMA di validaGiorni/assicuraVarieta
 
 src/app/api/piano/generate/route.ts  — genera un piano nuovo (o riusa l'ultimo in modalità
                                         "routine"), orchestration completa
@@ -199,9 +203,18 @@ src/components/supermercato-selector.tsx — componente condiviso di scelta supe
   avviene lato server sui dati già salvati, così il client non può mai iniettare contenuto nuovo.
 - **Aggiornamento ottimistico** per le azioni rapide (spunte spesa, preferiti): aggiorna lo stato
   locale subito, chiama il server action, fai rollback se torna un errore.
-- **Nessuna influenza sul motore AI senza che sia esplicitamente richiesto** — es. "Preferiti" è
-  stato costruito deliberatamente come sola lettura, nessun collegamento ai prompt di
-  generazione ("versione semplice" richiesta esplicitamente).
+- **Nessuna influenza sul motore AI senza che sia esplicitamente richiesto.** "Preferiti" è nato
+  deliberatamente come sola lettura, nessun collegamento al motore ("versione semplice" richiesta
+  esplicitamente) — poi esteso, su richiesta esplicita successiva, SOLO in modalità Scoperta (vedi
+  "Preferiti che influenzano Scoperta" più sotto): il principio resta che nessuna funzionalità
+  tocca il motore senza che sia stato chiesto, non che Preferiti sia per sempre sola lettura.
+- **Splice deterministico, non istruzione all'AI, quando serve riusare un dato esatto già noto**:
+  quando l'obiettivo è includere QUALCOSA DI GIÀ NOTO per intero (es. un piatto salvato nei
+  Preferiti, istantanea completa di ingredienti/nutrizione/preparazione), si sostituisce
+  direttamente nel piano generato PRIMA di `validaGiorni`/`assicuraVarieta` (che lo trattano come
+  ogni altro pasto, stessa sicurezza/varietà), invece di chiedere all'AI di "includere questo
+  piatto" nel prompt — più affidabile, e il pasto resta esattamente quello salvato, non una
+  reinterpretazione del modello. Vedi `includiFavoritoNelPiano` in `preferiti-scoperta.ts`.
 - **Stime esplicitamente etichettate come tali** nella UI quando non sono dati precisi (budget
   stimato, confronto LARN, sprechi evitati €) — mai presentare una stima come un dato esatto.
 - **Supermercato: due significati diversi, mai confusi.** In Onboarding/Profilo, `profile.supermercato`
@@ -230,7 +243,7 @@ src/components/supermercato-selector.tsx — componente condiviso di scelta supe
 Il banner nel Menu ("Verifica necessaria" di una volta) ora distingue rosso/clay ("Non adatto",
 rigenerazione fallita) da ambra/honey ("Da verificare", solo da controllare in etichetta).
 
-## Ordine cronologico di cosa è stato costruito (PR #16 → #49, tutte mergiate)
+## Ordine cronologico di cosa è stato costruito (PR #16 → #50, tutte mergiate)
 
 Le PR più vecchie (16-31) sono di una sessione precedente: setup iniziale, generazione piano,
 fix vari, lista spesa con "Non l'ho trovato"/"Proponine un altro", stagionalità, dispensa.
@@ -269,7 +282,7 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     corregge le stime prezzo nel tempo in base allo scostamento storico spesa_reale/budget_stimato
     per quel supermercato; componente di selezione unificato (`SupermercatoSelector`) riusato in
     tutti e tre i punti al posto di liste/stili duplicati
-15. **(questa sessione)**: **Obiettivi nutrizionali per pasto** in Profilo (nuova sezione:
+15. **#50**: **Obiettivi nutrizionali per pasto** in Profilo (nuova sezione:
     calorie min/max, proteine minime, carboidrati/grassi massimi per pasto, tutti opzionali) —
     diversi dal confronto LARN (automatico, dai dati biometrici, solo informativo): questi sono
     un target esplicito passato al motore come vincolo aggiuntivo, **stessa priorità
@@ -277,6 +290,15 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     `obiettiviNutrizionaliTesto` in `claude.ts`). Non aggiunto in Onboarding (richiesto solo per
     Profilo), nessuna validazione post-generazione (a differenza del glutine): è un'istruzione nel
     prompt, non un vincolo rigido verificato dopo
+16. **(questa sessione)**: **Preferiti che influenzano Scoperta** — in modalità Scoperta, circa
+    una settimana su tre include un piatto dai Preferiti invece di puntare solo a varietà pura
+    (`sceglieFavoritoScoperta` in `preferiti-scoperta.ts`), scegliendo sempre quello riproposto
+    meno di recente (rotazione, colonna `preferiti.ultima_proposta`) così nessuno si ripete finché
+    ce n'è un altro in attesa. Il piatto scelto viene sostituito direttamente nel piano generato
+    (non chiesto all'AI nel prompt) PRIMA di `validaGiorni`/`assicuraVarieta`, così passa dalla
+    stessa sicurezza/varietà di ogni altro pasto. Prima eccezione al principio "Preferiti è sola
+    lettura" (vedi Pattern ricorrenti) — resta vero che nessuna funzionalità tocca il motore senza
+    che sia stato chiesto esplicitamente
 
 ## Cose da sapere / residuo noto
 

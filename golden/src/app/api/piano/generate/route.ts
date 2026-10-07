@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateMealPlan, type ProfiloPerPiano } from "@/lib/claude";
+import { generateMealPlan, type ProfiloPerPiano, type Giorno } from "@/lib/claude";
 import { validaGiorni, assicuraVarieta, adattaEntroBudget, type GiornoValidato } from "@/lib/piano-validazione";
 import { leggiDispensa, applicaConsumiDispensa } from "@/lib/dispensa";
 import { fattoreCalibrazione, type CheckinPerCalibrazione } from "@/lib/calibrazione-prezzi";
+import {
+  leggiPreferitiPerRotazione,
+  segnaPreferitoProposto,
+  sceglieFavoritoScoperta,
+  includiFavoritoNelPiano,
+} from "@/lib/preferiti-scoperta";
 import type { GroceryList, ConsumoDispensa } from "@/lib/grocery";
 
 // Generare un piano può richiedere diverse chiamate a Claude in sequenza
@@ -86,11 +92,27 @@ export async function POST(request: Request) {
     return fattoreCalibrazione(checkinsStorico, supermercato);
   }
 
+  // In modalità Scoperta, ogni tanto (non sempre: vedi
+  // PROBABILITA_PREFERITO) include un piatto dai Preferiti invece di
+  // puntare solo a varietà pura — a rotazione, così non si ripete lo stesso
+  // finché ce n'è un altro in attesa (vedi preferiti-scoperta.ts).
+  async function includiEventualeFavorito(giorni: Giorno[]): Promise<Giorno[]> {
+    if (modalitaProfilo !== "scoperta") return giorni;
+
+    const preferiti = await leggiPreferitiPerRotazione(supabase, profileId);
+    const favorito = sceglieFavoritoScoperta(preferiti);
+    if (!favorito) return giorni;
+
+    await segnaPreferitoProposto(supabase, favorito.id);
+    return includiFavoritoNelPiano(giorni, favorito);
+  }
+
   async function generaFresco() {
     const dispensa = await leggiDispensa(supabase, profileId);
     const fattore = await calcolaFattoreCalibrazione();
     const plan = await generateMealPlan(profiloInput, modalitaProfilo, dispensa);
-    const giorniBase = await validaGiorni(profiloInput, plan.giorni, dispensa);
+    const giorniConFavorito = await includiEventualeFavorito(plan.giorni);
+    const giorniBase = await validaGiorni(profiloInput, giorniConFavorito, dispensa);
     const giorniVari = await assicuraVarieta(profiloInput, giorniBase, dispensa);
     const risultato = await adattaEntroBudget(
       profiloInput,
