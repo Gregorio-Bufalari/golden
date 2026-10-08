@@ -1,9 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { conservazioneTipica, gruppoAcquisto, coloreScadenza, type ColoreScadenza } from "@/lib/conservazione";
 import { dataScadenzaStimata, giorniAllaScadenza } from "@/lib/scadenza-frigo";
+import { ingredientiInScadenzaDomani } from "@/lib/notifiche-scadenza";
 import { formattaQuantita } from "@/lib/quantita";
 import { formattaData } from "@/lib/settimana";
 import { PageHeader } from "../page-header";
+import { NotifichePush } from "./notifiche-push";
 
 const DOT_PER_COLORE: Record<ColoreScadenza, string> = {
   rosso: "bg-clay",
@@ -93,11 +95,24 @@ export default async function FrigoPage({
   const presto = righe.filter((r) => gruppoAcquisto(r.ingrediente) === "subito");
   const dopo = righe.filter((r) => gruppoAcquisto(r.ingrediente) === "puo_aspettare");
 
-  // Banner di notifica: entro domani, come richiesto, esteso a chi è già
-  // scaduto perché altrimenti sparirebbe dall'avviso senza che l'utente
-  // l'abbia mai visto (basta non aprire l'app esattamente il giorno prima).
+  // Banner di notifica in-app: entro domani, come richiesto, esteso a chi è
+  // già scaduto perché altrimenti sparirebbe dall'avviso senza che
+  // l'utente l'abbia mai visto (basta non aprire l'app esattamente il
+  // giorno prima). Stesso elenco "domani" della notifica push vera (vedi
+  // notifiche-scadenza.ts), così i due canali concordano sempre.
   const scaduti = righe.filter((r) => r.giorni !== null && r.giorni <= 0);
-  const inScadenzaDomani = righe.filter((r) => r.giorni === 1);
+  const nomiInScadenzaDomani = ingredientiInScadenzaDomani(rimanenze || []);
+  const inScadenzaDomani = righe.filter((r) => nomiInScadenzaDomani.includes(r.ingrediente));
+
+  // Le notifiche push vere (se attive su almeno un dispositivo) sostituiscono
+  // il banner in-app: l'utente viene avvisato comunque, anche senza aprire
+  // l'app, quindi il banner ridondante sparisce. Resta come fallback per chi
+  // non ha ancora attivato le notifiche (o il browser non le supporta).
+  const { count: sottoscrizioniAttive } = await supabase
+    .from("push_subscriptions")
+    .select("id", { count: "exact", head: true })
+    .eq("profile_id", profile.id);
+  const notifichePushAttive = Boolean(sottoscrizioniAttive && sottoscrizioniAttive > 0);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -108,7 +123,7 @@ export default async function FrigoPage({
       />
 
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-5 pb-10">
-        {(scaduti.length > 0 || inScadenzaDomani.length > 0) && (
+        {!notifichePushAttive && (scaduti.length > 0 || inScadenzaDomani.length > 0) && (
           <div className="flex gap-3 bg-clay-soft px-4 py-3">
             <div className="w-1 shrink-0 bg-clay" />
             <div className="text-[13px] leading-relaxed text-ink">
@@ -127,6 +142,8 @@ export default async function FrigoPage({
             </div>
           </div>
         )}
+
+        {!notifichePushAttive && inScadenzaDomani.length > 0 && <NotifichePush token={token} />}
 
         {righe.length > 0 ? (
           <>
