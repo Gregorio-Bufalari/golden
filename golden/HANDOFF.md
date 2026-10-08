@@ -471,6 +471,18 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     utenti nel tempo) e **Condivisione piano famiglia** (esplicitamente bloccata finché l'app non
     ha un vero sistema di login) — nessuna delle due è stata costruita, solo documentate come
     vincoli/blocchi per quando (se) verranno affrontate.
+21. **(questa sessione)**: **Motore AI: prompt composti da moduli espliciti + fix varietà** —
+    quarta richiesta del batch ("tool-calling completo"), chiarita in chat: NON tool-calling reale
+    dell'API Anthropic (nessun loop multi-turno), ma modularizzazione della composizione del
+    prompt. Nuovo `componiIstruzioni([...])` in `claude.ts` sostituisce la concatenazione a mano;
+    ogni funzione (`generateMealPlan`, `modificaPiano`, `adattaBudget`, `regeneratePasto`)
+    dichiara esplicitamente i propri moduli (vedi Pattern ricorrenti sopra per l'elenco). Bug
+    corretto nel farlo: `modificaPiano` non applicava mai `assicuraVarieta`, a differenza di
+    `generateMealPlan` — risolto centralizzando il controllo DENTRO `adattaEntroBudget` (sui
+    giorni iniziali e dopo ogni retry budget), correggendo anche un gap analogo non notato nel
+    flusso di generazione stesso. Nessuna route ha dovuto cambiare tranne `generate/route.ts`
+    (rimossa la chiamata a `assicuraVarieta` ormai ridondante). Stessa PR #55 della voce
+    precedente (foto scontrino), unita perché pushata prima del merge.
 
 ## Cose da sapere / residuo noto
 
