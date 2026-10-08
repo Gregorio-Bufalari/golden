@@ -167,6 +167,12 @@ src/lib/preferiti-scoperta.ts — in modalità Scoperta, sceglie se e quale Pref
                                 includiFavoritoNelPiano() va chiamata DOPO adattaEntroBudget
                                 (non prima): l'AI che riduce il costo rivede liberamente tutti i
                                 pasti e potrebbe alterare il Preferito se fosse già presente.
+src/lib/notifiche-scadenza.ts — cosa notificare per le scadenze Frigo (ingredientiInScadenzaDomani),
+                                condiviso tra il banner in-app di fallback e la notifica push vera,
+                                così i due canali concordano sempre.
+src/lib/web-push.ts          — invio di una notifica push via VAPID (richiede VAPID_PUBLIC_KEY/
+                                VAPID_PRIVATE_KEY in env); rimuove da sola una sottoscrizione che
+                                il servizio push segnala come non più valida (404/410).
 
 src/app/api/piano/generate/route.ts  — genera un piano nuovo (o riusa l'ultimo in modalità
                                         "routine"). Se c'è un piano routine riusabile, salva
@@ -184,6 +190,10 @@ src/app/api/piano/modifica/route.ts  — UNICO endpoint per ogni modifica in lin
                                         al piano: "Proponi un piatto diverso", +/- nutrienti,
                                         "Sostituisci"/"Non l'ho trovato", ecc. Passa sempre da
                                         validaGiorni — nessuna validazione duplicata altrove.
+src/app/api/push/notifica-scadenze/route.ts — invocato una volta al giorno da Vercel Cron (vedi
+                                        vercel.json): per ogni profilo con almeno una notifica
+                                        push attiva, controlla cosa scade domani e invia la
+                                        notifica a tutti i suoi dispositivi sottoscritti.
 
 src/app/piano/[token]/
   layout.tsx, bottom-nav.tsx, page-header.tsx  — shell condivisa (6 tab: Menu, Spesa, Frigo,
@@ -191,16 +201,23 @@ src/app/piano/[token]/
   menu/                — schermata principale: piano settimanale, scambio pasti, preferiti,
                           confronto nutrizionale LARN, box "Modifica il piano" (NL)
   spesa/                — lista della spesa, spunte, "Non l'ho trovato"
-  frigo/                — dispensa residua con pallino colorato per urgenza di consumo
+  frigo/                — dispensa residua con pallino colorato per urgenza di consumo; banner
+                           di scadenza in-app SOLO se il profilo non ha notifiche push attive
+                           (notifiche-push.tsx propone di attivarle, solo quando c'è già
+                           qualcosa da notificare — mai un prompt proattivo al primo avvio)
   andamento/            — KPI: risparmio vs budget, % settimane senza sprechi, sprechi evitati €
   checkin-form.tsx      — check-in settimanale (seguito il piano? sprecato? spesa reale?)
   impostazioni/         — Profilo: riepilogo in sola lettura + pulsante Modifica in fondo
   preferiti/            — lista consultabile dei piatti salvati come preferiti
+  push-actions.ts       — server action salvaPushSubscription()/rimuoviPushSubscription()
   actions.ts            — server action scambiaPasti() + setModalita()
 
 src/components/supermercato-selector.tsx — componente condiviso di scelta supermercato,
   riusato in Onboarding, Profilo (Impostazioni) e Check-in: stessa lista
   (SUPERMERCATO_OPTIONS) e stesso stile pillola ovunque, nessuna duplicazione.
+
+public/sw.js — service worker minimo, solo per le notifiche push (nessuna cache offline).
+src/app/manifest.ts — web manifest, richiesto perché il service worker possa registrarsi.
 ```
 
 ## Pattern ricorrenti da rispettare
@@ -257,6 +274,18 @@ src/components/supermercato-selector.tsx — componente condiviso di scelta supe
   dispensa) che il client rimanda indietro, RICALCOLARLI sempre lato server da `giorni` (validato
   con `MealPlanSchema.safeParse` prima di tutto) — fidarsi solo del contenuto dei pasti in sé, già
   scelto dall'utente tra alternative mostrate, mai modificato a mano.
+- **Permesso del browser (notifiche, geolocalizzazione, ecc.) richiesto solo al primo utilizzo
+  utile, mai proattivamente.** `notifiche-push.tsx` è montato dal chiamante SOLO quando c'è già
+  qualcosa da notificare (vedi `frigo/page.tsx`) — non all'avvio dell'app — e al suo interno
+  chiama `Notification.requestPermission()` SOLO in risposta a un click esplicito su "Attiva
+  notifiche", mai automaticamente in un effect al mount (i browser lo scoraggiano comunque). Se il
+  permesso è già `"denied"`, non mostra nulla; se è già `"granted"` (dato in una sessione
+  precedente), si sottoscrive silenziosamente senza richiederlo di nuovo.
+- **Canale push attivo sostituisce il banner in-app corrispondente, non lo affianca.** Il banner
+  di fallback (`frigo/page.tsx`) si mostra solo se il profilo non ha nessuna `push_subscriptions`
+  attiva — altrimenti l'utente viene avvisato comunque, anche senza aprire l'app, e il banner
+  ridondante sparisce. Controllo lato server (conta le sottoscrizioni), non con `localStorage`: se
+  l'utente ha attivato le notifiche su un dispositivo, il banner sparisce ovunque, non solo lì.
 
 ## Validazione sicurezza glutine — a 4 livelli (cambiata di recente)
 
@@ -272,7 +301,7 @@ src/components/supermercato-selector.tsx — componente condiviso di scelta supe
 Il banner nel Menu ("Verifica necessaria" di una volta) ora distingue rosso/clay ("Non adatto",
 rigenerazione fallita) da ambra/honey ("Da verificare", solo da controllare in etichetta).
 
-## Ordine cronologico di cosa è stato costruito (PR #16 → #51, tutte mergiate)
+## Ordine cronologico di cosa è stato costruito (PR #16 → #52, tutte mergiate)
 
 Le PR più vecchie (16-31) sono di una sessione precedente: setup iniziale, generazione piano,
 fix vari, lista spesa con "Non l'ho trovato"/"Proponine un altro", stagionalità, dispensa.
@@ -327,7 +356,7 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     (non chiesto all'AI nel prompt), così passa dalla stessa sicurezza/varietà di ogni altro
     pasto. Prima eccezione al principio "Preferiti è sola lettura" (vedi Pattern ricorrenti) —
     resta vero che nessuna funzionalità tocca il motore senza che sia stato chiesto esplicitamente
-17. **(questa sessione)**: **Scenari multipli di budget** — `/api/piano/generate`, quando genera
+17. **#52**: **Scenari multipli di budget** — `/api/piano/generate`, quando genera
     fresco (non riusa un piano routine), produce TRE scenari ("Risparmio" -20%, "Equilibrato",
     "Più abbondante" +20%, percentuali relative al costo EFFETTIVO dell'equilibrato, non al budget
     nominale) invece di salvare subito un piano solo — ciascuno è un piano generato da zero per
@@ -340,6 +369,22 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     rischiando che l'AI del retry budget alterasse il Preferito appena inserito — ora va dopo
     (vedi Pattern ricorrenti). `calcolaFattoreCalibrazionePerProfilo` estratta in
     `calibrazione-prezzi.ts`, centralizzando una lettura Supabase finora duplicata in due route
+18. **(questa sessione)**: **Notifiche push vere** — sostituiscono (quando attive) il banner
+    in-app di scadenza Frigo. Nuova tabella `push_subscriptions`, nuovo service worker minimo
+    (`public/sw.js`, solo push — nessuna cache offline) e manifest (`src/app/manifest.ts`,
+    richiesto perché il SW possa registrarsi). `notifiche-push.tsx` propone di attivarle SOLO
+    quando c'è già qualcosa da notificare (mai un prompt proattivo all'avvio) e richiede il
+    permesso SOLO al click esplicito su "Attiva" (mai in automatico in un effect). Un nuovo
+    endpoint cron (`/api/push/notifica-scadenze`, invocato una volta al giorno da Vercel Cron —
+    vedi `vercel.json`) controlla ogni profilo sottoscritto e invia la notifica via `web-push`
+    (libreria nuova) con chiavi VAPID. **Richiede setup manuale dell'utente**: eseguire la
+    migration, generare una coppia di chiavi VAPID (`npx web-push generate-vapid-keys`, già fatto
+    una volta in questa sessione — le chiavi sono nel messaggio di chiusura), impostarle come env
+    var sia in locale sia su Vercel (vedi `.env.example`), e impostare `CRON_SECRET` (qualunque
+    stringa casuale) su Vercel perché il cron possa autenticarsi — senza queste variabili il cron
+    fallisce silenziosamente (nessun invio, nessun errore visibile all'utente finale, solo nei log
+    Vercel). Non testabile end-to-end in questo sandbox (Supabase irraggiungibile): verificato il
+    flusso fino alla chiamata del server action incluso, vedi commit per i dettagli.
 
 ## Cose da sapere / residuo noto
 

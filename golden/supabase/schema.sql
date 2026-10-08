@@ -142,6 +142,22 @@ create table if not exists preferiti (
 
 create index if not exists preferiti_profile_id_idx on preferiti(profile_id);
 
+-- Notifiche push vere (browser/PWA), al posto del solo banner in-app per
+-- le scadenze del Frigo (vedi src/lib/notifiche-scadenza.ts). Una riga per
+-- dispositivo/browser sottoscritto — un profilo può averne più di una
+-- (telefono + desktop). `endpoint` è univoco per sottoscrizione: usato
+-- anche per il upsert quando lo stesso dispositivo si ri-registra.
+create table if not exists push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references profiles(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth_key text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists push_subscriptions_profile_id_idx on push_subscriptions(profile_id);
+
 alter table profiles enable row level security;
 alter table weekly_plans enable row level security;
 alter table checkins enable row level security;
@@ -149,3 +165,4 @@ alter table rimanenze enable row level security;
 alter table spesa_stato enable row level security;
 alter table feedback_rapido enable row level security;
 alter table preferiti enable row level security;
+alter table push_subscriptions enable row level security;
