@@ -442,3 +442,90 @@ export async function regeneratePasto(
 
   return response.parsed_output;
 }
+
+const ProdottoScontrinoSchema = z.object({
+  nome: z.string(),
+  prezzo_eur: z.number(),
+});
+
+const CorrispondenzaScontrinoSchema = z.object({
+  nome_lista: z.string(),
+  prezzo_stimato_eur: z.number(),
+  trovato_sullo_scontrino: z.boolean(),
+  nome_scontrino: z.string().nullable(),
+  prezzo_scontrino_eur: z.number().nullable(),
+});
+
+const ConfrontoScontrinoSchema = z.object({
+  // null se lo scontrino non è leggibile o non ha un totale riconoscibile
+  // (es. foto sfocata, scontrino tagliato) — mai inventato.
+  totale_scontrino_eur: z.number().nullable(),
+  leggibile: z.boolean(),
+  corrispondenze: z.array(CorrispondenzaScontrinoSchema),
+  // prodotti sullo scontrino che non corrispondono a nessun articolo della lista.
+  extra_non_in_lista: z.array(ProdottoScontrinoSchema),
+});
+
+export type ArticoloListaSpesa = { nome: string; prezzo_stimato_eur: number };
+export type RisultatoConfrontoScontrino = z.infer<typeof ConfrontoScontrinoSchema> & {
+  usage: UsageChiamataAI;
+  costoStimatoUsd: number;
+};
+
+/**
+ * Legge una foto di uno scontrino (OCR via vision, nessun servizio OCR
+ * esterno) ed estrae prodotti e prezzi, confrontandoli con la lista della
+ * spesa attesa per la settimana — per ogni articolo della lista, dice se
+ * compare sullo scontrino e a quale prezzo, più gli eventuali prodotti
+ * extra non previsti. Il confronto semantico (nomi abbreviati/diversi tra
+ * scontrino e lista, es. "POLLO PETTO" vs "Petto di pollo") è lasciato
+ * all'AI: un matching per stringa esatta fallirebbe quasi sempre su
+ * scontrini reali.
+ */
+export async function confrontaScontrino(
+  immagineBase64: string,
+  mediaType: "image/jpeg" | "image/png" | "image/webp",
+  listaSpesa: ArticoloListaSpesa[],
+): Promise<RisultatoConfrontoScontrino> {
+  const response = await client.messages.parse({
+    model: MODEL,
+    max_tokens: 4000,
+    system:
+      "Sei un assistente che legge la foto di uno scontrino della spesa italiano (OCR) ed estrae i prodotti " +
+      "acquistati con i rispettivi prezzi, poi li confronta con la lista della spesa attesa fornita. Se la foto " +
+      "non è leggibile (sfocata, tagliata, non è uno scontrino) imposta leggibile a false e totale_scontrino_eur " +
+      "a null, senza inventare dati. Per ogni articolo della lista della spesa, cerca una corrispondenza " +
+      "sullo scontrino anche se il nome è abbreviato o scritto diversamente (es. \"POLLO PETTO\" sullo scontrino " +
+      "corrisponde a \"Petto di pollo\" nella lista): se la trovi, riporta il nome e il prezzo come scritti sullo " +
+      "scontrino; se non la trovi, lascia trovato_sullo_scontrino a false. Riporta infine in extra_non_in_lista " +
+      "i prodotti sullo scontrino che non corrispondono a nessun articolo della lista. Non arrotondare o " +
+      "correggere i prezzi: riportali esattamente come stampati sullo scontrino.",
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: mediaType, data: immagineBase64 } },
+          {
+            type: "text",
+            text: `Lista della spesa attesa per questa settimana (JSON):\n${JSON.stringify(listaSpesa)}`,
+          },
+        ],
+      },
+    ],
+    output_config: {
+      effort: "medium",
+      format: zodOutputFormat(ConfrontoScontrinoSchema),
+    },
+  });
+
+  if (!response.parsed_output) {
+    throw new Error("Claude non ha restituito un confronto valido.");
+  }
+
+  const costoStimatoUsd = calcolaCostoUsd(response.usage, MODEL);
+  console.log(
+    `confrontaScontrino: ~$${costoStimatoUsd.toFixed(5)} (${response.usage.input_tokens} input, ${response.usage.output_tokens} output token)`,
+  );
+
+  return { ...response.parsed_output, usage: response.usage, costoStimatoUsd };
+}

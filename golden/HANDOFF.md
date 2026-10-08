@@ -201,6 +201,10 @@ src/app/api/push/notifica-scadenze/route.ts — invocato una volta al giorno da 
                                         vercel.json): per ogni profilo con almeno una notifica
                                         push attiva, controlla cosa scade domani e invia la
                                         notifica a tutti i suoi dispositivi sottoscritti.
+src/app/api/scontrino/estrai/route.ts — legge la foto di uno scontrino (vision, nessun OCR
+                                        esterno) e la confronta con la grocery_list dell'ultimo
+                                        piano del profilo. Versione semplice: elaborazione al
+                                        volo, l'immagine non viene mai salvata né persistita.
 
 src/app/piano/[token]/
   layout.tsx, bottom-nav.tsx, page-header.tsx  — shell condivisa (6 tab: Menu, Spesa, Frigo,
@@ -213,7 +217,10 @@ src/app/piano/[token]/
                            (notifiche-push.tsx propone di attivarle, solo quando c'è già
                            qualcosa da notificare — mai un prompt proattivo al primo avvio)
   andamento/            — KPI: risparmio vs budget, % settimane senza sprechi, sprechi evitati €
-  checkin-form.tsx      — check-in settimanale (seguito il piano? sprecato? spesa reale?)
+  checkin-form.tsx      — check-in settimanale (seguito il piano? sprecato? spesa reale?) +
+                           "Fotografa lo scontrino" (comprime l'immagine lato client prima di
+                           inviarla, vedi comprimiImmagine) che confronta coi prezzi stimati e
+                           precompila "quanto hai speso" col totale letto
   impostazioni/         — Profilo: riepilogo in sola lettura + pulsante Modifica in fondo
   preferiti/            — lista consultabile dei piatti salvati come preferiti
   push-actions.ts       — server action salvaPushSubscription()/rimuoviPushSubscription()
@@ -301,12 +308,21 @@ src/app/manifest.ts — web manifest, richiesto perché il service worker possa 
   costante nella route (`/api/piano/modifica`), non nel prompt stesso.
 - **Costo per chiamata monitorato alla fonte, non ricostruito altrove.** `calcolaCostoUsd` (in
   `costo-ai.ts`) legge `response.usage` — già restituito dalla stessa chiamata, nessuna chiamata
-  in più per saperlo — e il risultato si logga in console E si salva su riga (vedi
-  `modifica_messaggi.costo_stimato_usd`) nello stesso momento in cui la chiamata avviene, non
-  ricalcolato in un passaggio successivo. Finora applicato solo a `modificaPiano` (la funzione
-  toccata da questa richiesta); le altre chiamate AI in `claude.ts` non hanno ancora
-  questo monitoraggio — estendilo se richiesto esplicitamente, stesso principio delle altre
-  funzionalità "non attive finché non è chiesto esplicitamente".
+  in più per saperlo — e il risultato si logga in console nello stesso momento in cui la chiamata
+  avviene, non ricalcolato in un passaggio successivo. Applicato a `modificaPiano` (anche salvato
+  su riga, vedi `modifica_messaggi.costo_stimato_usd`) e a `confrontaScontrino`; `generateMealPlan`,
+  `adattaBudget` e `regeneratePasto` non hanno ancora questo monitoraggio — estendilo se richiesto
+  esplicitamente, stesso principio delle altre funzionalità "non attive finché non è chiesto".
+- **OCR via vision di Claude, mai un servizio OCR esterno.** `confrontaScontrino` manda la foto
+  dello scontrino direttamente come content block `image` nella stessa chiamata che fa anche il
+  confronto semantico con la lista della spesa (nomi abbreviati/diversi, es. "POLLO PETTO" vs
+  "Petto di pollo" — un matching per stringa esatta fallirebbe quasi sempre su scontrini reali).
+  Nessuna persistenza: l'immagine e il risultato del confronto esistono solo per la singola
+  richiesta, coerente con "versione semplice" per una prima iterazione di una funzionalità nuova
+  (stesso approccio usato per Preferiti all'inizio). Il client ridimensiona/ricomprime sempre la
+  foto prima di inviarla (`comprimiImmagine` in `checkin-form.tsx`, max 1500px, JPEG qualità 0.8)
+  — sia per restare sotto i limiti di corpo richiesta sia perché i token di visione scalano con
+  la risoluzione dell'immagine.
 
 ## Validazione sicurezza glutine — a 4 livelli (cambiata di recente)
 
@@ -322,7 +338,7 @@ src/app/manifest.ts — web manifest, richiesto perché il service worker possa 
 Il banner nel Menu ("Verifica necessaria" di una volta) ora distingue rosso/clay ("Non adatto",
 rigenerazione fallita) da ambra/honey ("Da verificare", solo da controllare in etichetta).
 
-## Ordine cronologico di cosa è stato costruito (PR #16 → #53, tutte mergiate)
+## Ordine cronologico di cosa è stato costruito (PR #16 → #54, tutte mergiate)
 
 Le PR più vecchie (16-31) sono di una sessione precedente: setup iniziale, generazione piano,
 fix vari, lista spesa con "Non l'ho trovato"/"Proponine un altro", stagionalità, dispensa.
@@ -406,7 +422,7 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     fallisce silenziosamente (nessun invio, nessun errore visibile all'utente finale, solo nei log
     Vercel). Non testabile end-to-end in questo sandbox (Supabase irraggiungibile): verificato il
     flusso fino alla chiamata del server action incluso, vedi commit per i dettagli.
-19. **(questa sessione)**: **Chat con memoria conversazionale** — `modificaPiano` riceve ora le
+19. **#54**: **Chat con memoria conversazionale** — `modificaPiano` riceve ora le
     ultime 5 richieste di modifica fatte su QUESTO piano (testo + esito, non il piano intero),
     per capire riferimenti impliciti come "anche lì" o "idem per cena" (`testoCronologia` in
     `claude.ts`, limite in `/api/piano/modifica/route.ts` — vedi Pattern ricorrenti). Nuova
@@ -414,8 +430,21 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     memoria sia per il monitoraggio costo: ogni chiamata a `modificaPiano` ora calcola e
     restituisce `costoStimatoUsd` (`src/lib/costo-ai.ts`, prezzi $/1M token per modello — solo
     `claude-sonnet-5-5`/`claude-opus-5-5`, aggiorna la tabella se cambia `ANTHROPIC_MODEL`),
-    loggato in console e salvato su riga. Monitoraggio applicato solo a `modificaPiano` per ora
-    (vedi Pattern ricorrenti), non alle altre chiamate AI in `claude.ts`.
+    loggato in console e salvato su riga.
+20. **(questa sessione)**: **Foto scontrino + OCR** — nel Check-in, "Fotografa lo scontrino"
+    (`checkin-form.tsx`) legge la foto via vision di Claude (nessun servizio OCR esterno, vedi
+    Pattern ricorrenti) e la confronta semanticamente con la `grocery_list` dell'ultimo piano
+    (`confrontaScontrino` in `claude.ts`, nuovo endpoint `/api/scontrino/estrai`): per ogni
+    articolo della lista dice se è stato trovato sullo scontrino e a che prezzo, più gli eventuali
+    prodotti extra non previsti. Il totale letto precompila "quanto hai speso davvero" (resta
+    modificabile). Versione semplice, nessuna persistenza: immagine e risultato esistono solo per
+    la singola richiesta. Stesso monitoraggio costo di `modificaPiano` (vedi sopra), non salvato
+    su riga in questo caso (nessuna tabella dedicata, solo log console). Nella stessa sessione,
+    aggiunte a `BACKLOG.md` due note dal founder non ancora implementate: **Mappa supermercati**
+    (se costruita, va limitata a supermercati con assortimento senza glutine confermato dagli
+    utenti nel tempo) e **Condivisione piano famiglia** (esplicitamente bloccata finché l'app non
+    ha un vero sistema di login) — nessuna delle due è stata costruita, solo documentate come
+    vincoli/blocchi per quando (se) verranno affrontate.
 
 ## Cose da sapere / residuo noto
 
