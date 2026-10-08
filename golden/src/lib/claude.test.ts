@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { creaPianoEsempio } from "@/test/fixtures/piano-esempio";
-import { generateMealPlan, modificaPiano, type ProfiloPerPiano } from "./claude";
+import { generateMealPlan, modificaPiano, confrontaScontrino, type ProfiloPerPiano } from "./claude";
 
 // Il client Anthropic reale non viene mai istanziato in questi test: si
 // sostituisce l'intero SDK con una classe finta il cui .messages.parse()
@@ -194,6 +194,18 @@ describe("modificaPiano — risposta AI simulata", () => {
     expect(richiesta.system).toMatch(/di stagione/i);
   });
 
+  it("include anche qui il vincolo di varietà, per non reintrodurre un doppione modificando un pasto", async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      usage: { input_tokens: 1000, output_tokens: 500 },
+    });
+
+    await modificaPiano(profiloBase, creaPianoEsempio(), "ho già comprato il pollo");
+
+    const richiesta = mockParse.mock.calls[0][0];
+    expect(richiesta.system).toMatch(/14 ricette DISTINTE/);
+  });
+
   it("include anche qui gli ingredienti avanzati in dispensa, quando passati (es. pulsante \"Proponine un altro\")", async () => {
     mockParse.mockResolvedValueOnce({
       parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
@@ -249,5 +261,95 @@ describe("modificaPiano — risposta AI simulata", () => {
     expect(risultato.usage.output_tokens).toBe(1000);
     // claude-sonnet-5-5: $2/1M input, $10/1M output -> 2000*2/1e6 + 1000*10/1e6
     expect(risultato.costoStimatoUsd).toBeCloseTo(0.004 + 0.01, 6);
+  });
+});
+
+describe("confrontaScontrino — risposta AI simulata", () => {
+  const listaSpesa = [
+    { nome: "Petto di pollo", prezzo_stimato_eur: 4.5 },
+    { nome: "Pasta di riso", prezzo_stimato_eur: 2.1 },
+  ];
+
+  it("invia l'immagine e la lista della spesa nel messaggio", async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: {
+        totale_scontrino_eur: 6.6,
+        leggibile: true,
+        corrispondenze: [],
+        extra_non_in_lista: [],
+      },
+      usage: { input_tokens: 1500, output_tokens: 300 },
+    });
+
+    await confrontaScontrino("ZmFrZS1pbWFnZQ==", "image/jpeg", listaSpesa);
+
+    const richiesta = mockParse.mock.calls[0][0];
+    const content = richiesta.messages[0].content as { type: string; text?: string; [k: string]: unknown }[];
+    const bloccoImmagine = content.find((b) => b.type === "image");
+    const bloccoTesto = content.find((b) => b.type === "text");
+
+    expect(bloccoImmagine).toMatchObject({ source: { type: "base64", media_type: "image/jpeg", data: "ZmFrZS1pbWFnZQ==" } });
+    expect(bloccoTesto?.text).toContain("Petto di pollo");
+  });
+
+  it("restituisce le corrispondenze trovate e i prodotti extra", async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: {
+        totale_scontrino_eur: 6.6,
+        leggibile: true,
+        corrispondenze: [
+          {
+            nome_lista: "Petto di pollo",
+            prezzo_stimato_eur: 4.5,
+            trovato_sullo_scontrino: true,
+            nome_scontrino: "POLLO PETTO",
+            prezzo_scontrino_eur: 4.8,
+          },
+          {
+            nome_lista: "Pasta di riso",
+            prezzo_stimato_eur: 2.1,
+            trovato_sullo_scontrino: false,
+            nome_scontrino: null,
+            prezzo_scontrino_eur: null,
+          },
+        ],
+        extra_non_in_lista: [{ nome: "Acqua minerale", prezzo_eur: 0.5 }],
+      },
+      usage: { input_tokens: 1500, output_tokens: 300 },
+    });
+
+    const risultato = await confrontaScontrino("ZmFrZS1pbWFnZQ==", "image/jpeg", listaSpesa);
+
+    expect(risultato.leggibile).toBe(true);
+    expect(risultato.corrispondenze[0].trovato_sullo_scontrino).toBe(true);
+    expect(risultato.corrispondenze[0].prezzo_scontrino_eur).toBe(4.8);
+    expect(risultato.corrispondenze[1].trovato_sullo_scontrino).toBe(false);
+    expect(risultato.extra_non_in_lista).toEqual([{ nome: "Acqua minerale", prezzo_eur: 0.5 }]);
+    expect(risultato.costoStimatoUsd).toBeGreaterThan(0);
+  });
+
+  it("segnala leggibile a false senza inventare un totale quando la foto non è leggibile", async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: {
+        totale_scontrino_eur: null,
+        leggibile: false,
+        corrispondenze: [],
+        extra_non_in_lista: [],
+      },
+      usage: { input_tokens: 1200, output_tokens: 100 },
+    });
+
+    const risultato = await confrontaScontrino("ZmFrZS1pbWFnZQ==", "image/jpeg", listaSpesa);
+
+    expect(risultato.leggibile).toBe(false);
+    expect(risultato.totale_scontrino_eur).toBeNull();
+  });
+
+  it("lancia un errore chiaro se il parsing dell'output fallisce", async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: null });
+
+    await expect(confrontaScontrino("ZmFrZS1pbWFnZQ==", "image/jpeg", listaSpesa)).rejects.toThrow(
+      "Claude non ha restituito un confronto valido.",
+    );
   });
 });

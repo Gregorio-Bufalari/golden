@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateMealPlan, type ProfiloPerPiano, type Giorno } from "@/lib/claude";
-import { validaGiorni, assicuraVarieta, adattaEntroBudget, type GiornoValidato } from "@/lib/piano-validazione";
+import { validaGiorni, adattaEntroBudget, type GiornoValidato } from "@/lib/piano-validazione";
 import { leggiDispensa } from "@/lib/dispensa";
 import { calcolaFattoreCalibrazionePerProfilo } from "@/lib/calibrazione-prezzi";
 import {
@@ -166,10 +166,12 @@ export async function POST(request: Request) {
     const profiloScenario: ProfiloPerPiano = { ...profiloInput, budget_settimanale: targetBudget };
     const plan = await generateMealPlan(profiloScenario, modalitaProfilo, dispensa);
     const giorniBase = await validaGiorni(profiloScenario, plan.giorni, dispensa);
-    const giorniVari = await assicuraVarieta(profiloScenario, giorniBase, dispensa);
+    // adattaEntroBudget applica anche il controllo varietà internamente
+    // (sui giorni iniziali e dopo ogni eventuale adattamento budget), non
+    // serve richiamare assicuraVarieta qui.
     const adattato = await adattaEntroBudget(
       profiloScenario,
-      giorniVari,
+      giorniBase,
       supermercato,
       targetBudget,
       dispensa,

@@ -146,6 +146,15 @@ export async function assicuraVarieta(
   return validaGiorni(profilo, giorniRigenerati as Giorno[], dispensa);
 }
 
+/**
+ * Valida sicurezza E varietà sul piano in ingresso, poi lo adatta entro il
+ * budget se serve. Chiama internamente `assicuraVarieta` — sia sui giorni
+ * iniziali sia dopo ogni tentativo di `adattaBudget` — così ogni chiamante
+ * ottiene entrambi i controlli semplicemente passando da qui, senza dover
+ * ricordarsi di invocare `assicuraVarieta` a parte (prima di questo, un
+ * piano rivisto da `adattaBudget` per il costo poteva reintrodurre un
+ * doppione senza che nessun controllo lo intercettasse).
+ */
 export async function adattaEntroBudget(
   profilo: ProfiloPerPiano,
   giorniIniziali: GiornoValidato[],
@@ -159,7 +168,7 @@ export async function adattaEntroBudget(
   consumiDispensa: ConsumoDispensa[];
   budgetSuperato: boolean;
 }> {
-  let giorni = giorniIniziali;
+  let giorni = await assicuraVarieta(profilo, giorniIniziali, dispensa);
   let risultato = buildGroceryList(giorni, supermercato, dispensa, fattoreCalibrazione);
 
   if (!budget) {
@@ -177,7 +186,8 @@ export async function adattaEntroBudget(
         budget,
         dispensa,
       );
-      giorni = await validaGiorni(profilo, pianoAdattato.giorni, dispensa);
+      const giorniValidati = await validaGiorni(profilo, pianoAdattato.giorni, dispensa);
+      giorni = await assicuraVarieta(profilo, giorniValidati, dispensa);
       risultato = buildGroceryList(giorni, supermercato, dispensa, fattoreCalibrazione);
     } catch (err) {
       console.error("adattaBudget error:", err);

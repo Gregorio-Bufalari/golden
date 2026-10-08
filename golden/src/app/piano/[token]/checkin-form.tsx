@@ -8,6 +8,59 @@ import { SupermercatoSelector } from "@/components/supermercato-selector";
 
 const CATEGORIE_SPRECO = ["Verdura", "Proteine", "Latticini", "Pane/pasta", "Altro"];
 
+type CorrispondenzaScontrino = {
+  nome_lista: string;
+  prezzo_stimato_eur: number;
+  trovato_sullo_scontrino: boolean;
+  nome_scontrino: string | null;
+  prezzo_scontrino_eur: number | null;
+};
+
+type RisultatoScontrino = {
+  leggibile: boolean;
+  totale_scontrino_eur: number | null;
+  corrispondenze: CorrispondenzaScontrino[];
+  extra_non_in_lista: { nome: string; prezzo_eur: number }[];
+};
+
+// Ridimensiona e ricomprime la foto prima di inviarla: una foto scattata
+// con una fotocamera moderna può superare facilmente i limiti di corpo
+// richiesta, e immagini più piccole costano anche meno token di visione.
+function comprimiImmagine(file: File, maxLato = 1500, qualita = 0.8): Promise<{ base64: string; mediaType: "image/jpeg" }> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxLato || height > maxLato) {
+        const scala = maxLato / Math.max(width, height);
+        width = Math.round(width * scala);
+        height = Math.round(height * scala);
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Canvas non disponibile"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const dataUrl = canvas.toDataURL("image/jpeg", qualita);
+      resolve({ base64: dataUrl.split(",")[1], mediaType: "image/jpeg" });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Immagine non valida"));
+    };
+    img.src = url;
+  });
+}
+
 function SiNoButton({
   label,
   selected,
@@ -60,6 +113,10 @@ export function CheckinForm({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   const [inviato, setInviato] = useState(false);
 
+  const [scontrinoElaborando, setScontrinoElaborando] = useState(false);
+  const [erroreScontrino, setErroreScontrino] = useState<string | null>(null);
+  const [confrontoScontrino, setConfrontoScontrino] = useState<RisultatoScontrino | null>(null);
+
   const puoInviare =
     seguitoPiano !== null && spreco !== null && (!spreco || categoriaSpreco !== null);
 
@@ -83,6 +140,47 @@ export function CheckinForm({ token }: { token: string }) {
       setInviato(true);
     }
     setSubmitting(false);
+  }
+
+  // Confronto scontrino (versione semplice): la foto viene elaborata e
+  // confrontata al volo, mai salvata — solo il risultato (e il totale, per
+  // precompilare "quanto hai speso") resta nello stato di questo form.
+  async function handleScontrino(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setScontrinoElaborando(true);
+    setErroreScontrino(null);
+    setConfrontoScontrino(null);
+
+    try {
+      const { base64, mediaType } = await comprimiImmagine(file);
+      const res = await fetch("/api/scontrino/estrai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, immagine_base64: base64, media_type: mediaType }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErroreScontrino(data.error || "Qualcosa è andato storto.");
+        return;
+      }
+      if (!data.leggibile) {
+        setErroreScontrino("Non sono riuscito a leggere lo scontrino. Riprova con una foto più chiara.");
+        return;
+      }
+
+      setConfrontoScontrino(data);
+      if (data.totale_scontrino_eur != null) {
+        setSpesaReale(String(data.totale_scontrino_eur));
+      }
+    } catch {
+      setErroreScontrino("Qualcosa è andato storto. Riprova.");
+    } finally {
+      setScontrinoElaborando(false);
+    }
   }
 
   if (inviato) {
@@ -158,6 +256,53 @@ export function CheckinForm({ token }: { token: string }) {
         </div>
         <div className="mt-3">
           <SupermercatoSelector value={retailer} onChange={setRetailer} />
+        </div>
+
+        <div className="mt-4 border-t border-ink/10 pt-3.5">
+          <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 rounded-full bg-paper px-4 text-xs font-semibold text-accent">
+            {scontrinoElaborando && <Spinner className="h-3.5 w-3.5" />}
+            {scontrinoElaborando ? "Leggo lo scontrino..." : "Fotografa lo scontrino"}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleScontrino}
+              disabled={scontrinoElaborando}
+              className="hidden"
+            />
+          </label>
+          <p className="mt-1.5 text-[11px] text-ink/50">
+            Confrontiamo prodotti e prezzi con la lista della spesa di questa settimana — niente viene salvato,
+            solo il totale precompila il campo sopra.
+          </p>
+
+          {erroreScontrino && <p className="mt-2 text-xs text-clay">{erroreScontrino}</p>}
+
+          {confrontoScontrino && (
+            <div className="mt-3 flex flex-col gap-1.5">
+              {confrontoScontrino.corrispondenze.map((c) => (
+                <div key={c.nome_lista} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-ink">{c.nome_lista}</span>
+                  {c.trovato_sullo_scontrino ? (
+                    <span className="font-mono text-ink/70">
+                      €{c.prezzo_scontrino_eur?.toFixed(2)}
+                      <span className="ml-1 text-ink/40">(stima €{c.prezzo_stimato_eur.toFixed(2)})</span>
+                    </span>
+                  ) : (
+                    <span className="text-honey">non trovato</span>
+                  )}
+                </div>
+              ))}
+              {confrontoScontrino.extra_non_in_lista.length > 0 && (
+                <div className="mt-1.5 border-t border-ink/10 pt-1.5 text-xs text-ink/60">
+                  Extra non in lista:{" "}
+                  {confrontoScontrino.extra_non_in_lista
+                    .map((p) => `${p.nome} (€${p.prezzo_eur.toFixed(2)})`)
+                    .join(", ")}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

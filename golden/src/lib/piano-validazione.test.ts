@@ -290,4 +290,53 @@ describe("adattaEntroBudget — adattamento costi con risposta AI simulata", () 
     expect(mockAdattaBudget).toHaveBeenCalledTimes(1);
     expect(risultato.budgetSuperato).toBe(true);
   });
+
+  it("deduplica un doppione già nei giorni iniziali, anche senza sforare il budget (nessuna chiamata ad adattaBudget)", async () => {
+    const giorni = await validaGiorni(profiloSenzaRestrizioni, creaPianoEsempio());
+    giorni[1].pasti[0] = { ...giorni[1].pasti[0], nome: "Pasta al pomodoro" };
+
+    mockRegeneratePasto.mockResolvedValueOnce(
+      pasto({
+        tipo: "pranzo",
+        nome: "Riso al pomodoro",
+        ingredienti: [ingrediente({ nome: "Riso", quantita: 100, unita: "g", reparto: "Dispensa" })],
+      }),
+    );
+
+    const risultato = await adattaEntroBudget(profiloSenzaRestrizioni, giorni, "Conad", null);
+
+    expect(mockAdattaBudget).not.toHaveBeenCalled();
+    expect(mockRegeneratePasto).toHaveBeenCalledTimes(1);
+    expect(risultato.giorni[1].pasti[0].nome).toBe("Riso al pomodoro");
+  });
+
+  it("deduplica un doppione introdotto dal piano \"economico\" proposto da adattaBudget", async () => {
+    const giorni = await validaGiorni(profiloSenzaRestrizioni, creaPianoEsempio());
+
+    // adattaBudget risolve il budget ma, rivedendo liberamente tutti i 14
+    // pasti, introduce per errore un doppione (stesso nome a due pasti).
+    const pianoEconomicoConDoppione = creaPianoEsempio().map((g, gi) => ({
+      ...g,
+      pasti: g.pasti.map((p, pi) => ({
+        ...p,
+        nome: gi === 0 && pi === 0 ? "Riso in bianco" : gi === 1 && pi === 0 ? "Riso in bianco" : p.nome,
+        ingredienti: [ingrediente({ nome: "Riso", quantita: 50, unita: "g" as const, reparto: "Dispensa", prezzo_stimato_eur: 0.05 })],
+      })),
+    }));
+    mockAdattaBudget.mockResolvedValue({ giorni: pianoEconomicoConDoppione });
+    mockRegeneratePasto.mockResolvedValue(
+      pasto({
+        tipo: "pranzo",
+        nome: "Pasta in bianco",
+        ingredienti: [ingrediente({ nome: "Pasta", quantita: 50, unita: "g", reparto: "Pane e cereali", prezzo_stimato_eur: 0.05 })],
+      }),
+    );
+
+    const risultato = await adattaEntroBudget(profiloSenzaRestrizioni, giorni, "Conad", 5);
+
+    expect(mockAdattaBudget).toHaveBeenCalled();
+    const nomi = risultato.giorni.flatMap((g) => g.pasti.map((p) => p.nome));
+    const duplicati = nomi.filter((n, i) => nomi.indexOf(n) !== i);
+    expect(duplicati).toEqual([]);
+  });
 });
