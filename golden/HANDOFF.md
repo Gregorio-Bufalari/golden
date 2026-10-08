@@ -140,11 +140,18 @@ usato sia da Onboarding sia da Impostazioni/Profilo per non farli divergere visi
 
 ```
 src/lib/claude.ts            — tutte le chiamate AI (generateMealPlan, modificaPiano,
-                                adattaBudget, regeneratePasto); system prompt condivisi
+                                adattaBudget, regeneratePasto, confrontaScontrino). Ogni
+                                system prompt si compone con componiIstruzioni([...]) da
+                                moduli condivisi (ISTRUZIONI_INGREDIENTI, ISTRUZIONE_VARIETA,
+                                istruzioneDispensa()...) — la lista esplicita in ogni funzione
+                                è la documentazione di cosa quella chiamata sa davvero, vedi
+                                il commento sopra componiIstruzioni per la mappa completa.
 src/lib/piano-validazione.ts — pipeline di validazione POST-generazione, nessuna chiamata AI
                                 fuori da qui per la sicurezza: validaGiorni (controllo glutine
                                 a 4 livelli), assicuraVarieta (niente piatti duplicati nella
-                                settimana), adattaEntroBudget (retry budget)
+                                settimana), adattaEntroBudget (retry budget — chiama SEMPRE
+                                assicuraVarieta anche internamente, sui giorni iniziali e dopo
+                                ogni tentativo, così qualunque chiamante la ottiene gratis)
 src/lib/glutine-check.ts     — classificazione statica per ingrediente a 4 categorie (vedi sotto)
 src/lib/grocery.ts           — costruzione lista della spesa da un piano validato
 src/lib/dispensa.ts          — saldo "rimanenze" tra una settimana e l'altra
@@ -323,6 +330,25 @@ src/app/manifest.ts — web manifest, richiesto perché il service worker possa 
   foto prima di inviarla (`comprimiImmagine` in `checkin-form.tsx`, max 1500px, JPEG qualità 0.8)
   — sia per restare sotto i limiti di corpo richiesta sia perché i token di visione scalano con
   la risoluzione dell'immagine.
+- **Prompt composti da moduli dichiarati esplicitamente, stesso meccanismo one-shot di sempre.**
+  `componiIstruzioni([...])` in `claude.ts` sostituisce la concatenazione a mano (`A + " " + B +
+  " " + C`) con una lista esplicita per funzione — decisione presa dopo che l'uso reale di questa
+  sessione ha reso evidente quali moduli servono dove (es. `ISTRUZIONI_INGREDIENTI`/`NUTRIZIONE`/
+  `PREPARAZIONE` sempre, `ISTRUZIONE_VARIETA`/`BATCH_COOKING` solo nelle chiamate che generano/
+  rivedono l'intero piano). **Non** è stato introdotto il tool-calling reale dell'API Anthropic
+  (nessun loop multi-turno, nessuna chiamata agentica a strumenti): resta una singola chiamata con
+  output strutturato per funzione, identica affidabilità/latenza di prima — scelta deliberata,
+  discussa con l'utente prima di procedere, per non rischiare un motore già affidabile e testato.
+  Se in futuro serve davvero il tool-calling reale (Claude che decide a runtime quali capacità
+  invocare), è una richiesta esplicita a parte, non implicita in "tool-calling completo".
+- **Un controllo deterministico va centralizzato dove viene DAVVERO applicato sempre, non
+  ripetuto ad ogni chiamante.** Bug corretto in questa sessione: `assicuraVarieta` veniva invocata
+  esplicitamente solo dalla route di generazione, MAI dalla route di modifica né dopo un retry
+  budget di `adattaBudget` — un piano rivisto per il costo, o una singola modifica, potevano
+  reintrodurre un doppione senza che nulla lo intercettasse. Fix: spostata DENTRO
+  `adattaEntroBudget` stessa (chiamata sui giorni iniziali e dopo ogni tentativo budget), così
+  ogni chiamante la ottiene automaticamente continuando a chiamare solo `adattaEntroBudget` come
+  già faceva — nessuna route ha dovuto aggiungere una chiamata esplicita in più.
 
 ## Validazione sicurezza glutine — a 4 livelli (cambiata di recente)
 
@@ -448,10 +474,12 @@ Questa sessione (dalla PR #32 in poi), in ordine:
 
 ## Cose da sapere / residuo noto
 
-- Lo smoke test `"generateMealPlan produce un piano di 7 giorni senza ingredienti a rischio
-  glutine"` in `claude.smoke.test.ts` **timeouta spesso a 30s** in questo sandbox per latenza di
-  rete verso l'API reale, non per un bug — osservato ripetutamente, non è una regressione.
-  Se lo rivedi fallire, non è automaticamente un allarme.
+- Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
+  esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —
+  osservato ripetutamente su più test diversi (generateMealPlan, modificaPiano), non è una
+  regressione di una modifica specifica. Il timeout è hardcoded per test (il flag CLI
+  `--testTimeout` NON lo sovrascrive): se lo rivedi fallire a ~30008ms, non è automaticamente un
+  allarme, prova a isolarlo e a ripeterlo prima di sospettare una regressione reale.
 - Ogni migration elencata sopra in `supabase/migrations/` va verificata con l'utente: se non è
   stata ancora eseguita sul Supabase di produzione, qualunque funzionalità che tocca quella
   tabella fallirà silenziosamente (azione via server action) o romperà la pagina (se letta

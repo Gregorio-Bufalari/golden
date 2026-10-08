@@ -213,6 +213,32 @@ const ISTRUZIONE_SCOPERTA =
   "di default per questo profilo — più varietà rispetto a un piano standard — sempre nel rispetto di restrizioni, " +
   "preferenze e budget. Evita i piatti più ovvi e ripetitivi per questo tipo di richiesta.";
 
+/**
+ * Unisce i moduli di istruzioni applicabili a una chiamata, saltando quelli
+ * assenti (es. ISTRUZIONE_SCOPERTA solo in modalità Scoperta, o una
+ * istruzioneX() condizionale che ha restituito ""). Ogni funzione sotto
+ * dichiara qui la propria lista di moduli in modo esplicito, invece di
+ * concatenarli a mano con `+` — così si vede a colpo d'occhio cosa sa
+ * ciascuna chiamata, e un nuovo modulo si aggiunge a chi serve senza
+ * toccare le altre tre funzioni che non lo usano. Nessun cambio nel
+ * meccanismo della chiamata: resta una singola richiesta con output
+ * strutturato, questo compone solo il testo del system prompt.
+ *
+ * Moduli usati da ciascuna funzione, oggi:
+ *   generateMealPlan — varietà, batch cooking, scoperta (se attiva),
+ *     ingredienti, nutrizione, preparazione, dispensa, stagionalità
+ *   modificaPiano     — varietà, ingredienti, nutrizione, preparazione,
+ *     dispensa, stagionalità
+ *   adattaBudget      — nota costo confezioni, varietà, batch cooking,
+ *     ingredienti, nutrizione, preparazione, dispensa, stagionalità
+ *   regeneratePasto   — ingredienti, nutrizione, preparazione, dispensa,
+ *     stagionalità (la varietà qui è gestita per-chiamata da nomiDaEvitare,
+ *     più precisa del modulo generale)
+ */
+function componiIstruzioni(moduli: (string | null | undefined)[]): string {
+  return moduli.filter((m): m is string => Boolean(m)).join(" ");
+}
+
 export async function generateMealPlan(
   profilo: ProfiloPerPiano,
   modalita: "routine" | "scoperta" = "routine",
@@ -228,10 +254,16 @@ export async function generateMealPlan(
       "Rispetta anche l'obiettivo generale e gli eventuali obiettivi nutrizionali per pasto (stessa priorità " +
       "dell'obiettivo, mai sopra restrizioni o budget), poi preferenze e tempo di preparazione, in questo ordine " +
       "di priorità, scegliendo ingredienti e porzioni che permettano di rientrare nel budget. " +
-      ISTRUZIONE_VARIETA + " " + ISTRUZIONE_BATCH_COOKING + " " +
-      (modalita === "scoperta" ? ISTRUZIONE_SCOPERTA + " " : "") +
-      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
-      istruzioneDispensa(dispensa) + " " + istruzioneStagionalita(),
+      componiIstruzioni([
+        ISTRUZIONE_VARIETA,
+        ISTRUZIONE_BATCH_COOKING,
+        modalita === "scoperta" ? ISTRUZIONE_SCOPERTA : null,
+        ISTRUZIONI_INGREDIENTI,
+        ISTRUZIONI_NUTRIZIONE,
+        ISTRUZIONI_PREPARAZIONE,
+        istruzioneDispensa(dispensa),
+        istruzioneStagionalita(),
+      ]),
     messages: [
       {
         role: "user",
@@ -312,8 +344,14 @@ export async function modificaPiano(
       "soluzione migliore è quasi sempre cambiare QUALI pasti lo contengono — sostituendo un piatto con un altro " +
       "che usa di più (o di meno) quell'ingrediente — piuttosto che alterare le porzioni di una singola ricetta " +
       "fino a renderle irrealistiche per una persona (es. non proporre mai 800g di pollo in un solo piatto). " +
-      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
-      istruzioneDispensa(dispensa) + " " + istruzioneStagionalita(),
+      componiIstruzioni([
+        ISTRUZIONE_VARIETA,
+        ISTRUZIONI_INGREDIENTI,
+        ISTRUZIONI_NUTRIZIONE,
+        ISTRUZIONI_PREPARAZIONE,
+        istruzioneDispensa(dispensa),
+        istruzioneStagionalita(),
+      ]),
     messages: [
       {
         role: "user",
@@ -369,9 +407,16 @@ export async function adattaBudget(
       "senza violare le restrizioni alimentari (vincolo rigido, non negoziabile) e senza stravolgere le preferenze. " +
       "Riduci il costo totale stimato sostituendo ingredienti costosi con alternative più economiche (es. proteine " +
       "meno pregiate, prodotti di stagione, porzioni più ragionevoli), mantenendo varietà e qualità nutrizionale. " +
-      NOTA_COSTO_CONFEZIONI + " " + ISTRUZIONE_VARIETA + " " + ISTRUZIONE_BATCH_COOKING + " " +
-      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
-      istruzioneDispensa(dispensa) + " " + istruzioneStagionalita(),
+      componiIstruzioni([
+        NOTA_COSTO_CONFEZIONI,
+        ISTRUZIONE_VARIETA,
+        ISTRUZIONE_BATCH_COOKING,
+        ISTRUZIONI_INGREDIENTI,
+        ISTRUZIONI_NUTRIZIONE,
+        ISTRUZIONI_PREPARAZIONE,
+        istruzioneDispensa(dispensa),
+        istruzioneStagionalita(),
+      ]),
     messages: [
       {
         role: "user",
@@ -413,8 +458,13 @@ export async function regeneratePasto(
     system:
       "Sei un assistente che rigenera un singolo pasto di un piano settimanale, in italiano. " +
       "Le restrizioni alimentari sono un vincolo rigido: non includere MAI un ingrediente incompatibile. " +
-      ISTRUZIONI_INGREDIENTI + " " + ISTRUZIONI_NUTRIZIONE + " " + ISTRUZIONI_PREPARAZIONE + " " +
-      istruzioneDispensa(dispensa) + " " + istruzioneStagionalita(),
+      componiIstruzioni([
+        ISTRUZIONI_INGREDIENTI,
+        ISTRUZIONI_NUTRIZIONE,
+        ISTRUZIONI_PREPARAZIONE,
+        istruzioneDispensa(dispensa),
+        istruzioneStagionalita(),
+      ]),
     messages: [
       {
         role: "user",

@@ -194,6 +194,18 @@ describe("modificaPiano — risposta AI simulata", () => {
     expect(richiesta.system).toMatch(/di stagione/i);
   });
 
+  it("include anche qui il vincolo di varietà, per non reintrodurre un doppione modificando un pasto", async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      usage: { input_tokens: 1000, output_tokens: 500 },
+    });
+
+    await modificaPiano(profiloBase, creaPianoEsempio(), "ho già comprato il pollo");
+
+    const richiesta = mockParse.mock.calls[0][0];
+    expect(richiesta.system).toMatch(/14 ricette DISTINTE/);
+  });
+
   it("include anche qui gli ingredienti avanzati in dispensa, quando passati (es. pulsante \"Proponine un altro\")", async () => {
     mockParse.mockResolvedValueOnce({
       parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
