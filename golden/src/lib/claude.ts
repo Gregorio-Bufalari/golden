@@ -4,6 +4,7 @@ import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { istruzioneStagionalita } from "./stagionalita";
 import { istruzioneDispensa } from "./dispensa";
+import { calcolaCostoUsd, type UsageChiamataAI } from "./costo-ai";
 
 // Sonnet invece di Opus: elencare pasti/ingredienti/prezzi non richiede un
 // ragionamento complesso, e Sonnet genera molto più velocemente — importante
@@ -262,13 +263,37 @@ export type RisultatoModifica = {
   modificaApplicata: boolean;
   motivoRifiuto: string | null;
   giorni: Giorno[];
+  usage: UsageChiamataAI;
+  costoStimatoUsd: number;
 };
+
+// Una richiesta di modifica precedente in questa stessa conversazione (sullo
+// stesso piano), con l'esito — serve a capire riferimenti impliciti come
+// "anche lì", "idem per cena", "no, l'altro giorno" nella richiesta attuale.
+export type MessaggioCronologia = {
+  messaggio: string;
+  applicata: boolean;
+};
+
+function testoCronologia(cronologia: MessaggioCronologia[]): string {
+  if (cronologia.length === 0) return "";
+
+  const righe = cronologia.map(
+    (c, i) => `${i + 1}. "${c.messaggio}" → ${c.applicata ? "applicata" : "rifiutata"}`,
+  );
+  return (
+    `Richieste di modifica più recenti in questa conversazione, dalla meno recente (solo per capire a cosa si ` +
+    `riferisce la richiesta attuale se usa un riferimento implicito — non riapplicarle, sono già riflesse nel ` +
+    `piano attuale sotto):\n${righe.join("\n")}\n\n`
+  );
+}
 
 export async function modificaPiano(
   profilo: ProfiloPerPiano,
   giorniAttuali: Giorno[],
   messaggioUtente: string,
   dispensa: Map<string, number> = new Map(),
+  cronologia: MessaggioCronologia[] = [],
 ): Promise<RisultatoModifica> {
   const response = await client.messages.parse({
     model: MODEL,
@@ -294,6 +319,7 @@ export async function modificaPiano(
         role: "user",
         content:
           `Profilo:\n${buildContestoProfilo(profilo)}\n\n` +
+          testoCronologia(cronologia) +
           `Piano attuale (JSON):\n${JSON.stringify({ giorni: giorniAttuali })}\n\n` +
           `Richiesta dell'utente: "${messaggioUtente}"\n\n` +
           "Restituisci il piano completo (tutti i 7 giorni): aggiornato se la richiesta è compatibile con le restrizioni, invariato altrimenti.",
@@ -312,10 +338,19 @@ export async function modificaPiano(
     throw new Error("Claude non ha restituito un piano valido.");
   }
 
+  const costoStimatoUsd = calcolaCostoUsd(response.usage, MODEL);
+  // Costo per chiamata, monitorato nei log del server (oltre che salvato
+  // per questa conversazione — vedi modifica_messaggi in /api/piano/modifica).
+  console.log(
+    `modificaPiano: ~$${costoStimatoUsd.toFixed(5)} (${response.usage.input_tokens} input, ${response.usage.output_tokens} output token)`,
+  );
+
   return {
     modificaApplicata: response.parsed_output.modifica_applicata,
     motivoRifiuto: response.parsed_output.motivo_rifiuto,
     giorni: response.parsed_output.giorni,
+    usage: response.usage,
+    costoStimatoUsd,
   };
 }
 

@@ -173,6 +173,9 @@ src/lib/notifiche-scadenza.ts — cosa notificare per le scadenze Frigo (ingredi
 src/lib/web-push.ts          — invio di una notifica push via VAPID (richiede VAPID_PUBLIC_KEY/
                                 VAPID_PRIVATE_KEY in env); rimuove da sola una sottoscrizione che
                                 il servizio push segnala come non più valida (404/410).
+src/lib/costo-ai.ts          — calcolaCostoUsd(usage, model): stima in USD di UNA chiamata a
+                                Claude dai token in response.usage, tabella prezzi solo per i
+                                modelli usati da questa app — aggiorna se cambia ANTHROPIC_MODEL.
 
 src/app/api/piano/generate/route.ts  — genera un piano nuovo (o riusa l'ultimo in modalità
                                         "routine"). Se c'è un piano routine riusabile, salva
@@ -190,6 +193,10 @@ src/app/api/piano/modifica/route.ts  — UNICO endpoint per ogni modifica in lin
                                         al piano: "Proponi un piatto diverso", +/- nutrienti,
                                         "Sostituisci"/"Non l'ho trovato", ecc. Passa sempre da
                                         validaGiorni — nessuna validazione duplicata altrove.
+                                        Legge/scrive modifica_messaggi: le ultime 5 richieste su
+                                        QUESTO piano (memoria conversazionale, vedi
+                                        testoCronologia in claude.ts) e il costo stimato di ogni
+                                        chiamata (anche loggato in console da modificaPiano).
 src/app/api/push/notifica-scadenze/route.ts — invocato una volta al giorno da Vercel Cron (vedi
                                         vercel.json): per ogni profilo con almeno una notifica
                                         push attiva, controlla cosa scade domani e invia la
@@ -286,6 +293,20 @@ src/app/manifest.ts — web manifest, richiesto perché il service worker possa 
   attiva — altrimenti l'utente viene avvisato comunque, anche senza aprire l'app, e il banner
   ridondante sparisce. Controllo lato server (conta le sottoscrizioni), non con `localStorage`: se
   l'utente ha attivato le notifiche su un dispositivo, il banner sparisce ovunque, non solo lì.
+- **Memoria conversazionale limitata, non l'intera cronologia.** `modificaPiano` riceve al
+  massimo le ultime `CRONOLOGIA_MAX` (5) richieste precedenti su quel piano come testo breve
+  ("richiesta" → "applicata"/"rifiutata"), non l'intero scambio o le versioni passate del piano —
+  basta per risolvere un riferimento implicito ("anche lì", "idem per cena") senza far crescere il
+  costo per chiamata in modo illimitato man mano che la conversazione si allunga. Il limite è una
+  costante nella route (`/api/piano/modifica`), non nel prompt stesso.
+- **Costo per chiamata monitorato alla fonte, non ricostruito altrove.** `calcolaCostoUsd` (in
+  `costo-ai.ts`) legge `response.usage` — già restituito dalla stessa chiamata, nessuna chiamata
+  in più per saperlo — e il risultato si logga in console E si salva su riga (vedi
+  `modifica_messaggi.costo_stimato_usd`) nello stesso momento in cui la chiamata avviene, non
+  ricalcolato in un passaggio successivo. Finora applicato solo a `modificaPiano` (la funzione
+  toccata da questa richiesta); le altre chiamate AI in `claude.ts` non hanno ancora
+  questo monitoraggio — estendilo se richiesto esplicitamente, stesso principio delle altre
+  funzionalità "non attive finché non è chiesto esplicitamente".
 
 ## Validazione sicurezza glutine — a 4 livelli (cambiata di recente)
 
@@ -301,7 +322,7 @@ src/app/manifest.ts — web manifest, richiesto perché il service worker possa 
 Il banner nel Menu ("Verifica necessaria" di una volta) ora distingue rosso/clay ("Non adatto",
 rigenerazione fallita) da ambra/honey ("Da verificare", solo da controllare in etichetta).
 
-## Ordine cronologico di cosa è stato costruito (PR #16 → #52, tutte mergiate)
+## Ordine cronologico di cosa è stato costruito (PR #16 → #53, tutte mergiate)
 
 Le PR più vecchie (16-31) sono di una sessione precedente: setup iniziale, generazione piano,
 fix vari, lista spesa con "Non l'ho trovato"/"Proponine un altro", stagionalità, dispensa.
@@ -369,7 +390,7 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     rischiando che l'AI del retry budget alterasse il Preferito appena inserito — ora va dopo
     (vedi Pattern ricorrenti). `calcolaFattoreCalibrazionePerProfilo` estratta in
     `calibrazione-prezzi.ts`, centralizzando una lettura Supabase finora duplicata in due route
-18. **(questa sessione)**: **Notifiche push vere** — sostituiscono (quando attive) il banner
+18. **#53**: **Notifiche push vere** — sostituiscono (quando attive) il banner
     in-app di scadenza Frigo. Nuova tabella `push_subscriptions`, nuovo service worker minimo
     (`public/sw.js`, solo push — nessuna cache offline) e manifest (`src/app/manifest.ts`,
     richiesto perché il SW possa registrarsi). `notifiche-push.tsx` propone di attivarle SOLO
@@ -385,6 +406,16 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     fallisce silenziosamente (nessun invio, nessun errore visibile all'utente finale, solo nei log
     Vercel). Non testabile end-to-end in questo sandbox (Supabase irraggiungibile): verificato il
     flusso fino alla chiamata del server action incluso, vedi commit per i dettagli.
+19. **(questa sessione)**: **Chat con memoria conversazionale** — `modificaPiano` riceve ora le
+    ultime 5 richieste di modifica fatte su QUESTO piano (testo + esito, non il piano intero),
+    per capire riferimenti impliciti come "anche lì" o "idem per cena" (`testoCronologia` in
+    `claude.ts`, limite in `/api/piano/modifica/route.ts` — vedi Pattern ricorrenti). Nuova
+    tabella `modifica_messaggi` (weekly_plan_id, messaggio, esito, token, costo) sia per questa
+    memoria sia per il monitoraggio costo: ogni chiamata a `modificaPiano` ora calcola e
+    restituisce `costoStimatoUsd` (`src/lib/costo-ai.ts`, prezzi $/1M token per modello — solo
+    `claude-sonnet-5-5`/`claude-opus-5-5`, aggiorna la tabella se cambia `ANTHROPIC_MODEL`),
+    loggato in console e salvato su riga. Monitoraggio applicato solo a `modificaPiano` per ora
+    (vedi Pattern ricorrenti), non alle altre chiamate AI in `claude.ts`.
 
 ## Cose da sapere / residuo noto
 
