@@ -147,6 +147,7 @@ describe("modificaPiano — risposta AI simulata", () => {
   it("applica la modifica quando l'AI la accetta", async () => {
     mockParse.mockResolvedValueOnce({
       parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      usage: { input_tokens: 1000, output_tokens: 500 },
     });
 
     const risultato = await modificaPiano(profiloBase, creaPianoEsempio(), "ho già comprato il pollo");
@@ -154,6 +155,7 @@ describe("modificaPiano — risposta AI simulata", () => {
     expect(risultato.modificaApplicata).toBe(true);
     expect(risultato.motivoRifiuto).toBeNull();
     expect(risultato.giorni).toHaveLength(7);
+    expect(risultato.costoStimatoUsd).toBeGreaterThan(0);
   });
 
   it("rifiuta la modifica e riporta il motivo quando è incompatibile con le restrizioni", async () => {
@@ -163,6 +165,7 @@ describe("modificaPiano — risposta AI simulata", () => {
         motivo_rifiuto: "Non posso aggiungere pasta di grano: contiene glutine.",
         giorni: creaPianoEsempio(),
       },
+      usage: { input_tokens: 1000, output_tokens: 500 },
     });
 
     const risultato = await modificaPiano(profiloBase, creaPianoEsempio(), "aggiungi pasta al forno");
@@ -182,6 +185,7 @@ describe("modificaPiano — risposta AI simulata", () => {
   it("include anche qui il criterio di stagionalità nel prompt", async () => {
     mockParse.mockResolvedValueOnce({
       parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      usage: { input_tokens: 1000, output_tokens: 500 },
     });
 
     await modificaPiano(profiloBase, creaPianoEsempio(), "ho già comprato il pollo");
@@ -193,6 +197,7 @@ describe("modificaPiano — risposta AI simulata", () => {
   it("include anche qui gli ingredienti avanzati in dispensa, quando passati (es. pulsante \"Proponine un altro\")", async () => {
     mockParse.mockResolvedValueOnce({
       parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      usage: { input_tokens: 1000, output_tokens: 500 },
     });
 
     const dispensa = new Map([["uova__pz", 1]]);
@@ -200,5 +205,49 @@ describe("modificaPiano — risposta AI simulata", () => {
 
     const richiesta = mockParse.mock.calls[0][0];
     expect(richiesta.system).toContain("uova (1pz)");
+  });
+
+  it("senza cronologia passata, non menziona richieste precedenti nel messaggio", async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      usage: { input_tokens: 1000, output_tokens: 500 },
+    });
+
+    await modificaPiano(profiloBase, creaPianoEsempio(), "ho già comprato il pollo");
+
+    const richiesta = mockParse.mock.calls[0][0];
+    const testoMessaggio = richiesta.messages[0].content as string;
+    expect(testoMessaggio).not.toMatch(/Richieste di modifica/i);
+  });
+
+  it("con una cronologia passata, include le richieste precedenti e il loro esito nel messaggio", async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      usage: { input_tokens: 1000, output_tokens: 500 },
+    });
+
+    await modificaPiano(profiloBase, creaPianoEsempio(), "fallo anche per cena", new Map(), [
+      { messaggio: "metti più proteine a pranzo", applicata: true },
+      { messaggio: "aggiungi pasta di grano", applicata: false },
+    ]);
+
+    const richiesta = mockParse.mock.calls[0][0];
+    const testoMessaggio = richiesta.messages[0].content as string;
+    expect(testoMessaggio).toContain('"metti più proteine a pranzo" → applicata');
+    expect(testoMessaggio).toContain('"aggiungi pasta di grano" → rifiutata');
+  });
+
+  it("restituisce i token usati e il costo stimato della chiamata", async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      usage: { input_tokens: 2000, output_tokens: 1000 },
+    });
+
+    const risultato = await modificaPiano(profiloBase, creaPianoEsempio(), "ho già comprato il pollo");
+
+    expect(risultato.usage.input_tokens).toBe(2000);
+    expect(risultato.usage.output_tokens).toBe(1000);
+    // claude-sonnet-5-5: $2/1M input, $10/1M output -> 2000*2/1e6 + 1000*10/1e6
+    expect(risultato.costoStimatoUsd).toBeCloseTo(0.004 + 0.01, 6);
   });
 });

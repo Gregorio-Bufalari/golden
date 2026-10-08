@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { modificaPiano, type ProfiloPerPiano, type Giorno } from "@/lib/claude";
+import { modificaPiano, type ProfiloPerPiano, type Giorno, type MessaggioCronologia } from "@/lib/claude";
 import { validaGiorni, adattaEntroBudget } from "@/lib/piano-validazione";
 import { leggiDispensa, dispensaSenzaVersione, sostituisciConsumiDispensa } from "@/lib/dispensa";
 import { calcolaFattoreCalibrazionePerProfilo } from "@/lib/calibrazione-prezzi";
@@ -9,6 +9,12 @@ import type { GroceryList, ConsumoDispensa } from "@/lib/grocery";
 // Vedi la stessa impostazione in /api/piano/generate: più chiamate a Claude
 // in sequenza possono superare il limite di default di Vercel.
 export const maxDuration = 300;
+
+// Quante richieste di modifica passate (su QUESTO piano) includere come
+// contesto conversazionale nella chiamata — abbastanza per capire un
+// riferimento implicito ("anche lì", "idem per cena"), non l'intera
+// cronologia: più messaggi = più token input ad ogni chiamata successiva.
+const CRONOLOGIA_MAX = 5;
 
 export async function POST(request: Request) {
   const { token, messaggio } = await request.json();
@@ -49,6 +55,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+  const pianoAttualeId: string = pianoAttuale.id;
 
   const profiloInput: ProfiloPerPiano = {
     restrizioni: profile.restrizioni || [],
@@ -63,6 +70,42 @@ export async function POST(request: Request) {
   const profileId: string = profile.id;
   const vecchioRimasto = (pianoAttuale.grocery_list as GroceryList | null)?.rimasto ?? [];
   const vecchiConsumi = (pianoAttuale.consumi_dispensa as ConsumoDispensa[] | null) ?? [];
+
+  // Memoria conversazionale: le ultime richieste di modifica su QUESTO
+  // piano, più vecchia prima — così l'AI può capire un riferimento
+  // implicito nella richiesta attuale (vedi testoCronologia in claude.ts).
+  const { data: messaggiPrecedenti } = await supabase
+    .from("modifica_messaggi")
+    .select("messaggio, modifica_applicata")
+    .eq("weekly_plan_id", pianoAttualeId)
+    .order("created_at", { ascending: false })
+    .limit(CRONOLOGIA_MAX);
+
+  const cronologia: MessaggioCronologia[] = (messaggiPrecedenti || [])
+    .reverse()
+    .map((m) => ({ messaggio: m.messaggio, applicata: m.modifica_applicata }));
+
+  // Registra questo scambio nella cronologia della conversazione (sia che
+  // la modifica sia stata applicata o rifiutata — un rifiuto fa comunque
+  // parte del contesto per la richiesta successiva) e il costo stimato
+  // della chiamata, per monitorarlo nel tempo.
+  async function registraMessaggio(
+    applicata: boolean,
+    motivoRifiuto: string | null,
+    usage?: { input_tokens: number; output_tokens: number },
+    costoStimatoUsd?: number,
+  ): Promise<void> {
+    const { error } = await supabase.from("modifica_messaggi").insert({
+      weekly_plan_id: pianoAttualeId,
+      messaggio: messaggio.trim(),
+      modifica_applicata: applicata,
+      motivo_rifiuto: motivoRifiuto,
+      input_tokens: usage?.input_tokens ?? null,
+      output_tokens: usage?.output_tokens ?? null,
+      costo_stimato_usd: costoStimatoUsd ?? null,
+    });
+    if (error) console.error("modifica_messaggi insert error:", error);
+  }
 
   let giorniValidati;
   let groceryList;
@@ -86,6 +129,14 @@ export async function POST(request: Request) {
       pianoAttuale.meal_plan.giorni as Giorno[],
       messaggio.trim(),
       dispensaBase,
+      cronologia,
+    );
+
+    await registraMessaggio(
+      risultato.modificaApplicata,
+      risultato.motivoRifiuto,
+      risultato.usage,
+      risultato.costoStimatoUsd,
     );
 
     if (!risultato.modificaApplicata) {
