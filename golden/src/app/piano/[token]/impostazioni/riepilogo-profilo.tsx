@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { TEMPO_OPTIONS, LIVELLO_ATTIVITA_OPTIONS } from "@/lib/opzioni-profilo";
 import type { ProfileData } from "./impostazioni-form";
 
@@ -42,9 +43,11 @@ function Riga({ label, value }: { label: string; value: string }) {
 }
 
 export function RiepilogoProfilo({
+  token,
   profile,
   onModifica,
 }: {
+  token: string;
   profile: ProfileData;
   onModifica: () => void;
 }) {
@@ -100,6 +103,13 @@ export function RiepilogoProfilo({
           <Riga label="Target per pasto" value={formattaObiettiviNutrizionali(profile.obiettivi_nutrizionali)} />
         </div>
       </div>
+
+      <Link
+        href={`/piano/${token}/archivio`}
+        className="flex min-h-11 items-center justify-center self-start rounded-full bg-panel px-6 text-sm font-semibold text-ink"
+      >
+        Settimane passate
+      </Link>
 
       <button
         type="button"
