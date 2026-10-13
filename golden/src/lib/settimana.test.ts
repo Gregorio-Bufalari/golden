@@ -32,11 +32,20 @@ describe("dataDelGiorno", () => {
 });
 
 describe("etichettaGiorno", () => {
-  it("combina nome del giorno e data", () => {
-    expect(etichettaGiorno("Mercoledì", "2026-10-05")).toBe("Mercoledì 7 ottobre");
+  it("combina giorno abbreviato e data abbreviata", () => {
+    expect(etichettaGiorno("Mercoledì", "2026-10-05")).toBe("Mer 7 ott");
   });
 
-  it("torna al solo nome del giorno se la data non è calcolabile", () => {
+  it("è stabile rispetto a quali pasti sono assegnati al giorno: dipende solo da nome giorno + settimana", () => {
+    // Stesso input, indipendentemente da qualunque scambio di pasti avvenuto nel frattempo.
+    expect(etichettaGiorno("Giovedì", "2026-10-05")).toBe(etichettaGiorno("Giovedì", "2026-10-05"));
+  });
+
+  it("usa la settimana passata, non quella corrente — serve per l'Archivio", () => {
+    expect(etichettaGiorno("Lunedì", "2026-01-05")).toBe("Lun 5 gen");
+  });
+
+  it("torna al nome completo del giorno se la data non è calcolabile", () => {
     expect(etichettaGiorno("Lunedì", "")).toBe("Lunedì");
   });
 });

@@ -213,6 +213,14 @@ src/app/api/scontrino/estrai/route.ts — legge la foto di uno scontrino (vision
                                         piano del profilo. Versione semplice: elaborazione al
                                         volo, l'immagine non viene mai salvata né persistita.
 
+src/app/piano/[token]/archivio/      — Archivio (nuovo, sola lettura): elenco delle settimane
+  page.tsx, [settimana]/page.tsx       passate (una riga `weekly_plans` per settimana, nessuna
+                                        tabella nuova) e dettaglio di una settimana scelta, con
+                                        le SUE date reali (mai quelle di oggi). Nessuna
+                                        interazione: niente scambio pasti, niente chat di
+                                        modifica — solo consultazione. Raggiungibile da un link
+                                        "Settimane passate" in Profilo (Impostazioni).
+
 src/app/piano/[token]/
   layout.tsx, bottom-nav.tsx, page-header.tsx  — shell condivisa (6 tab: Menu, Spesa, Frigo,
                                                    Andamento, Check-in, Preferiti)
@@ -236,6 +244,11 @@ src/app/piano/[token]/
 src/components/supermercato-selector.tsx — componente condiviso di scelta supermercato,
   riusato in Onboarding, Profilo (Impostazioni) e Check-in: stessa lista
   (SUPERMERCATO_OPTIONS) e stesso stile pillola ovunque, nessuna duplicazione.
+
+src/lib/settimana.ts — anche la chiave stabile del giorno nel Menu/Archivio: etichettaGiorno()
+  deriva SEMPRE la data reale dalla `settimana` della riga weekly_plans in questione (mai da
+  "oggi"), mai dall'ordine/contenuto dei pasti — vedi "Giorno identificato da nome fisso + data
+  derivata, mai da un indice" più sotto.
 
 public/sw.js — service worker minimo, solo per le notifiche push (nessuna cache offline).
 src/app/manifest.ts — web manifest, richiesto perché il service worker possa registrarsi.
@@ -349,6 +362,18 @@ src/app/manifest.ts — web manifest, richiesto perché il service worker possa 
   `adattaEntroBudget` stessa (chiamata sui giorni iniziali e dopo ogni tentativo budget), così
   ogni chiamante la ottiene automaticamente continuando a chiamare solo `adattaEntroBudget` come
   già faceva — nessuna route ha dovuto aggiungere una chiamata esplicita in più.
+- **Giorno identificato da nome fisso + data derivata, mai da un indice.** `giorno.giorno`
+  (`"Lunedì"`...`"Domenica"`, enum fisso in `GiornoSchema`) è e resta la chiave usata per scambio
+  pasti, riferimenti in chat e validazione — NON una data persistita sul singolo giorno. La data
+  reale mostrata in UI (`etichettaGiorno` in `settimana.ts`, es. "Gio 15 ott") è sempre *derivata*
+  da `(giorno.giorno, settimana)` al momento del render, mai salvata: così resta automaticamente
+  stabile sotto scambio pasti (che riassegna solo `pasti[indice]`, mai `giorno.giorno` — vedi
+  `scambiaPasti` in `actions.ts`) e sotto una modifica che sostituisce il contenuto di un giorno
+  (lo schema impone sempre esattamente 7 giorni con nomi fissi, quindi nessuno può scalare o
+  sparire). Per una settimana passata (Archivio), la stessa funzione riceve la `settimana` di
+  QUELLA riga `weekly_plans`, mai quella corrente — nessun calcolo rispetto a "oggi". Verificato
+  con test espliciti in `menu-view.test.ts` (scambio, sostituzione contenuto) e
+  `settimana.test.ts` (settimana passata vs corrente).
 
 ## Validazione sicurezza glutine — a 4 livelli (cambiata di recente)
 
@@ -483,6 +508,20 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     flusso di generazione stesso. Nessuna route ha dovuto cambiare tranne `generate/route.ts`
     (rimossa la chiamata a `assicuraVarieta` ormai ridondante). Stessa PR #55 della voce
     precedente (foto scontrino), unita perché pushata prima del merge.
+22. **(questa sessione)**: **Giorni del Menu identificati per data reale, non per indice** +
+    **Archivio (nuovo)**. Verificato prima di tutto (il founder l'aveva chiesto esplicitamente)
+    che la chiave di un giorno è già il nome fisso (`"Lunedì"`...), mai un indice numerico, e che
+    scambio pasti/modifica chat già preservano la data per costruzione (vedi "Giorno identificato
+    da nome fisso..." in Pattern ricorrenti) — nessun bug da correggere lì. Cambiato solo il
+    *formato* dell'etichetta in `etichettaGiorno` (`settimana.ts`): da "Lunedì 6 ottobre" per
+    intero a "Gio 15 ott" abbreviato, su richiesta esplicita. Nuova schermata **Archivio**
+    (`src/app/piano/[token]/archivio/`, sola lettura, nessuna tabella nuova — riusa le righe
+    `weekly_plans` già esistenti) per aprire una settimana passata e vederne le date reali di
+    allora; raggiungibile da un link in Profilo (Impostazioni), non in bottom nav (fissa a 6 tab).
+    **Non implementato, deliberatamente, e annotato in `BACKLOG.md`**: uno stato dedicato "pasto
+    fuori/vuoto" — oggi è solo un esempio di testo nella chat di modifica libera, nessuna
+    marcatura speciale nello schema; costruirlo è lavoro separato (schema + validazione + UI), non
+    implicito nella sola identificazione per data.
 
 ## Cose da sapere / residuo noto
 

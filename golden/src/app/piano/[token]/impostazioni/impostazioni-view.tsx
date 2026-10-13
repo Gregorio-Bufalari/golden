@@ -22,5 +22,5 @@ export function ImpostazioniView({ token, profile }: { token: string; profile: P
     );
   }
 
-  return <RiepilogoProfilo profile={datiProfilo} onModifica={() => setModalita("modifica")} />;
+  return <RiepilogoProfilo token={token} profile={datiProfilo} onModifica={() => setModalita("modifica")} />;
 }
