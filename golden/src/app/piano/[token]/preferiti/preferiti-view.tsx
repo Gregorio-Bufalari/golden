@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { rimuoviPreferito } from "../preferiti-actions";
 import { HeartIcon } from "@/components/heart-icon";
+import { CITAZIONE_CREA } from "@/lib/nutrizione-crea";
 
 type Ingrediente = { nome: string; quantita: number; unita: string; reparto: string; prezzo_stimato_eur: number };
 type Nutrizione = { calorie: number; proteine_g: number; carboidrati_g: number; grassi_g: number; fibre_g: number };
@@ -13,6 +14,7 @@ export type Preferito = {
   ingredienti: Ingrediente[];
   tempo_preparazione_min: number | null;
   nutrizione: Nutrizione | null;
+  fonte_nutrizione?: "crea_inran" | "stima_ai" | null;
   preparazione: string[] | null;
 };
 
@@ -79,13 +81,18 @@ export function PreferitiView({ token, initialPreferiti }: { token: string; init
                   {p.ingredienti.map((ing) => ing.nome).join(", ")}
                 </p>
                 {p.nutrizione && (
-                  <div className="mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[13px] text-ink/75">
-                    <span>{p.nutrizione.calorie} kcal</span>
-                    <span>{p.nutrizione.proteine_g}g proteine</span>
-                    <span>{p.nutrizione.carboidrati_g}g carboidrati</span>
-                    <span>{p.nutrizione.grassi_g}g grassi</span>
-                    <span>{p.nutrizione.fibre_g}g fibre</span>
-                  </div>
+                  <>
+                    <div className="mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[13px] text-ink/75">
+                      <span>{p.nutrizione.calorie} kcal</span>
+                      <span>{p.nutrizione.proteine_g}g proteine</span>
+                      <span>{p.nutrizione.carboidrati_g}g carboidrati</span>
+                      <span>{p.nutrizione.grassi_g}g grassi</span>
+                      <span>{p.nutrizione.fibre_g}g fibre</span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-ink/45">
+                      {p.fonte_nutrizione === "crea_inran" ? CITAZIONE_CREA : "Stima AI"}
+                    </p>
+                  </>
                 )}
                 {haPreparazione && (
                   <span className="mt-2 flex items-center gap-1 font-sans text-xs font-medium text-accent">

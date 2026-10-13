@@ -6,6 +6,7 @@ import { PageHeader } from "../page-header";
 import { setModalita, scambiaPasti } from "../actions";
 import { aggiungiPreferito, rimuoviPreferito } from "../preferiti-actions";
 import { etichettaGiorno } from "@/lib/settimana";
+import { CITAZIONE_CREA } from "@/lib/nutrizione-crea";
 import { conflittiDopoScambio, suggerisciGiornoAlternativo } from "@/lib/varieta-giorno";
 import { formattaQuantita } from "@/lib/quantita";
 import { Spinner } from "@/components/spinner";
@@ -45,6 +46,7 @@ type Pasto = {
   verificare?: boolean;
   ingredienti_a_rischio?: string[];
   ingredienti_non_adatti?: string[];
+  fonte_nutrizione?: "crea_inran" | "stima_ai";
 };
 
 type Giorno = {
@@ -722,6 +724,9 @@ export function MenuView({
                                   <span>{pasto.nutrizione.grassi_g}g grassi</span>
                                   <span>{pasto.nutrizione.fibre_g}g fibre</span>
                                 </div>
+                                <p className="mt-1 text-[11px] text-ink/45">
+                                  {pasto.fonte_nutrizione === "crea_inran" ? CITAZIONE_CREA : "Stima AI"}
+                                </p>
                                 {haPreparazione && (
                                   <span className="mt-2 flex items-center gap-1 font-sans text-xs font-medium text-accent">
                                     Preparazione

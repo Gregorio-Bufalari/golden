@@ -22,7 +22,7 @@ export default async function PreferitiPage({
 
   const { data: preferiti } = await supabase
     .from("preferiti")
-    .select("nome, tipo, ingredienti, tempo_preparazione_min, nutrizione, preparazione")
+    .select("nome, tipo, ingredienti, tempo_preparazione_min, nutrizione, fonte_nutrizione, preparazione")
     .eq("profile_id", profile.id)
     .order("created_at", { ascending: false });
 

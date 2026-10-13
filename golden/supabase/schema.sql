@@ -130,6 +130,11 @@ create table if not exists preferiti (
   tempo_preparazione_min integer,
   nutrizione jsonb,
   preparazione jsonb,
+  -- Fonte del valore in `nutrizione` al momento del salvataggio ('crea_inran'
+  -- o 'stima_ai', vedi src/lib/nutrizione-crea.ts) — null per i preferiti
+  -- salvati prima che questa distinzione esistesse (trattati come stima AI
+  -- in UI, mai dato per scontato che fossero CREA/INRAN).
+  fonte_nutrizione text check (fonte_nutrizione in ('crea_inran', 'stima_ai')),
   created_at timestamptz not null default now(),
   -- Ultima volta che questo Preferito è stato incluso in un piano Scoperta
   -- (vedi src/lib/preferiti-scoperta.ts) — null se non è mai stato
