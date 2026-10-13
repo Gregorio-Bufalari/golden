@@ -157,6 +157,56 @@ describe("validaGiorni — controllo glutine con rigenerazione simulata dall'AI"
   });
 });
 
+describe("validaGiorni — fonte_nutrizione (CREA/INRAN vs stima AI)", () => {
+  it("usa il dato CREA/INRAN quando tutti gli ingredienti del pasto sono coperti", async () => {
+    const giorni = [
+      {
+        giorno: "Lunedì" as const,
+        pasti: [
+          pasto({
+            tipo: "pranzo",
+            nome: "Pollo e riso",
+            ingredienti: [
+              ingrediente({ nome: "Petto di pollo", quantita: 200, unita: "g" }),
+              ingrediente({ nome: "Riso", quantita: 100, unita: "g" }),
+            ],
+          }),
+          pasto({ tipo: "cena", nome: "Pasto 2", ingredienti: [ingrediente({ nome: "Pomodoro", quantita: 100, unita: "g" })] }),
+        ],
+      },
+    ];
+
+    const risultato = await validaGiorni(profiloSenzaRestrizioni, giorni);
+
+    expect(risultato[0].pasti[0].fonte_nutrizione).toBe("crea_inran");
+    expect(risultato[0].pasti[0].nutrizione.calorie).toBe(534); // 200g pollo + 100g riso
+  });
+
+  it("resta stima AI quando anche un solo ingrediente del pasto non è in tabella", async () => {
+    const giorni = [
+      {
+        giorno: "Lunedì" as const,
+        pasti: [
+          pasto({
+            tipo: "pranzo",
+            nome: "Pollo misterioso",
+            nutrizione: { calorie: 777, proteine_g: 1, carboidrati_g: 1, grassi_g: 1, fibre_g: 1 },
+            ingredienti: [
+              ingrediente({ nome: "Petto di pollo", quantita: 200, unita: "g" }),
+              ingrediente({ nome: "Ingrediente generico", quantita: 10, unita: "g" }),
+            ],
+          }),
+        ],
+      },
+    ];
+
+    const risultato = await validaGiorni(profiloSenzaRestrizioni, giorni);
+
+    expect(risultato[0].pasti[0].fonte_nutrizione).toBe("stima_ai");
+    expect(risultato[0].pasti[0].nutrizione.calorie).toBe(777); // invariata, non mischiata con CREA
+  });
+});
+
 describe("assicuraVarieta — niente due pasti con lo stesso nome nella settimana", () => {
   it("non chiama mai l'AI se i 14 pasti sono già tutti distinti", async () => {
     const giorni = await validaGiorni(profiloSenzaRestrizioni, creaPianoEsempio());

@@ -2,6 +2,7 @@ import "server-only";
 import { regeneratePasto, adattaBudget, type Pasto, type Giorno, type ProfiloPerPiano } from "./claude";
 import { ingredientiNonAdatti, ingredientiDaVerificare } from "./glutine-check";
 import { buildGroceryList, type GroceryList, type ConsumoDispensa } from "./grocery";
+import { calcolaNutrizionePasto, type FonteNutrizione } from "./nutrizione-crea";
 
 const MAX_RIGENERAZIONI = 2;
 const MAX_TENTATIVI_BUDGET = 2;
@@ -13,6 +14,12 @@ export type PastoValidato = Pasto & {
   // tentativi di rigenerazione (vs. solo "da verificare" in etichetta):
   // distingue in UI un blocco reale da un controllo preventivo.
   ingredienti_non_adatti?: string[];
+  // Fonte del valore nutrizionale di questo pasto — vedi applicaFonteNutrizione.
+  // Opzionale come gli altri campi qui sopra: lo splice di un Preferito
+  // (preferiti-scoperta.ts) costruisce un GiornoValidato intermedio prima
+  // di ripassare da validaGiorni, che è l'unico punto che lo valorizza
+  // davvero prima che arrivi in UI.
+  fonte_nutrizione?: FonteNutrizione;
 };
 
 export type GiornoValidato = {
@@ -85,7 +92,24 @@ export async function validaGiorni(
     }
   }
 
+  applicaFonteNutrizione(pasti);
   return giorni.map((g, gi) => ({ giorno: g.giorno, pasti: pasti[gi] }));
+}
+
+// Determina se il valore nutrizionale di ogni pasto viene dal dato
+// CREA/INRAN (tutti gli ingredienti coperti dalla tabella statica, mai
+// mischiato con la stima AI nello stesso piatto) o resta la stima
+// originale dell'AI — vedi nutrizione-crea.ts. Applicato qui, in coda a
+// validaGiorni (chiamato da ogni punto che tocca il piano), non in un
+// passaggio separato: stesso principio già scelto per assicuraVarieta
+// dentro adattaEntroBudget, per non dover ricordare di richiamarlo altrove.
+function applicaFonteNutrizione(pasti: PastoValidato[][]): void {
+  for (let gi = 0; gi < pasti.length; gi++) {
+    for (let pi = 0; pi < pasti[gi].length; pi++) {
+      const { nutrizione, fonte } = calcolaNutrizionePasto(pasti[gi][pi].ingredienti, pasti[gi][pi].nutrizione);
+      pasti[gi][pi] = { ...pasti[gi][pi], nutrizione, fonte_nutrizione: fonte };
+    }
+  }
 }
 
 const MAX_RIGENERAZIONI_VARIETA = 2;

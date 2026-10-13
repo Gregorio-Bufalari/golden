@@ -25,6 +25,7 @@ export type PastoPerPreferito = {
   tempo_preparazione_min: number;
   nutrizione: NutrizionePreferito;
   preparazione?: string[];
+  fonte_nutrizione?: "crea_inran" | "stima_ai";
 };
 
 /**
@@ -57,6 +58,7 @@ export async function aggiungiPreferito(
       ingredienti: pasto.ingredienti,
       tempo_preparazione_min: pasto.tempo_preparazione_min,
       nutrizione: pasto.nutrizione,
+      fonte_nutrizione: pasto.fonte_nutrizione || null,
       preparazione: pasto.preparazione || null,
     },
     { onConflict: "profile_id,nome", ignoreDuplicates: true },

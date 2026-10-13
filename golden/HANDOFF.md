@@ -148,8 +148,9 @@ src/lib/claude.ts            — tutte le chiamate AI (generateMealPlan, modific
                                 il commento sopra componiIstruzioni per la mappa completa.
 src/lib/piano-validazione.ts — pipeline di validazione POST-generazione, nessuna chiamata AI
                                 fuori da qui per la sicurezza: validaGiorni (controllo glutine
-                                a 4 livelli), assicuraVarieta (niente piatti duplicati nella
-                                settimana), adattaEntroBudget (retry budget — chiama SEMPRE
+                                a 4 livelli, e in coda fonte_nutrizione per ogni pasto — vedi
+                                nutrizione-crea.ts), assicuraVarieta (niente piatti duplicati
+                                nella settimana), adattaEntroBudget (retry budget — chiama SEMPRE
                                 assicuraVarieta anche internamente, sui giorni iniziali e dopo
                                 ogni tentativo, così qualunque chiamante la ottiene gratis)
 src/lib/glutine-check.ts     — classificazione statica per ingrediente a 4 categorie (vedi sotto)
@@ -163,6 +164,13 @@ src/lib/settimana.ts         — data reale di un giorno della settimana, solo p
 src/lib/quantita.ts          — formattazione quantità per porzione, scalata su household_size
 src/lib/scadenza-frigo.ts    — data di scadenza stimata per voce del Frigo (euristica per
                                 categoria ingrediente) + giorni mancanti, per il banner
+src/lib/nutrizione-crea.ts   — tabella statica valori CREA/INRAN (per 100g) + calcolaNutrizionePasto:
+                                sostituisce la stima AI col dato ufficiale quando TUTTI gli
+                                ingredienti del pasto sono coperti ed espressi in g/kg, mai
+                                mischiato nello stesso piatto. Applicato da piano-validazione.ts
+                                (applicaFonteNutrizione, in coda a validaGiorni), non un passaggio
+                                a parte — vedi "Nutrizione: CREA/INRAN quando copre tutto il
+                                piatto..." in Pattern ricorrenti.
 src/lib/calibrazione-prezzi.ts — "learning loop" prezzi: fattore correttivo derivato dai
                                 check-in passati (spesa_reale vs budget_stimato) PER
                                 SUPERMERCATO, applicato sopra la fascia statica in grocery.ts.
@@ -374,6 +382,26 @@ src/app/manifest.ts — web manifest, richiesto perché il service worker possa 
   QUELLA riga `weekly_plans`, mai quella corrente — nessun calcolo rispetto a "oggi". Verificato
   con test espliciti in `menu-view.test.ts` (scambio, sostituzione contenuto) e
   `settimana.test.ts` (settimana passata vs corrente).
+- **Nutrizione: CREA/INRAN quando copre TUTTO il piatto, mai mischiata con la stima AI.**
+  `nutrizione-crea.ts` ha una tabella statica (fornita dal founder, nessuna chiamata esterna) di
+  valori ufficiali per 100g. `calcolaNutrizionePasto` — chiamata da `applicaFonteNutrizione` in
+  coda a `validaGiorni`, stesso principio di centralizzazione di `assicuraVarieta` — sostituisce
+  `pasto.nutrizione` col dato CREA scalato sulla quantità reale SOLO se ogni ingrediente del
+  piatto è sia coperto dalla tabella sia espresso in g/kg (ml/l/pz/confezione non sono
+  convertibili senza una densità non fornita); altrimenti l'intero piatto resta la stima AI
+  originale, mai un mix dei due. Il match sul nome ingrediente è per **parola intera**, non per
+  sottostringa (`cercaValoriCrea`): "fagioli" non deve combaciare con "fagiolini", "mela" non con
+  "melanzana" — un rischio concreto con la sottostringa, visto che `"fagiolini".includes("fagioli")
+  === true`. Alcune voci hanno anche `esclusioni` (es. "latte di mandorla"/"yogurt greco"/"patate
+  dolci"/"burro di arachidi") per non attribuire il profilo nutrizionale di un prodotto animale/
+  base a una variante vegetale o a un prodotto diverso che condivide la stessa parola generica.
+  L'Aglio è volutamente escluso dalla tabella (valore trovato non attendibile, richiesta esplicita
+  del founder) — resta sempre stima AI. In UI, la fonte è mostrata ESPLICITAMENTE accanto ai
+  valori di ogni piatto (Menu, Archivio, Preferiti), mai solo in un disclaimer generale: etichetta
+  "Fonte: CREA/INRAN - Centro di ricerca Alimenti e Nutrizione" (citazione obbligatoria, non
+  facoltativa — `CITAZIONE_CREA`) o "Stima AI". I Preferiti salvano una propria colonna
+  `fonte_nutrizione` nello snapshot (nuova migration) — indipendente dal piano live, che la
+  ricalcola sempre fresca ogni volta che passa da `validaGiorni`.
 
 ## Validazione sicurezza glutine — a 4 livelli (cambiata di recente)
 
@@ -522,6 +550,19 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     fuori/vuoto" — oggi è solo un esempio di testo nella chat di modifica libera, nessuna
     marcatura speciale nello schema; costruirlo è lavoro separato (schema + validazione + UI), non
     implicito nella sola identificazione per data.
+23. **(questa sessione)**: **Nutrizione: fonte CREA/INRAN vs stima AI**. Nuova tabella statica
+    `nutrizione-crea.ts` (30 alimenti, valori ufficiali per 100g forniti dal founder) e
+    `calcolaNutrizionePasto`, applicata da `applicaFonteNutrizione` in coda a `validaGiorni` (ogni
+    punto che tocca il piano la eredita gratis, stesso principio di `assicuraVarieta`): un piatto
+    usa il dato CREA SOLO se ogni ingrediente è coperto ed espresso in g/kg, altrimenti resta
+    stima AI, mai mischiate. Match per parola intera con `esclusioni` mirate (vedi Pattern
+    ricorrenti) per evitare falsi positivi (fagiolini/fagioli, mela/melanzana, latte vegetale/
+    latte vaccino, ecc.). UI: etichetta "Fonte: CREA/INRAN - Centro di ricerca Alimenti e
+    Nutrizione" o "Stima AI" accanto a ogni piatto in Menu, Archivio e Preferiti (non solo un
+    disclaimer generale). Nuova colonna `preferiti.fonte_nutrizione` (migration
+    `2026-10-13_add_fonte_nutrizione_preferiti.sql`, **da eseguire a mano sul Supabase di
+    produzione**) per lo snapshot dei Preferiti. Nessuna modifica alla generazione del piano né
+    alla validazione glutine.
 
 ## Cose da sapere / residuo noto
 

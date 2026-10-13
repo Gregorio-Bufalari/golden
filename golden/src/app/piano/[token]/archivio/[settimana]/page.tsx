@@ -1,7 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PageHeader } from "../../page-header";
 import { etichettaGiorno } from "@/lib/settimana";
-import type { Giorno } from "@/lib/claude";
+import { CITAZIONE_CREA } from "@/lib/nutrizione-crea";
+import type { GiornoValidato } from "@/lib/piano-validazione";
 
 // Dettaglio di sola lettura di una settimana passata: stesse date reali di
 // allora (derivate da QUESTA `settimana`, mai da oggi — vedi settimana.ts),
@@ -39,7 +40,7 @@ export default async function ArchivioSettimanaPage({
     .limit(1)
     .maybeSingle();
 
-  const giorni = piano?.meal_plan?.giorni as Giorno[] | undefined;
+  const giorni = piano?.meal_plan?.giorni as GiornoValidato[] | undefined;
 
   return (
     <div className="flex flex-1 flex-col">
@@ -68,6 +69,9 @@ export default async function ArchivioSettimanaPage({
                         {pasto.ingredienti.map((ing) => ing.nome).join(", ")}
                       </p>
                       <div className="mt-2 font-mono text-[13px] text-ink/75">{pasto.nutrizione.calorie} kcal</div>
+                      <p className="mt-1 text-[11px] text-ink/45">
+                        {pasto.fonte_nutrizione === "crea_inran" ? CITAZIONE_CREA : "Stima AI"}
+                      </p>
                     </div>
                   ))}
                 </div>
