@@ -1,12 +1,11 @@
 // Stima una data di scadenza per una voce del Frigo, a partire dalla
-// stessa classificazione di conservazione già usata per il pallino
-// colorato e il testo descrittivo (conservazione.ts). Solo fresco e
-// frigo_aperto hanno un limite "a breve" sensato (giorni, non mesi): per
-// surgelati, dispensa secca o ingredienti non riconosciuti non si calcola
-// nessuna scadenza, coerente col fatto che durano mesi (vedi
-// coloreScadenza, che li tratta già come "verde").
+// stessa classificazione di conservazione già usata per il testo
+// descrittivo (conservazione.ts). Solo fresco e frigo_aperto hanno un
+// limite "a breve" sensato (giorni, non mesi): per surgelati, dispensa
+// secca o ingredienti non riconosciuti non si calcola nessuna scadenza,
+// coerente col fatto che durano mesi.
 
-import { categoriaConservazione, type Categoria } from "./conservazione";
+import { categoriaConservazione, type Categoria, type ColoreScadenza } from "./conservazione";
 
 // Limite superiore della fascia già mostrata in TESTO_PER_CATEGORIA
 // (es. "fresco: consuma entro 2-4 giorni" -> stima sui 4 giorni): è una
@@ -44,4 +43,24 @@ export function giorniAllaScadenza(scadenza: Date, oggi: Date = new Date()): num
   const mezzanotteScadenza = new Date(scadenza.getFullYear(), scadenza.getMonth(), scadenza.getDate());
   const msAlGiorno = 1000 * 60 * 60 * 24;
   return Math.round((mezzanotteScadenza.getTime() - mezzanotteOggi.getTime()) / msAlGiorno);
+}
+
+// Sotto questa soglia il pallino è rosso (urgente), sotto l'altra arancione
+// (in avvicinamento) — oltre resta verde. Valori assoluti di giorni, non
+// relativi alla fascia di conservazione: così lo stesso ingrediente passa
+// da verde ad arancione a rosso avvicinandosi DAVVERO alla scadenza,
+// invece di restare fisso allo stesso colore dal giorno dell'acquisto.
+const SOGLIA_ROSSO_GIORNI = 1;
+const SOGLIA_ARANCIONE_GIORNI = 3;
+
+/**
+ * Colore del pallino per il Frigo, in base ai giorni REALI rimanenti alla
+ * scadenza stimata (null se la categoria non ne ha una "a breve"
+ * tracciabile, es. surgelato/dispensa — resta verde, dura comunque mesi).
+ */
+export function coloreUrgenza(giorni: number | null): ColoreScadenza {
+  if (giorni === null) return "verde";
+  if (giorni <= SOGLIA_ROSSO_GIORNI) return "rosso";
+  if (giorni <= SOGLIA_ARANCIONE_GIORNI) return "arancione";
+  return "verde";
 }

@@ -163,7 +163,9 @@ src/lib/varieta-giorno.ts    — controllo leggero post-scambio pasti (stesso in
 src/lib/settimana.ts         — data reale di un giorno della settimana, solo per display
 src/lib/quantita.ts          — formattazione quantità per porzione, scalata su household_size
 src/lib/scadenza-frigo.ts    — data di scadenza stimata per voce del Frigo (euristica per
-                                categoria ingrediente) + giorni mancanti, per il banner
+                                categoria ingrediente) + giorni mancanti, per il banner.
+                                coloreUrgenza(giorni) decide il colore del pallino dai giorni
+                                REALI rimanenti (non più dalla sola categoria, vedi conservazione.ts)
 src/lib/nutrizione-crea.ts   — tabella statica valori CREA/INRAN (per 100g) + calcolaNutrizionePasto:
                                 sostituisce la stima AI col dato ufficiale quando TUTTI gli
                                 ingredienti del pasto sono coperti ed espressi in g/kg, mai
@@ -563,6 +565,27 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     `2026-10-13_add_fonte_nutrizione_preferiti.sql`, **da eseguire a mano sul Supabase di
     produzione**) per lo snapshot dei Preferiti. Nessuna modifica alla generazione del piano né
     alla validazione glutine.
+24. **(questa sessione)**: **Pass di verifica su 28 comportamenti già costruiti** (non nuove
+    feature) — testati uno a uno, due bug reali trovati e corretti:
+    - **Onboarding**: solo lo step 0 (nome+restrizioni) bloccava "Avanti" se mancante; i passi
+      "quante persone", "obiettivo" e "tempo per cucinare" si potevano saltare del tutto,
+      salvando valori di fallback in silenzio. Aggiunta validazione anche lì (`onboarding/page.tsx`,
+      `canAdvance`). Budget, supermercato e dati biometrici restano senza validazione, come
+      dichiarato esplicitamente nel loro stesso testo in UI ("opzionale"/"indicativo"/"facoltativo").
+    - **Pallino colorato urgenza Frigo**: era statico per categoria (`coloreScadenza`, rimossa) —
+      un fresco mostrava sempre rosso dal giorno dell'acquisto alla scadenza, mai arancione/verde
+      nel mentre. Sostituito con `coloreUrgenza(giorni)` in `scadenza-frigo.ts`, che usa i giorni
+      REALI rimanenti (rosso ≤1, arancione ≤3, verde oltre o non tracciabile).
+    Tutti gli altri 26 punti erano già corretti (verificati via codice + test automatici
+    esistenti/nuovi, nessuna modifica necessaria). **Non verificabile dal vivo in questa sessione**:
+    la chiave `ANTHROPIC_API_KEY` in uso ha credito esaurito ("credit balance too low") — nessuno
+    smoke test reale è girato, quindi i comportamenti che dipendono dalla qualità di una
+    generazione AI vera (obiettivi nutrizionali rispettati, batch cooking, scenari budget
+    davvero diversi, memoria conversazionale multi-turno, OCR scontrino) sono confermati solo a
+    livello di logica/prompt/test con risposte mockate, non con una chiamata reale. **Se la stessa
+    chiave è usata in produzione, l'app probabilmente non riesce a generare né modificare piani
+    in questo momento** — verificare il credito su console.anthropic.com prima di qualunque altra
+    indagine se un utente segnala che "genera piano" non funziona.
 
 ## Cose da sapere / residuo noto
 
