@@ -586,6 +586,25 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     chiave è usata in produzione, l'app probabilmente non riesce a generare né modificare piani
     in questo momento** — verificare il credito su console.anthropic.com prima di qualunque altra
     indagine se un utente segnala che "genera piano" non funziona.
+25. **(questa sessione)**: **follow-up con chiave ricaricata** — i punti lasciati "non
+    verificabili" sopra sono stati ritestati dal vivo (budget ridotto, ~4 euro), riusando gli
+    stessi output tra più controlli invece di una generazione per singolo test (vedi riepilogo
+    dato in chat per i dettagli numerici). Esito: **obiettivi nutrizionali per pasto** rispettati
+    senza violare restrizioni, **batch cooking** confermato (ingredienti condivisi tra più piatti),
+    **scenari budget** davvero diversi tra loro (overlap minimo), **memoria conversazionale** con
+    riferimento implicito confermata su un test mirato pulito (stesso incremento applicato
+    coerentemente a un giorno diverso), **OCR scontrino** (su uno scontrino finto ma plausibile,
+    generato con Playwright, contenente articoli reali dalla lista della spesa) corretto al 100%:
+    totale esatto, matching semantico anche con nomi abbreviati/diversi, articoli non presenti
+    segnalati come tali, articoli extra isolati senza abbinamenti forzati. **Due comportamenti
+    reali diversi dalle attese**, annotati in `BACKLOG.md` e lasciati così su richiesta esplicita
+    del founder (non corretti): "giovedì mangio fuori" viene **rifiutato** da `modificaPiano`
+    (`modificaApplicata: false`, nessun pasto rimosso) invece di sparire dal piano; "ho già
+    comprato [ingrediente]" risponde `modificaApplicata: true` ma l'ingrediente resta comunque
+    nella lista della spesa ricostruita. **Non verificabile neanche stavolta**: l'aggiornamento
+    vero della calibrazione prezzi dopo un check-in (richiede scrivere/leggere `checkins` su
+    Supabase, irraggiungibile da questo sandbox) e la persistenza degli scenari budget dopo un
+    cambio tab nel browser reale (nessun fix del genere trovato nel codice).
 
 ## Cose da sapere / residuo noto
 
