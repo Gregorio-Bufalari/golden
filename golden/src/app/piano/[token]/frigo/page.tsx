@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { conservazioneTipica, gruppoAcquisto, coloreScadenza, type ColoreScadenza } from "@/lib/conservazione";
-import { dataScadenzaStimata, giorniAllaScadenza } from "@/lib/scadenza-frigo";
+import { conservazioneTipica, gruppoAcquisto, type ColoreScadenza } from "@/lib/conservazione";
+import { dataScadenzaStimata, giorniAllaScadenza, coloreUrgenza } from "@/lib/scadenza-frigo";
 import { ingredientiInScadenzaDomani } from "@/lib/notifiche-scadenza";
 import { formattaQuantita } from "@/lib/quantita";
 import { formattaData } from "@/lib/settimana";
@@ -35,7 +35,7 @@ function Sezione({ titolo, righe }: { titolo: string; righe: Rimanenza[] }) {
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span
-                  className={`h-[7px] w-[7px] shrink-0 rounded-full ${DOT_PER_COLORE[coloreScadenza(r.ingrediente)]}`}
+                  className={`h-[7px] w-[7px] shrink-0 rounded-full ${DOT_PER_COLORE[coloreUrgenza(r.giorni)]}`}
                   aria-hidden="true"
                 />
                 <span className="text-[15px] text-ink">{r.ingrediente}</span>

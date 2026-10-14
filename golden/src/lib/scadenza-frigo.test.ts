@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { dataScadenzaStimata, giorniAllaScadenza } from "./scadenza-frigo";
+import { dataScadenzaStimata, giorniAllaScadenza, coloreUrgenza } from "./scadenza-frigo";
 
 describe("dataScadenzaStimata", () => {
   it("stima 4 giorni per un ingrediente fresco", () => {
@@ -56,5 +56,37 @@ describe("giorniAllaScadenza", () => {
     const oggi = new Date(2026, 9, 5, 23, 59);
     const scadenza = new Date(2026, 9, 6, 0, 1);
     expect(giorniAllaScadenza(scadenza, oggi)).toBe(1);
+  });
+});
+
+describe("coloreUrgenza", () => {
+  it("verde quando non c'è una scadenza a breve tracciabile (surgelato/dispensa)", () => {
+    expect(coloreUrgenza(null)).toBe("verde");
+  });
+
+  it("rosso se scade oggi o domani", () => {
+    expect(coloreUrgenza(0)).toBe("rosso");
+    expect(coloreUrgenza(1)).toBe("rosso");
+  });
+
+  it("rosso anche se già scaduto", () => {
+    expect(coloreUrgenza(-2)).toBe("rosso");
+  });
+
+  it("arancione se mancano 2-3 giorni", () => {
+    expect(coloreUrgenza(2)).toBe("arancione");
+    expect(coloreUrgenza(3)).toBe("arancione");
+  });
+
+  it("verde se mancano più di 3 giorni", () => {
+    expect(coloreUrgenza(4)).toBe("verde");
+  });
+
+  it("cambia colore avvicinandosi alla scadenza dello stesso ingrediente, non resta fisso", () => {
+    // Stesso ingrediente (es. un fresco con 4 giorni di margine): il colore
+    // deve scalare verso il rosso man mano che i giorni rimanenti calano,
+    // non restare identico dal giorno dell'acquisto alla scadenza.
+    const sequenza = [4, 3, 2, 1, 0].map(coloreUrgenza);
+    expect(sequenza).toEqual(["verde", "arancione", "arancione", "rosso", "rosso"]);
   });
 });

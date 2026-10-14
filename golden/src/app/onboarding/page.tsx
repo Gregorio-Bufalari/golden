@@ -78,6 +78,15 @@ export default function OnboardingPage() {
     switch (step) {
       case 0:
         return form.nome.trim().length > 0 && form.restrizioni.length > 0;
+      case 1:
+        return Number(form.household_size) > 0;
+      case 2:
+        return form.obiettivo.length > 0;
+      case 4:
+        return form.tempo_max_cucina !== null;
+      // Budget (5) e supermercato (6) sono esplicitamente indicati come
+      // opzionali/indicativi nel testo del passo, i dati biometrici (7)
+      // come facoltativi: nessuna validazione richiesta lì.
       default:
         return true;
     }
