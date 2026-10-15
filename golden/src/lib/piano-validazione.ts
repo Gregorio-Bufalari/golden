@@ -120,7 +120,7 @@ function chiaveNomePasto(nome: string): string {
 }
 
 /**
- * Controlla che i 14 pasti della settimana siano 14 ricette distinte
+ * Controlla che i pasti della settimana siano tutti ricette distinte
  * (nessuna ripetuta) e rigenera i doppioni, passando all'AI l'elenco dei
  * piatti già usati da evitare. Senza questo controllo deterministico,
  * un'istruzione come "obiettivo: ridurre gli sprechi" può spingere l'AI a

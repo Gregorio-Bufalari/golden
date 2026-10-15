@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { creaPianoEsempio, ingrediente, pasto } from "@/test/fixtures/piano-esempio";
-import type { ProfiloPerPiano, Pasto } from "@/lib/claude";
+import type { ProfiloPerPiano, Pasto, Giorno } from "@/lib/claude";
 import { validaGiorni, assicuraVarieta, adattaEntroBudget } from "./piano-validazione";
 
 // Mock dell'intero modulo claude.ts: questi test verificano che la pipeline
@@ -378,6 +378,40 @@ describe("assicuraVarieta — niente due pasti con lo stesso nome nella settiman
     const risultato = await assicuraVarieta(profiloSenzaRestrizioni, giorni);
 
     expect(risultato[1].pasti[0].nome).toBe("Pasta al pomodoro");
+  });
+
+  it("funziona anche con 3 pasti al giorno (colazione+pranzo+cena): rigenera un doppione di colazione", async () => {
+    const giorni: Giorno[] = [
+      {
+        giorno: "Lunedì",
+        pasti: [
+          pasto({ tipo: "colazione", nome: "Yogurt con frutta", ingredienti: [ingrediente({ nome: "Yogurt" })] }),
+          pasto({ tipo: "pranzo", nome: "Riso al pomodoro", ingredienti: [ingrediente({ nome: "Riso" })] }),
+          pasto({ tipo: "cena", nome: "Pollo alla griglia", ingredienti: [ingrediente({ nome: "Pollo" })] }),
+        ],
+      },
+      {
+        giorno: "Martedì",
+        // Stessa colazione di Lunedì: doppione da rigenerare.
+        pasti: [
+          pasto({ tipo: "colazione", nome: "Yogurt con frutta", ingredienti: [ingrediente({ nome: "Yogurt" })] }),
+          pasto({ tipo: "pranzo", nome: "Pasta al tonno", ingredienti: [ingrediente({ nome: "Pasta" })] }),
+          pasto({ tipo: "cena", nome: "Frittata", ingredienti: [ingrediente({ nome: "Uova" })] }),
+        ],
+      },
+    ];
+
+    const giorniValidati = await validaGiorni(profiloSenzaRestrizioni, giorni);
+
+    mockRegeneratePasto.mockResolvedValueOnce(
+      pasto({ tipo: "colazione", nome: "Pane e marmellata", ingredienti: [ingrediente({ nome: "Pane" })] }),
+    );
+
+    const risultato = await assicuraVarieta(profiloSenzaRestrizioni, giorniValidati);
+
+    expect(mockRegeneratePasto).toHaveBeenCalledTimes(1);
+    expect(risultato[0].pasti[0].nome).toBe("Yogurt con frutta");
+    expect(risultato[1].pasti[0].nome).toBe("Pane e marmellata");
   });
 });
 

@@ -42,6 +42,36 @@ describe("ingredientiPrincipaliRipetuti", () => {
     const pasti = [pasto([ing("pollo", "Carne e pesce")]), pasto([ing("Pollo", "Carne e pesce")])];
     expect(ingredientiPrincipaliRipetuti(pasti)).toEqual(["Pollo"]);
   });
+
+  it("con 3 pasti al giorno (colazione+pranzo+cena) segnala un principale ripetuto tra colazione e cena", () => {
+    // Bug reale corretto in questa feature: la versione precedente aveva
+    // `if (pasti.length !== 2) return [];`, quindi con 3 pasti al giorno
+    // (dopo l'aggiunta della colazione) questo controllo smetteva
+    // silenziosamente di funzionare per qualunque giorno.
+    const pasti = [
+      pasto([ing("Uova", "Latticini e uova")]),
+      pasto([ing("Pasta", "Pane e cereali")]),
+      pasto([ing("Uova", "Latticini e uova")]),
+    ];
+    expect(ingredientiPrincipaliRipetuti(pasti)).toEqual(["Uova"]);
+  });
+
+  it("con 3 pasti al giorno non segnala nulla se nessun principale si ripete", () => {
+    const pasti = [
+      pasto([ing("Yogurt", "Latticini e uova")]),
+      pasto([ing("Pollo", "Carne e pesce")]),
+      pasto([ing("Pesce", "Carne e pesce")]),
+    ];
+    expect(ingredientiPrincipaliRipetuti(pasti)).toEqual([]);
+  });
+
+  it("non conta due volte un principale usato più volte nello stesso pasto", () => {
+    const pasti = [
+      pasto([ing("Uova", "Latticini e uova"), ing("Uova", "Latticini e uova")]),
+      pasto([ing("Pasta", "Pane e cereali")]),
+    ];
+    expect(ingredientiPrincipaliRipetuti(pasti)).toEqual([]);
+  });
 });
 
 describe("conflittiDopoScambio", () => {
@@ -78,6 +108,31 @@ describe("conflittiDopoScambio", () => {
   it("restituisce array vuoto per giorni o indici inesistenti", () => {
     expect(conflittiDopoScambio(giorni, "Lunedì", 0, "Venerdì", 0)).toEqual([]);
     expect(conflittiDopoScambio(giorni, "Lunedì", 5, "Martedì", 0)).toEqual([]);
+  });
+
+  it("rileva un conflitto sullo scambio della colazione (indice 0 con 3 pasti al giorno)", () => {
+    const giorniConColazione: GiornoConPasti[] = [
+      {
+        giorno: "Lunedì",
+        pasti: [
+          pasto([ing("Uova", "Latticini e uova")]),
+          pasto([ing("Pasta", "Pane e cereali")]),
+          pasto([ing("Pollo", "Carne e pesce")]),
+        ],
+      },
+      {
+        giorno: "Martedì",
+        pasti: [
+          pasto([ing("Yogurt", "Latticini e uova")]),
+          pasto([ing("Riso", "Dispensa")]),
+          pasto([ing("Uova", "Latticini e uova")]),
+        ],
+      },
+    ];
+    // Colazione di Lunedì (Uova) <-> colazione di Martedì (Yogurt): Martedì
+    // finisce con Uova sia a colazione (arrivata da Lunedì) sia a cena.
+    const conflitti = conflittiDopoScambio(giorniConColazione, "Lunedì", 0, "Martedì", 0);
+    expect(conflitti).toEqual([{ giorno: "Martedì", ingredienti: ["Uova"] }]);
   });
 });
 

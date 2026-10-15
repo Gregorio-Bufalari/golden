@@ -10,12 +10,18 @@ type Nutrizione = { calorie: number; proteine_g: number; carboidrati_g: number; 
 
 export type Preferito = {
   nome: string;
-  tipo: "pranzo" | "cena";
+  tipo: "colazione" | "pranzo" | "cena";
   ingredienti: Ingrediente[];
   tempo_preparazione_min: number | null;
   nutrizione: Nutrizione | null;
   fonte_nutrizione?: "crea_inran" | "stima_ai" | null;
   preparazione: string[] | null;
+};
+
+const ETICHETTA_TIPO_PASTO: Record<Preferito["tipo"], string> = {
+  colazione: "Colazione",
+  pranzo: "Pranzo",
+  cena: "Cena",
 };
 
 function ChevronIcon({ aperto }: { aperto: boolean }) {
@@ -73,7 +79,7 @@ export function PreferitiView({ token, initialPreferiti }: { token: string; init
                 className="block w-full rounded-[14px] bg-panel px-5 py-[18px] pr-14 text-left disabled:cursor-default"
               >
                 <div className="text-[13px] font-medium text-ink/60">
-                  {p.tipo === "pranzo" ? "Pranzo" : "Cena"}
+                  {ETICHETTA_TIPO_PASTO[p.tipo]}
                   {p.tempo_preparazione_min ? ` · ${p.tempo_preparazione_min} min` : ""}
                 </div>
                 <div className="mt-1 text-[21px] font-bold leading-tight tracking-tight text-ink">{p.nome}</div>

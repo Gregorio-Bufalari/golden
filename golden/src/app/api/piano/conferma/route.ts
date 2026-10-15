@@ -12,7 +12,7 @@ export const maxDuration = 60;
 /**
  * Salva lo scenario di budget scelto dall'utente tra quelli proposti da
  * /api/piano/generate (vedi "Scenari multipli di budget"). Riceve dal
- * client solo `giorni` (i 14 pasti dello scenario scelto, non modificati
+ * client solo `giorni` (i pasti dello scenario scelto, non modificati
  * dall'utente — solo scelto tra quelli mostrati): la lista della spesa e i
  * consumi dispensa si RICALCOLANO sempre qui lato server, non ci si fida
  * di quella mostrata nel confronto, così restano coerenti anche nel raro

@@ -6,7 +6,7 @@ import type { GiornoValidato, PastoValidato } from "./piano-validazione";
 export type PreferitoPerRotazione = {
   id: string;
   nome: string;
-  tipo: "pranzo" | "cena";
+  tipo: "colazione" | "pranzo" | "cena";
   ingredienti: Pasto["ingredienti"];
   tempo_preparazione_min: number | null;
   nutrizione: Pasto["nutrizione"] | null;
@@ -43,8 +43,8 @@ export function sceglieFavoritoScoperta(
 }
 
 /**
- * Sostituisce, nel piano, il primo pasto dello stesso tipo (pranzo/cena)
- * del Preferito scelto con l'istantanea salvata — così il piatto incluso è
+ * Sostituisce, nel piano, il primo pasto dello stesso tipo (colazione,
+ * pranzo o cena) del Preferito scelto con l'istantanea salvata — così il piatto incluso è
  * esattamente quello che l'utente aveva messo tra i preferiti, non una
  * reinterpretazione dell'AI. Va chiamata DOPO l'adattamento budget (non
  * prima): l'AI che riduce il costo rivede liberamente tutti i pasti e

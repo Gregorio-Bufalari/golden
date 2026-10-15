@@ -94,8 +94,15 @@ describe("generateMealPlan — risposta AI simulata", () => {
 
     const richiesta = mockParse.mock.calls[0][0];
     const testoMessaggio = richiesta.messages[0].content as string;
-    expect(testoMessaggio).toContain("al massimo 700 kcal");
-    expect(testoMessaggio).toContain("almeno 30g di proteine");
+    // Il target per pasto impostato (700 kcal, 30g proteine) è trattato come
+    // un totale giornaliero implicito e ridistribuito 25%/35%/40% su
+    // colazione/pranzo/cena (vedi FRAZIONE_OBIETTIVO_PER_PASTO in claude.ts).
+    expect(testoMessaggio).toContain("al massimo 350 kcal");
+    expect(testoMessaggio).toContain("almeno 15g di proteine");
+    expect(testoMessaggio).toContain("al massimo 490 kcal");
+    expect(testoMessaggio).toContain("almeno 21g di proteine");
+    expect(testoMessaggio).toContain("al massimo 560 kcal");
+    expect(testoMessaggio).toContain("almeno 24g di proteine");
     expect(testoMessaggio).not.toContain("carboidrati");
   });
 
@@ -140,6 +147,31 @@ describe("generateMealPlan — risposta AI simulata", () => {
     expect(richiesta.system).toMatch(/avanzati in dispensa/i);
     expect(richiesta.system).toContain("spinaci (450g)");
     expect(richiesta.system).toContain("riso (670g)");
+  });
+
+  it("include l'istruzione specifica per la colazione e chiede colazione+pranzo+cena per 7 giorni", async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: { giorni: creaPianoEsempio() } });
+
+    await generateMealPlan(profiloBase);
+
+    const richiesta = mockParse.mock.calls[0][0];
+    expect(richiesta.system).toMatch(/piatti tipici da colazione/i);
+
+    const testoMessaggio = richiesta.messages[0].content as string;
+    expect(testoMessaggio).toMatch(/colazione, pranzo e cena per ognuno dei 7 giorni/i);
+  });
+
+  it("con obiettivi nutrizionali impostati, il messaggio elenca il target ridistribuito per i tre pasti (25%/35%/40%)", async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: { giorni: creaPianoEsempio() } });
+
+    await generateMealPlan({
+      ...profiloBase,
+      obiettivi_nutrizionali: { calorie_min: null, calorie_max: 700, proteine_min_g: 30, carboidrati_max_g: null, grassi_max_g: null },
+    });
+
+    const richiesta = mockParse.mock.calls[0][0];
+    const testoMessaggio = richiesta.messages[0].content as string;
+    expect(testoMessaggio).toMatch(/colazione \(circa 25%.*pranzo \(circa 35%.*cena \(circa 40%/i);
   });
 });
 
@@ -203,7 +235,20 @@ describe("modificaPiano — risposta AI simulata", () => {
     await modificaPiano(profiloBase, creaPianoEsempio(), "ho già comprato il pollo");
 
     const richiesta = mockParse.mock.calls[0][0];
-    expect(richiesta.system).toMatch(/14 ricette DISTINTE/);
+    expect(richiesta.system).toMatch(/21 ricette DISTINTE/);
+  });
+
+  it("include anche qui l'istruzione specifica per la colazione e il vincolo di 21 pasti fissi", async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      usage: { input_tokens: 1000, output_tokens: 500 },
+    });
+
+    await modificaPiano(profiloBase, creaPianoEsempio(), "ho già comprato il pollo");
+
+    const richiesta = mockParse.mock.calls[0][0];
+    expect(richiesta.system).toMatch(/piatti tipici da colazione/i);
+    expect(richiesta.system).toMatch(/21 pasti fissi/);
   });
 
   it("include anche qui gli ingredienti avanzati in dispensa, quando passati (es. pulsante \"Proponine un altro\")", async () => {

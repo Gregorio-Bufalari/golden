@@ -19,7 +19,7 @@ export type NutrizionePreferito = {
 };
 
 export type PastoPerPreferito = {
-  tipo: "pranzo" | "cena";
+  tipo: "colazione" | "pranzo" | "cena";
   nome: string;
   ingredienti: IngredientePreferito[];
   tempo_preparazione_min: number;

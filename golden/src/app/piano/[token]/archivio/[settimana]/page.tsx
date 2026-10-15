@@ -2,7 +2,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { PageHeader } from "../../page-header";
 import { etichettaGiorno } from "@/lib/settimana";
 import { CITAZIONE_CREA } from "@/lib/nutrizione-crea";
-import type { GiornoValidato } from "@/lib/piano-validazione";
+import type { GiornoValidato, PastoValidato } from "@/lib/piano-validazione";
+
+const ETICHETTA_TIPO_PASTO: Record<PastoValidato["tipo"], string> = {
+  colazione: "Colazione",
+  pranzo: "Pranzo",
+  cena: "Cena",
+};
 
 // Dettaglio di sola lettura di una settimana passata: stesse date reali di
 // allora (derivate da QUESTA `settimana`, mai da oggi — vedi settimana.ts),
@@ -60,7 +66,7 @@ export default async function ArchivioSettimanaPage({
                   {giorno.pasti.map((pasto, i) => (
                     <div key={i} className="rounded-[14px] bg-panel px-5 py-[18px]">
                       <div className="text-[13px] font-medium text-ink/60">
-                        {pasto.tipo === "pranzo" ? "Pranzo" : "Cena"} · {pasto.tempo_preparazione_min} min
+                        {ETICHETTA_TIPO_PASTO[pasto.tipo]} · {pasto.tempo_preparazione_min} min
                       </div>
                       <div className="mt-1 text-[17px] font-bold leading-tight tracking-tight text-ink">
                         {pasto.nome}

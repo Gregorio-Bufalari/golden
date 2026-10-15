@@ -37,7 +37,7 @@ type Nutrizione = {
 };
 
 type Pasto = {
-  tipo: "pranzo" | "cena";
+  tipo: "colazione" | "pranzo" | "cena";
   nome: string;
   ingredienti: Ingrediente[];
   tempo_preparazione_min: number;
@@ -54,6 +54,12 @@ type Giorno = {
   pasti: Pasto[];
 };
 
+const ETICHETTA_TIPO_PASTO: Record<Pasto["tipo"], string> = {
+  colazione: "Colazione",
+  pranzo: "Pranzo",
+  cena: "Cena",
+};
+
 type Scenario = {
   chiave: "risparmio" | "equilibrato" | "abbondante";
   etichetta: string;
@@ -64,7 +70,7 @@ type Scenario = {
 };
 
 // Due piatti di assaggio per scenario, non l'intera settimana: il
-// confronto serve a farsi un'idea veloce, non a leggere 14 pasti tre
+// confronto serve a farsi un'idea veloce, non a leggere tutti i pasti tre
 // volte — il piano completo si vede solo dopo aver confermato.
 export function anteprimaPiatti(giorni: Giorno[]): string {
   const nomi = giorni.flatMap((g) => g.pasti.map((p) => p.nome));
@@ -375,7 +381,7 @@ export function MenuView({
   }
 
   // Scambio tra due pasti di giorni diversi: puro riordino dei dati già nel
-  // piano (stessi 14 pasti, stesso totale ingredienti), nessuna chiamata AI.
+  // piano (stessi pasti, stesso totale ingredienti), nessuna chiamata AI.
   // Tre tocchi: il primo arma la "modalità scambio" (card evidenziata,
   // banner con istruzioni); un secondo tocco sullo stesso giorno sposta
   // semplicemente la selezione; un tocco su un giorno diverso propone lo
@@ -390,7 +396,7 @@ export function MenuView({
     const alternativa = suggerisciGiornoAlternativo(giorni, giornoA, indiceA, giornoB, indiceB);
     const messaggio =
       conflitti
-        .map((c) => `${c.giorno} avrebbe ${c.ingredienti.join(", ")} sia a pranzo che a cena`)
+        .map((c) => `${c.giorno} avrebbe ${c.ingredienti.join(", ")} ripetuto in più di un pasto`)
         .join("; ") + ".";
     setConflittoScambio({ messaggio, alternativa });
   }
@@ -416,7 +422,8 @@ export function MenuView({
   }
 
   // Passa alla proposta alternativa suggerita (stesso tipo di pasto, es.
-  // pranzo con pranzo): il controllo varietà si rivaluta sul nuovo giorno.
+  // colazione con colazione, pranzo con pranzo): il controllo varietà si
+  // rivaluta sul nuovo giorno.
   function handleProvaAlternativa(nomeGiorno: string) {
     if (!giorni || !pastoProposto) return;
     const record = giorni.find((g) => g.giorno === nomeGiorno);
@@ -709,7 +716,7 @@ export function MenuView({
                                 }`}
                               >
                                 <div className="text-[13px] font-medium text-ink/60">
-                                  {pasto.tipo === "pranzo" ? "Pranzo" : "Cena"} · {pasto.tempo_preparazione_min} min
+                                  {ETICHETTA_TIPO_PASTO[pasto.tipo]} · {pasto.tempo_preparazione_min} min
                                 </div>
                                 <div className="mt-1 text-[21px] font-bold leading-tight tracking-tight text-ink">
                                   {pasto.nome}
