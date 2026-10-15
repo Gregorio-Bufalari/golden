@@ -11,6 +11,7 @@ import { conflittiDopoScambio, suggerisciGiornoAlternativo } from "@/lib/varieta
 import { formattaQuantita } from "@/lib/quantita";
 import { Spinner } from "@/components/spinner";
 import { HeartIcon } from "@/components/heart-icon";
+import { RepartoIcon } from "@/components/reparto-icon";
 import {
   calcolaRiferimentoLARN,
   confrontaConLARN,
@@ -497,9 +498,14 @@ export function MenuView({
     <div className="flex flex-1 flex-col">
       <PageHeader
         token={token}
-        logo
         title="Menu"
-        subtitle={giorni ? `Ciao ${nome} · Settimana del ${settimana}${loading ? " · genero il nuovo piano..." : ""}` : `Ciao ${nome}`}
+        subtitle={
+          scenari
+            ? undefined
+            : giorni
+              ? `Ciao ${nome} · Settimana del ${settimana}${loading ? " · genero il nuovo piano..." : ""}`
+              : `Ciao ${nome}`
+        }
       />
 
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-5 pb-10">
@@ -514,7 +520,7 @@ export function MenuView({
             <button
               onClick={handleGenerate}
               disabled={loading || cambiandoModalita}
-              className="flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-accent-fill-text disabled:opacity-50"
+              className="flex items-center gap-2 rounded-full bg-dark px-6 py-3 text-sm font-semibold text-dark-fill-text disabled:opacity-50"
             >
               {loading && <Spinner className="h-4 w-4" />}
               {loading ? "Genero il piano..." : "Genera il piano della settimana"}
@@ -527,8 +533,9 @@ export function MenuView({
         {scenari && (
           <div className="flex flex-col gap-4 py-6 text-left">
             <div>
-              <h2 className="text-base font-semibold text-ink">Scegli il piano per questa settimana</h2>
-              <p className="mt-1 text-xs text-ink/55">
+              <h2 className="font-sans text-base font-semibold text-ink">Scegli il piano</h2>
+              <p className="mt-0.5 text-sm text-ink/60">Settimana del {settimana}</p>
+              <p className="mt-2 text-xs text-ink/55">
                 Tre scenari a budget diverso, pensati su misura per ciascuno — non lo stesso piano ridimensionato.
                 Conferma quello che preferisci.
               </p>
@@ -543,11 +550,15 @@ export function MenuView({
                   scenario.chiave === "equilibrato" ? "" : percentualeSuBase(scenario.grocery_list.totale_stimato, base);
                 const confermando = confermandoScenario === scenario.chiave;
                 return (
-                  <div key={scenario.chiave} className="rounded-[14px] bg-panel p-5">
+                  <div key={scenario.chiave} className="rounded-[14px] bg-paper p-5">
                     <div className="flex items-baseline justify-between gap-2">
                       <h3 className="text-sm font-semibold text-ink">
                         {scenario.etichetta}
-                        {percentuale && <span className="ml-1.5 text-xs font-medium text-ink/50">{percentuale}</span>}
+                        {percentuale && (
+                          <span className="ml-1.5 rounded-full bg-dark px-2 py-0.5 text-xs font-semibold text-dark-fill-text">
+                            {percentuale}
+                          </span>
+                        )}
                       </h3>
                       <span className="shrink-0 font-mono text-lg font-semibold text-ink">
                         €{scenario.grocery_list.totale_stimato.toFixed(2)}
@@ -562,7 +573,7 @@ export function MenuView({
                     <button
                       onClick={() => handleConfermaScenario(scenario)}
                       disabled={Boolean(confermandoScenario)}
-                      className="mt-3.5 flex min-h-11 items-center justify-center gap-2 rounded-full bg-accent px-5 text-sm font-semibold text-accent-fill-text disabled:opacity-50"
+                      className="mt-3.5 flex min-h-11 items-center justify-center gap-2 rounded-full bg-dark px-5 text-sm font-semibold text-dark-fill-text disabled:opacity-50"
                     >
                       {confermando && <Spinner className="h-4 w-4" />}
                       {confermando ? "Confermo..." : "Conferma questo piano"}
@@ -591,7 +602,7 @@ export function MenuView({
               <button
                 onClick={handleGenerate}
                 disabled={loading || cambiandoModalita}
-                className="flex items-center gap-1.5 self-start rounded-full bg-panel px-4 py-2 text-xs font-semibold text-ink disabled:opacity-50"
+                className="flex items-center gap-1.5 self-start rounded-full bg-paper px-4 py-2 text-xs font-semibold text-ink disabled:opacity-50"
               >
                 {loading && <Spinner className="h-3.5 w-3.5" />}
                 {loading ? "Genero..." : "Altri suggerimenti"}
@@ -606,7 +617,7 @@ export function MenuView({
             )}
 
             {pastoSelezionato && !pastoProposto && (
-              <div className="flex items-center justify-between gap-3 bg-panel px-4 py-3 text-sm text-ink">
+              <div className="flex items-center justify-between gap-3 bg-paper px-4 py-3 text-sm text-ink">
                 <span>
                   <strong className="font-semibold text-accent">Modalità scambio attiva.</strong> Tocca un pasto
                   in un altro giorno per scambiarlo con{" "}
@@ -633,7 +644,7 @@ export function MenuView({
                     <button
                       type="button"
                       onClick={() => handleProvaAlternativa(conflittoScambio.alternativa as string)}
-                      className="flex min-h-11 items-center justify-center rounded-full bg-accent px-5 text-sm font-semibold text-accent-fill-text"
+                      className="flex min-h-11 items-center justify-center rounded-full bg-dark px-5 text-sm font-semibold text-dark-fill-text"
                     >
                       Prova {conflittoScambio.alternativa} invece
                     </button>
@@ -658,7 +669,7 @@ export function MenuView({
             )}
 
             {pastoSelezionato && pastoProposto && !conflittoScambio && (
-              <div className="flex flex-col gap-3 bg-panel px-4 py-4 text-sm text-ink">
+              <div className="flex flex-col gap-3 bg-paper px-4 py-4 text-sm text-ink">
                 <p>
                   Scambiare <strong className="font-semibold">{pastoSelezionato.nome}</strong> (
                   {pastoSelezionato.giorno}) con <strong className="font-semibold">{pastoProposto.nome}</strong> (
@@ -669,7 +680,7 @@ export function MenuView({
                     type="button"
                     onClick={handleConfermaScambio}
                     disabled={scambioInCorso}
-                    className="flex min-h-11 items-center justify-center gap-2 rounded-full bg-accent px-5 text-sm font-semibold text-accent-fill-text disabled:opacity-50"
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-full bg-dark px-5 text-sm font-semibold text-dark-fill-text disabled:opacity-50"
                   >
                     {scambioInCorso && <Spinner className="h-4 w-4" />}
                     {scambioInCorso ? "Scambio..." : "Scambia"}
@@ -711,9 +722,7 @@ export function MenuView({
                                 type="button"
                                 onClick={() => haPreparazione && setPastoEspanso(espanso ? null : chiave)}
                                 disabled={!haPreparazione}
-                                className={`block w-full rounded-[14px] bg-panel px-5 py-[18px] pr-14 text-left disabled:cursor-default ${
-                                  selezionatoPerScambio ? "ring-2 ring-accent" : ""
-                                }`}
+                                className="block w-full rounded-[14px] bg-paper px-5 py-[18px] pr-14 text-left disabled:cursor-default"
                               >
                                 <div className="text-[13px] font-medium text-ink/60">
                                   {ETICHETTA_TIPO_PASTO[pasto.tipo]} · {pasto.tempo_preparazione_min} min
@@ -749,7 +758,7 @@ export function MenuView({
                                 }
                                 aria-pressed={preferito}
                                 className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center ${
-                                  preferito ? "text-accent" : "text-ink/35"
+                                  preferito ? "text-dark" : "text-ink/35"
                                 }`}
                               >
                                 <HeartIcon pieno={preferito} />
@@ -770,7 +779,7 @@ export function MenuView({
                                 aria-label={`Scambia ${pasto.tipo} di ${giorno.giorno} con un altro giorno`}
                                 aria-pressed={selezionatoPerScambio}
                                 className={`flex flex-1 items-center justify-center rounded-xl disabled:opacity-40 ${
-                                  selezionatoPerScambio ? "bg-accent text-accent-fill-text" : "text-accent"
+                                  selezionatoPerScambio ? "bg-dark text-dark-fill-text" : "text-accent"
                                 }`}
                               >
                                 <SwapIcon />
@@ -780,14 +789,17 @@ export function MenuView({
 
                           {espanso && haPreparazione && (
                             <div className="flex items-stretch gap-2">
-                              <div className="flex-1 rounded-[14px] bg-panel px-5 py-4">
+                              <div className="flex-1 rounded-[14px] bg-paper px-5 py-4">
                                 <h4 className="mb-2 text-sm font-semibold text-ink">
                                   Ingredienti {persone > 1 ? `· per ${persone} persone` : ""}
                                 </h4>
                                 <ul className="flex flex-col gap-1 text-sm text-ink/80">
                                   {pasto.ingredienti.map((ing, k) => (
                                     <li key={k} className="flex items-start justify-between gap-3">
-                                      <span>{ing.nome}</span>
+                                      <span className="flex items-center gap-1.5">
+                                        <RepartoIcon reparto={ing.reparto} />
+                                        {ing.nome}
+                                      </span>
                                       <span className="shrink-0 whitespace-nowrap font-mono text-xs text-ink/60">
                                         {formattaQuantita(ing.quantita, ing.unita)}
                                         {persone > 1 &&
@@ -848,7 +860,7 @@ export function MenuView({
             )}
 
             {confrontoLARN && (
-              <div className="rounded-[14px] bg-panel p-5">
+              <div className="rounded-[14px] bg-paper p-5">
                 <h3 className="mb-3.5 text-sm font-semibold text-ink">Confronto nutrizionale settimanale</h3>
                 <div className="flex flex-col gap-2.5">
                   {confrontoLARN.map((n) => {
@@ -891,13 +903,13 @@ export function MenuView({
                     );
                   })}
                 </div>
-                <p className="mt-4 text-xs text-ink/50">
+                <p className="mt-4 rounded-[10px] bg-tan-soft px-3.5 py-2.5 text-xs text-ink/70">
                   Tra parentesi: questa settimana / riferimento. {DISCLAIMER_LARN}
                 </p>
               </div>
             )}
 
-            <div className="rounded-[14px] bg-panel p-5">
+            <div className="rounded-[14px] bg-paper p-5">
               <h3 className="mb-1.5 text-sm font-semibold text-ink">Modifica il piano</h3>
               <p className="mb-3 text-xs text-ink/55">
                 Es. &quot;giovedì mangio fuori&quot;, &quot;ho già comprato il pollo&quot;, &quot;spendi meno
@@ -917,7 +929,7 @@ export function MenuView({
               <button
                 onClick={handleModifica}
                 disabled={!messaggio.trim() || azioneInCorso}
-                className="mt-3.5 flex min-h-11 items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-accent-fill-text disabled:opacity-40"
+                className="mt-3.5 flex min-h-11 items-center gap-2 rounded-full bg-dark px-5 py-2.5 text-sm font-semibold text-dark-fill-text disabled:opacity-40"
               >
                 {modificando && <Spinner className="h-4 w-4" />}
                 {modificando ? "Applico la modifica..." : "Applica modifica"}

@@ -1,12 +1,12 @@
-import Image from "next/image";
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 
 function ProfiloButton({ token }: { token: string }) {
   return (
     <Link
       href={`/piano/${token}/impostazioni`}
       aria-label="Profilo"
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-panel print:hidden"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-paper print:hidden"
     >
       <svg
         width="18"
@@ -26,31 +26,59 @@ function ProfiloButton({ token }: { token: string }) {
   );
 }
 
+function BackButton({ href }: { href: string }) {
+  return (
+    <Link href={href} aria-label="Indietro" className="-ml-2.5 flex h-11 w-11 shrink-0 items-center justify-center">
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-ink"
+      >
+        <path d="M15 18l-6-6 6-6" />
+      </svg>
+    </Link>
+  );
+}
+
 /**
- * Header ripetuto in cima a ogni schermata: il logo compare solo nel Menu
- * (la schermata "principale"), le altre hanno il semplice nome della
- * sezione — coerente con il piano di design approvato.
+ * Header ripetuto in cima a ogni schermata: logo "Groci" sempre centrato
+ * (24px, Caveat Brush) — a sinistra il titolo della pagina (Caveat,
+ * ~30px) o, se la pagina ha un punto a cui tornare, solo una freccia
+ * indietro al suo posto; a destra l'icona profilo. Tre colonne
+ * `1fr auto 1fr`, non tre terzi uguali: così il logo resta
+ * perfettamente centrato qualunque sia la lunghezza del titolo.
  */
 export function PageHeader({
   token,
   title,
-  logo = false,
+  backHref,
   subtitle,
 }: {
   token: string;
   title: string;
-  logo?: boolean;
+  backHref?: string;
   subtitle?: string;
 }) {
   return (
     <div className="flex flex-col gap-1 px-5 pb-2.5 pt-5">
-      <div className="flex items-center justify-between">
-        {logo ? (
-          <Image src="/logo.png" alt="Groci" height={36} width={120} style={{ height: 36, width: "auto" }} priority />
-        ) : (
-          <h1 className="text-xl font-bold tracking-tight text-ink">{title}</h1>
-        )}
-        <ProfiloButton token={token} />
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+        <div className="flex min-w-0 justify-start">
+          {backHref ? (
+            <BackButton href={backHref} />
+          ) : (
+            <h1 className="font-caveat min-w-0 truncate pr-2 text-[28px] font-bold leading-none text-ink">{title}</h1>
+          )}
+        </div>
+        <Logo size={24} />
+        <div className="flex justify-end">
+          <ProfiloButton token={token} />
+        </div>
       </div>
       {subtitle && <p className="text-sm text-ink/60">{subtitle}</p>}
     </div>

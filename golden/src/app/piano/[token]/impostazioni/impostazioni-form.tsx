@@ -4,6 +4,7 @@ import { useState } from "react";
 import { updateProfilo } from "./actions";
 import { Spinner } from "@/components/spinner";
 import { inputClass, labelClass, checkboxClass, optionRowClass, Pill } from "@/components/form-kit";
+import { RestrizioneIcon } from "@/components/restrizione-icon";
 import { SupermercatoSelector } from "@/components/supermercato-selector";
 import {
   RESTRIZIONI_OPTIONS,
@@ -178,6 +179,7 @@ export function ImpostazioniForm({
                 onChange={() => toggleRestrizione(opt)}
                 className={checkboxClass}
               />
+              <RestrizioneIcon opzione={opt} />
               {opt}
             </label>
           ))}
@@ -417,7 +419,7 @@ export function ImpostazioniForm({
         <button
           onClick={handleSalva}
           disabled={salvando}
-          className="flex min-h-11 items-center justify-center gap-2 self-start rounded-full bg-accent px-6 text-sm font-semibold text-accent-fill-text disabled:opacity-50"
+          className="flex min-h-11 items-center justify-center gap-2 self-start rounded-full bg-dark px-6 text-sm font-semibold text-dark-fill-text disabled:opacity-50"
         >
           {salvando && <Spinner className="h-4 w-4" />}
           {salvando ? "Salvo..." : "Salva impostazioni"}

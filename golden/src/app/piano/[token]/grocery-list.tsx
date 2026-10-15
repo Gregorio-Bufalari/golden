@@ -86,8 +86,8 @@ export function riepilogoSostituzione(
 function CheckboxGlyph({ checked }: { checked: boolean }) {
   if (checked) {
     return (
-      <span className="flex h-5 w-5 items-center justify-center rounded-[5px] bg-accent">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="text-accent-fill-text">
+      <span className="flex h-5 w-5 items-center justify-center rounded-[5px] bg-dark">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="text-dark-fill-text">
           <path d="M5 12.5l4.5 4.5L19 7" />
         </svg>
       </span>
@@ -339,7 +339,7 @@ export function GroceryList({
 
   return (
     <div className="flex flex-col gap-5 py-4">
-      <div className="bg-panel rounded-[14px] px-5 py-4">
+      <div className="bg-paper rounded-[14px] px-5 py-4">
         <div className="flex items-baseline justify-between">
           <div className="text-sm font-medium text-ink/75">Totale stimato</div>
           <div className="font-mono text-xl font-semibold text-ink">€{data.totale_stimato.toFixed(2)}</div>
@@ -359,17 +359,17 @@ export function GroceryList({
       </div>
 
       <div className="flex gap-2 print:hidden">
-        <button onClick={handleWhatsApp} className="rounded-full bg-panel px-4 py-2 text-xs font-semibold text-ink">
+        <button onClick={handleWhatsApp} className="rounded-full bg-paper px-4 py-2 text-xs font-semibold text-ink">
           Condividi su WhatsApp
         </button>
-        <button onClick={handlePrint} className="rounded-full bg-panel px-4 py-2 text-xs font-semibold text-ink">
+        <button onClick={handlePrint} className="rounded-full bg-paper px-4 py-2 text-xs font-semibold text-ink">
           Esporta PDF
         </button>
       </div>
 
       {errore && <p className="text-sm text-clay print:hidden">{errore}</p>}
       {rifiuto && <div className="bg-honey-soft px-3.5 py-2.5 text-sm text-ink print:hidden">{rifiuto}</div>}
-      {sostituzioneInfo && <div className="bg-panel px-3.5 py-2.5 text-sm text-ink print:hidden">{sostituzioneInfo}</div>}
+      {sostituzioneInfo && <div className="bg-paper px-3.5 py-2.5 text-sm text-ink print:hidden">{sostituzioneInfo}</div>}
 
       <div className="flex flex-col gap-5">
         {renderSezione(
@@ -397,7 +397,7 @@ export function GroceryList({
       </p>
 
       {data.rimasto.length > 0 && (
-        <div className="bg-panel rounded-[14px] p-5">
+        <div className="bg-paper rounded-[14px] p-5">
           <h3 className="mb-2 text-sm font-semibold text-ink">Rimasto in frigo/dispensa</h3>
           <p className="mb-2 text-xs text-ink/55">
             Comprando le confezioni intere, questa settimana avanza. Premi + se vuoi che ne avanzi di più (il

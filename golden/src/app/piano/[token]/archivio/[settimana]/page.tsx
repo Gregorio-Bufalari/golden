@@ -50,7 +50,12 @@ export default async function ArchivioSettimanaPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <PageHeader token={token} title="Archivio" subtitle="Sola lettura — le date sono quelle reali di questa settimana." />
+      <PageHeader
+        token={token}
+        title="Archivio"
+        backHref={`/piano/${token}/archivio`}
+        subtitle="Sola lettura — le date sono quelle reali di questa settimana."
+      />
 
       <div className="mx-auto w-full max-w-md flex-1 px-5 pb-10">
         {!giorni ? (
@@ -64,7 +69,7 @@ export default async function ArchivioSettimanaPage({
                 </h3>
                 <div className="flex flex-col gap-3">
                   {giorno.pasti.map((pasto, i) => (
-                    <div key={i} className="rounded-[14px] bg-panel px-5 py-[18px]">
+                    <div key={i} className="rounded-[14px] bg-paper px-5 py-[18px]">
                       <div className="text-[13px] font-medium text-ink/60">
                         {ETICHETTA_TIPO_PASTO[pasto.tipo]} · {pasto.tempo_preparazione_min} min
                       </div>

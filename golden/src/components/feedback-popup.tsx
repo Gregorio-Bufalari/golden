@@ -82,7 +82,7 @@ export function FeedbackPopup({
 
   if (fatto) {
     return (
-      <div className="bg-panel rounded-[14px] px-5 py-4 text-center text-sm font-medium text-accent">
+      <div className="bg-paper rounded-[14px] px-5 py-4 text-center text-sm font-medium text-accent">
         Grazie per il feedback!
       </div>
     );
@@ -90,7 +90,7 @@ export function FeedbackPopup({
 
   if (risposta === null) {
     return (
-      <div className="flex items-start justify-between gap-3 bg-panel rounded-[14px] px-5 py-4 text-left">
+      <div className="flex items-start justify-between gap-3 bg-paper rounded-[14px] px-5 py-4 text-left">
         <p className="text-sm font-medium text-ink">{domanda}</p>
         <div className="flex shrink-0 items-center gap-1.5">
           <button
@@ -123,7 +123,7 @@ export function FeedbackPopup({
   }
 
   return (
-    <div className="bg-panel rounded-[14px] px-5 py-4 text-left">
+    <div className="bg-paper rounded-[14px] px-5 py-4 text-left">
       <p className="text-sm font-medium text-ink">Grazie! Vuoi aggiungere un dettaglio? (facoltativo)</p>
       <textarea
         value={commento}
@@ -136,7 +136,7 @@ export function FeedbackPopup({
         type="button"
         onClick={handleInvia}
         disabled={submitting}
-        className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-full bg-accent px-5 text-sm font-semibold text-accent-fill-text disabled:opacity-50"
+        className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-full bg-dark px-5 text-sm font-semibold text-dark-fill-text disabled:opacity-50"
       >
         {submitting && <Spinner className="h-4 w-4" />}
         {submitting ? "Invio..." : "Invia"}

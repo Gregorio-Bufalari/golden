@@ -692,6 +692,73 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     `claude.smoke.test.ts` passano ancora questa fixture a 2 pasti/giorno come input a una API che
     ora si aspetta/richiede 3 pasti fissi nel prompt — comportamento dell'AI reale in quel caso
     non verificato, da osservare alla prossima sessione con credito disponibile.
+28. **(questa sessione)**: **Restyle visivo completo: palette verde → crema/terracotta** (logica e
+    funzionalità invariate, come richiesto esplicitamente). Nuovi token in `globals.css`: `--bg`
+    (#F3E8D9, sfondo pagina, prima era di fatto il quasi-bianco `--paper`), `--paper` (#FBFAF6,
+    invariato, ora usato per superfici/card/pannelli — ha sostituito **tutte** le ~37 occorrenze
+    di `--panel`, il vecchio sage #ECF3E0, rimosso del tutto), `--ink` (#1C1B17, solo testo, mai
+    più riempimento bottoni), `--accent` (#C4713E terracotta, solo bordi/puntini/link/icone di
+    dettaglio — NON più riempimento bottoni), **nuovo** `--dark` (#7A3B22, riempimento bottoni
+    primari/badge/chip-checkbox-radio selezionati/cuori attivi, sempre con `--dark-fill-text`
+    bianco — ha sostituito la combinazione `bg-accent`+`text-accent-fill-text` usata ovunque
+    prima), **nuovo** `--tan-soft` (#F0DCC4, box informativi neutri, applicato al disclaimer LARN
+    nel Menu). `--clay`/`--honey` (rischio glutine/attenzione) lasciati **invariati** di proposito,
+    non fanno parte del restyle. **Font**: aggiunti Jost (corpo/UI, sostituisce Geist Sans),
+    Caveat bold (titoli pagina nell'header, ~28px — ridotto da 30px per un problema di clipping,
+    vedi sotto), Caveat Brush (SOLO il logo "Groci", mai usato altrove) via `next/font/google` in
+    `layout.tsx`. **Logo**: era un'immagine PNG (`/logo.png`) mostrata solo nel Menu; ora è un
+    componente testuale (`src/components/logo.tsx`, Caveat Brush, `rotate(-3deg)`, colore ink)
+    mostrato centrato (24px) nell'header di OGNI schermata tranne l'onboarding (dove resta grande,
+    78px, colore ink — non terracotta). `logo.png` resta solo come icona PWA in `manifest.ts`,
+    non più nell'UI. **Header** (`page-header.tsx`) riscritto a 3 colonne `[1fr_auto_1fr]`: titolo
+    pagina (Caveat) o freccia indietro a sinistra, logo sempre perfettamente centrato al centro
+    (grid asimmetrica apposta, non 3 terzi uguali — il logo resta centrato qualunque sia la
+    lunghezza del titolo), profilo a destra. Aggiunto un `backHref` opzionale (nuovo, prima non
+    esisteva alcun back-button) — usato solo in `archivio/[settimana]` per tornare a `archivio`,
+    unico caso di pagina-dettaglio-sotto-una-lista nell'app. **Bug di rendering trovato e
+    corretto**: con `overflow-hidden` (truncate) attivo su un titolo Caveat che in realtà
+    CI STA nello spazio disponibile, il carattere finale veniva comunque tagliato — non è un
+    overflow reale ma l'"inchiostro" del font corsivo che eccede leggermente il suo box di
+    metrica (overshoot tipico dei font corsivi/italici), tagliato dall'`overflow:hidden` anche se
+    `scrollWidth === width`. Risolto con un piccolo `padding-right` sul titolo, non rimuovendo il
+    truncate (che resta utile come rete di sicurezza per titoli davvero troppo lunghi). **Icone**:
+    nuove icone lineari stroke 1.8px colore dark per le 8 opzioni di `RESTRIZIONI_OPTIONS`
+    (`restrizione-icon.tsx`, usate in onboarding E impostazioni-form — prima non c'era alcuna
+    icona, solo testo) e per il reparto di ogni ingrediente nel dettaglio piatto del Menu
+    (`reparto-icon.tsx`, 7 icone per i 7 reparti). La lista della spesa NON è stata toccata (resta
+    testo semplice, nessuna emoji esisteva già da aggiungere/rimuovere — l'istruzione "lascia pure
+    le emoji colorate" è stata letta come "non applicarci il nuovo stile icone lineari", non come
+    "costruisci un sistema di emoji per prodotto" che non esisteva). **Bottoni/badge**: ogni
+    combinazione `bg-accent`+`text-accent-fill-text` (CTA, badge, chip/checkbox selezionati, cuori
+    attivi) convertita a `bg-dark`+`text-dark-fill-text` con un sed scoped per riga (non un
+    replace cieco: i puntini/dot decorativi e la barra di progresso in onboarding sono rimasti
+    `bg-accent`, coerente con "accent = decorativo, dark = riempimento azione"). Il badge
+    percentuale sugli scenari budget (prima testo muto `text-ink/50`) è diventato un vero badge
+    `bg-dark`/`text-dark-fill-text` pillola, come richiesto esplicitamente. **Bordo di selezione
+    rimosso** sulla card del pasto selezionato per lo scambio (`ring-2 ring-accent` → nessun
+    bordo, lo stato si vede già dall'icona scambio che diventa `bg-dark`) — le card scenario non
+    avevano mai avuto un bordo di selezione nel codice (nulla da rimuovere lì, l'istruzione era
+    presumibilmente preventiva). **Scelta scenario**: "Scegli il piano" spostato fuori
+    dall'header, sotto, in Jost normale (non Caveat), con "Settimana del..." come riga separata
+    sotto di lui — l'header in quello stato ora non mostra più il sottotitolo "Ciao {nome}...".
+    **Check-in**: `SupermercatoSelector` (componente condiviso con onboarding/impostazioni) passato
+    da `flex flex-wrap` a `grid grid-cols-4` con una nuova variante `compact` di `Pill` — 7
+    opzioni si dispongono automaticamente 4+3 su due righe fisse (nessuna logica ad-hoc necessaria,
+    la griglia a 4 colonne lo fa da sola). Applicato a tutti e tre i punti che usano il componente
+    condiviso, non solo al Check-in, per coerenza. **Residuo palette verde trovato e corretto**:
+    `manifest.ts` aveva ancora `theme_color`/`background_color` hardcoded ai vecchi valori
+    (#425a30 verde, #fbfbf6) — aggiornati a #f3e8d9. Verificato con `npm test`/`lint`/`build`
+    (tutti puliti, nessuna modifica di logica) e visivamente via `previewtmp` + Playwright su 4
+    schermate chiave (onboarding con lista restrizioni+icone, header title/back-arrow, scelta
+    scenario con badge, Check-in con griglia supermercati) prima di rimuovere `previewtmp`.
+    **Discrepanze trovate rispetto a quanto il founder credeva fosse già nel codice** (nessuna
+    bloccante, agite comunque secondo lo spirito della richiesta): Jost non era già il font del
+    corpo (era Geist Sans, sostituito ora); non esisteva alcuna emoji/icona nella lista della spesa
+    né altrove da "lasciare" o "sostituire" (icone aggiunte ex novo solo dove esplicitamente
+    richiesto); il vecchio sfondo pagina non era letteralmente verde (`--paper`, quasi bianco) —
+    il vecchio verde (`--panel`, ECF3E0) era usato per superfici secondarie, non per lo sfondo
+    pagina vero e proprio; mappato comunque sul nuovo `--bg` per intento (il token che sostituisce
+    "lo sfondo che si vede ovunque"), non per corrispondenza letterale col CSS precedente.
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —

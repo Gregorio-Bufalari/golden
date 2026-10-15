@@ -23,7 +23,7 @@ export default async function PianoLayout({
   }
 
   return (
-    <div className="flex min-h-full w-full flex-1 flex-col bg-paper">
+    <div className="flex min-h-full w-full flex-1 flex-col bg-bg">
       <div className="flex flex-1 flex-col overflow-y-auto">{children}</div>
       <BottomNav token={token} />
     </div>

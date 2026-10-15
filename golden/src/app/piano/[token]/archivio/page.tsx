@@ -51,7 +51,7 @@ export default async function ArchivioPage({
               <Link
                 key={settimana}
                 href={`/piano/${token}/archivio/${settimana}`}
-                className="flex min-h-11 items-center rounded-[14px] bg-panel px-5 py-[18px] text-[15px] font-medium text-ink"
+                className="flex min-h-11 items-center rounded-[14px] bg-paper px-5 py-[18px] text-[15px] font-medium text-ink"
               >
                 Settimana del {formattaData(new Date(`${settimana}T00:00:00`))}
               </Link>
