@@ -26,7 +26,7 @@ type GiornoPiano = { giorno: string; pasti: unknown[] };
 /**
  * Scambia due pasti tra giorni diversi dell'ultimo piano: puro riordino,
  * nessuna chiamata AI, nessun ricalcolo di lista della spesa o budget
- * (stessi 14 pasti, stessi ingredienti totali in settimana — cambia solo
+ * (stessi pasti, stessi ingredienti totali in settimana — cambia solo
  * in che giorno si mangia cosa). Lo scambio avviene lato server sui dati
  * già salvati (mai sul meal_plan intero mandato dal client), così non può
  * mai introdurre contenuto nuovo nel piano, solo riordinarlo.

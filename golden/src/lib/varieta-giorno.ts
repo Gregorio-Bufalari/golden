@@ -1,7 +1,8 @@
 // Controllo leggero (nessuna AI) eseguito interamente sui dati del piano
 // già caricati lato client, prima di applicare uno scambio pasti tra
 // giorni: segnala se il giorno risultante avrebbe lo stesso ingrediente
-// "principale" sia a pranzo che a cena, invece di applicare lo scambio in
+// "principale" ripetuto in più di un pasto dello stesso giorno (colazione,
+// pranzo, cena — quanti che siano), invece di applicare lo scambio in
 // silenzio.
 
 export type IngredienteConReparto = { nome: string; reparto: string };
@@ -15,22 +16,34 @@ export type GiornoConPasti = { giorno: string; pasti: PastoConIngredienti[] };
 // pranzo che a cena.
 const REPARTI_PRINCIPALI = new Set(["Carne e pesce", "Latticini e uova"]);
 
-/** Ingredienti "principali" (nome originale) condivisi tra i due pasti di un giorno. */
+/** Ingredienti "principali" (nome originale) usati in più di un pasto dello stesso giorno. */
 export function ingredientiPrincipaliRipetuti(pasti: PastoConIngredienti[]): string[] {
-  if (pasti.length !== 2) return [];
-  const [primo, secondo] = pasti;
+  if (pasti.length < 2) return [];
 
-  const nomiPrimo = new Set(
-    primo.ingredienti
-      .filter((i) => REPARTI_PRINCIPALI.has(i.reparto))
-      .map((i) => i.nome.trim().toLowerCase()),
-  );
+  // Per ogni ingrediente principale, quanti pasti DIVERSI lo usano (non
+  // quante occorrenze totali) e il suo nome come scritto nell'ultimo pasto
+  // in cui compare.
+  const occorrenze = new Map<string, { nomeOriginale: string; pastiCount: number }>();
 
-  const ripetuti = secondo.ingredienti.filter(
-    (i) => REPARTI_PRINCIPALI.has(i.reparto) && nomiPrimo.has(i.nome.trim().toLowerCase()),
-  );
+  for (const pasto of pasti) {
+    const principaliInQuestoPasto = new Map<string, string>();
+    for (const ing of pasto.ingredienti) {
+      if (!REPARTI_PRINCIPALI.has(ing.reparto)) continue;
+      const chiave = ing.nome.trim().toLowerCase();
+      if (!principaliInQuestoPasto.has(chiave)) principaliInQuestoPasto.set(chiave, ing.nome);
+    }
+    for (const [chiave, nomeOriginale] of principaliInQuestoPasto) {
+      const esistente = occorrenze.get(chiave);
+      if (esistente) {
+        esistente.pastiCount += 1;
+        esistente.nomeOriginale = nomeOriginale;
+      } else {
+        occorrenze.set(chiave, { nomeOriginale, pastiCount: 1 });
+      }
+    }
+  }
 
-  return [...new Set(ripetuti.map((i) => i.nome))];
+  return [...occorrenze.values()].filter((v) => v.pastiCount > 1).map((v) => v.nomeOriginale);
 }
 
 export type ConflittoGiorno = { giorno: string; ingredienti: string[] };
@@ -73,8 +86,9 @@ export function conflittiDopoScambio(
 }
 
 /**
- * Cerca un altro giorno (stesso indice pasto, es. pranzo con pranzo) con
- * cui scambiare `giornoA`/`indiceA` senza generare conflitti — per
+ * Cerca un altro giorno (stesso indice pasto, es. colazione con colazione,
+ * pranzo con pranzo) con cui scambiare `giornoA`/`indiceA` senza generare
+ * conflitti — per
  * proporre un'alternativa invece di limitarsi a bloccare lo scambio.
  */
 export function suggerisciGiornoAlternativo(

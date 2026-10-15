@@ -37,7 +37,7 @@ describe.skipIf(!haChiaveApi)("Smoke test — API Anthropic reale", () => {
 
       expect(piano.giorni).toHaveLength(7);
       for (const giorno of piano.giorni) {
-        expect(giorno.pasti).toHaveLength(2);
+        expect(giorno.pasti).toHaveLength(3);
         for (const pasto of giorno.pasti) {
           const rischi = ingredientiDaSegnalare(pasto.ingredienti.map((i) => i.nome), ["glutine"]);
           expect(rischi, `${giorno.giorno} ${pasto.tipo} (${pasto.nome}): ${rischi.join(", ")}`).toEqual([]);
@@ -83,7 +83,7 @@ describe.skipIf(!haChiaveApi)("Smoke test — API Anthropic reale", () => {
       const piano = await adattaBudget(profiloCeliaco, creaPianoEsempio(), 60, 25);
 
       expect(piano.giorni).toHaveLength(7);
-      piano.giorni.forEach((g) => expect(g.pasti).toHaveLength(2));
+      piano.giorni.forEach((g) => expect(g.pasti).toHaveLength(3));
     },
     30_000,
   );
@@ -224,7 +224,7 @@ describe.skipIf(!haChiaveApi)("Smoke test — API Anthropic reale", () => {
     // controllo glutine + controllo varietà + adattamento budget), non solo
     // generateMealPlan da sola, perché il collasso nasceva dall'interazione
     // tra "ridurre gli sprechi" e l'adattamento al budget.
-    "profilo celiachia + \"Ridurre gli sprechi\" produce 14 ricette distinte e una spesa con più di 3 ingredienti",
+    "profilo celiachia + \"Ridurre gli sprechi\" produce 21 ricette distinte e una spesa con più di 3 ingredienti",
     async () => {
       const profiloSprechi: ProfiloPerPiano = {
         restrizioni: ["Glutine (celiachia)"],

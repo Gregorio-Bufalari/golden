@@ -642,6 +642,56 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     test: i qualificatori "vegano"/"vegetariano" non matchavano le forme declinate per genere
     ("maionese **vegana**" non conteneva la sottostringa esatta "vegano") — corretti in prefissi
     "vegan"/"vegetarian". Nessuna modifica alla generazione del piano o alla UI.
+27. **(questa sessione)**: **Colazione aggiunta al piano settimanale** (prima solo pranzo+cena).
+    Confermata l'assunzione di partenza senza fermarsi: colazione fissa generata per tutti, non
+    opzionale in onboarding — la struttura ad array a lunghezza fissa è già il pattern esistente
+    per pranzo/cena, estenderla a 3 è il percorso più semplice e coerente, nessun vincolo
+    architetturale reale la rende sconsigliabile. Verifica preliminare (come richiesto): il numero
+    di pasti era hardcoded in un solo punto isolato, lo zod schema in `claude.ts`
+    (`PastoSchema.tipo` enum + `GiornoSchema.pasti.length(2)`), più i prompt testuali nelle 4
+    funzioni che generano/modificano il piano (`generateMealPlan`, `modificaPiano`, `adattaBudget`,
+    `regeneratePasto`) — non sparso in moduli diversi. `piano-validazione.ts` e `grocery.ts` erano
+    **già** completamente generici (iterano `giorni[].pasti` senza assumere quanti sono), nessuna
+    modifica necessaria lì: eredita automaticamente la garanzia di sicurezza/batch
+    cooking/varietà/lista spesa per il terzo pasto. **Due bug reali trovati** durante la verifica
+    (non introdotti da questa modifica, pre-esistenti ma silenziosi finché ogni giorno aveva
+    esattamente 2 pasti): (1) `varieta-giorno.ts` aveva `if (pasti.length !== 2) return [];` —
+    con 3 pasti al giorno il controllo "stesso ingrediente principale ripetuto nello stesso
+    giorno" (usato prima di uno scambio pasti) smetteva di funzionare silenziosamente per
+    QUALUNQUE giorno, mai più un conflitto rilevato. Riscritto in modo generico (conta, per
+    ingrediente principale, in quanti pasti DISTINTI del giorno compare, qualunque sia N).
+    (2) Tre punti UI avevano `pasto.tipo === "pranzo" ? "Pranzo" : "Cena"` (`menu-view.tsx`,
+    `preferiti-view.tsx`, `archivio/[settimana]/page.tsx`): con la colazione questo ternario
+    binario l'avrebbe etichettata "Cena" per errore. Sostituiti con una mappa
+    `ETICHETTA_TIPO_PASTO` a 3 voci in ciascun file. **Target nutrizionali per pasto**: il valore
+    oggi impostato dall'utente per pranzo/cena viene trattato come "metà di un totale giornaliero
+    implicito" e ridistribuito 25% colazione / 35% pranzo / 40% cena (`FRAZIONE_OBIETTIVO_PER_PASTO`
+    in `claude.ts`, funzione `scalaObiettivi`) — scelto così il totale giornaliero resta invariato
+    aggiungendo un pasto, invece di applicare lo stesso valore assoluto a tutti e 3 (che avrebbe
+    alzato il target giornaliero del 50% senza che l'utente lo chiedesse). `buildContestoProfilo`
+    accetta ora un `tipoPasto` opzionale: generazione settimanale/modifica/budget elencano tutti e
+    3 i target nel prompt, `regeneratePasto` (un solo pasto alla volta) passa solo quello
+    pertinente. Aggiunta istruzione `ISTRUZIONI_COLAZIONE` (piatti tipici da colazione, non una
+    "variante ridotta" di pranzo/cena) alle 4 funzioni AI. **Preferiti**: tipo esteso a
+    `"colazione" | "pranzo" | "cena"` in `preferiti-scoperta.ts` e `preferiti-actions.ts` — la
+    logica di sostituzione/rotazione era già generica (match per tipo via `findIndex`), nessun
+    altro cambio lì. **Richiede una migration manuale su Supabase** (non eseguita da questa
+    sessione, sandbox senza rete verso Supabase):
+    `supabase/migrations/2026-10-15_add_colazione_tipo_preferiti.sql` aggiorna il CHECK constraint
+    di `preferiti.tipo` per accettare anche `'colazione'` — senza, salvare un preferito di
+    colazione fallisce silenziosamente lato server action. Test: 2 bug fix coperti da nuovi test
+    mirati con 3 pasti/giorno in `varieta-giorno.test.ts` e `piano-validazione.test.ts`
+    (`assicuraVarieta`), nuovi test in `claude.test.ts` per l'istruzione colazione e la
+    ridistribuzione 25/35/40 nel prompt, `claude.smoke.test.ts` aggiornato (lunghezza pasti
+    2→3, "14"→"21" ricette) ma non eseguito (nessun credito API disponibile in questa sessione).
+    Verificato visivamente via `previewtmp` + Playwright che il Menu etichetta correttamente
+    Colazione/Pranzo/Cena. **Non toccato**: `piano-esempio.ts` (fixture di test condivisa) resta
+    a 2 pasti/giorno di proposito — i test che la usano verificano logica generica che non dipende
+    dal conteggio pasti; solo i nuovi test colazione-specifici costruiscono i propri dati a 3
+    pasti. Nota per un prossimo smoke test reale: i test `modificaPiano`/`adattaBudget` in
+    `claude.smoke.test.ts` passano ancora questa fixture a 2 pasti/giorno come input a una API che
+    ora si aspetta/richiede 3 pasti fissi nel prompt — comportamento dell'AI reale in quel caso
+    non verificato, da osservare alla prossima sessione con credito disponibile.
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —

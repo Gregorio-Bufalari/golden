@@ -125,7 +125,7 @@ create table if not exists preferiti (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references profiles(id) on delete cascade,
   nome text not null,
-  tipo text not null check (tipo in ('pranzo', 'cena')),
+  tipo text not null check (tipo in ('colazione', 'pranzo', 'cena')),
   ingredienti jsonb not null,
   tempo_preparazione_min integer,
   nutrizione jsonb,

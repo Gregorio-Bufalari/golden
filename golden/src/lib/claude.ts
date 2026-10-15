@@ -43,7 +43,7 @@ const NutrizioneSchema = z.object({
 });
 
 const PastoSchema = z.object({
-  tipo: z.enum(["pranzo", "cena"]),
+  tipo: z.enum(["colazione", "pranzo", "cena"]),
   nome: z.string(),
   ingredienti: z.array(IngredienteSchema),
   tempo_preparazione_min: z.number(),
@@ -61,7 +61,7 @@ const GiornoSchema = z.object({
     "Sabato",
     "Domenica",
   ]),
-  pasti: z.array(PastoSchema).length(2),
+  pasti: z.array(PastoSchema).length(3),
 });
 
 // Esportato (non solo il tipo inferito) perché /api/piano/conferma lo
@@ -115,7 +115,7 @@ const NOTA_COSTO_CONFEZIONI =
 
 const ISTRUZIONE_VARIETA =
   "Varietà (vincolo rigido quanto le restrizioni e il budget, mai sacrificabile per risparmiare o ridurre gli " +
-  "sprechi): i 14 pasti della settimana devono essere 14 ricette DISTINTE, mai lo stesso piatto ripetuto due " +
+  "sprechi): i 21 pasti della settimana devono essere 21 ricette DISTINTE, mai lo stesso piatto ripetuto due " +
   "volte (stesso nome o stessa combinazione con solo variazioni cosmetiche). Varia proteine, tipo di cottura, " +
   "cucina ed elaborazione dei piatti durante la settimana. Se l'obiettivo è ridurre gli sprechi o il costo, " +
   "ottienilo riusando gli stessi ingredienti di base in ricette diverse (vedi sopra), MAI riducendo il numero di " +
@@ -135,17 +135,69 @@ const ISTRUZIONE_BATCH_COOKING =
   "e sprecate in parte) sia lo spreco alimentare. Le ricette restano comunque distinte tra loro (vedi varietà " +
   "sopra): cambia la preparazione o il resto del piatto, non l'ingrediente principale condiviso.";
 
-function obiettiviNutrizionaliTesto(obiettivi: ObiettiviNutrizionaliPerPasto | null | undefined): string {
-  if (!obiettivi) return "non specificati";
+type TipoPasto = "colazione" | "pranzo" | "cena";
 
+// Il valore che l'utente imposta in Profilo si applicava finora identico a
+// pranzo E cena (2 pasti) — rappresenta quindi implicitamente metà di un
+// "totale giornaliero" (valore × 2). Con la colazione, ridistribuiamo
+// quello stesso totale sui 3 pasti con queste percentuali, così il target
+// giornaliero complessivo resta invariato rispetto a prima — nessuna
+// "proteina gratis" solo perché si aggiunge un pasto. Criterio scelto (non
+// richiesto esplicitamente dall'utente, valore ragionevole di default):
+// colazione più leggera, cena il pasto principale.
+const FRAZIONE_OBIETTIVO_PER_PASTO: Record<TipoPasto, number> = {
+  colazione: 0.25,
+  pranzo: 0.35,
+  cena: 0.4,
+};
+
+function scalaObiettivi(
+  obiettivi: ObiettiviNutrizionaliPerPasto,
+  frazione: number,
+): ObiettiviNutrizionaliPerPasto {
+  const scala = (v: number | null) => (v == null ? null : Math.round(v * 2 * frazione));
+  return {
+    calorie_min: scala(obiettivi.calorie_min),
+    calorie_max: scala(obiettivi.calorie_max),
+    proteine_min_g: scala(obiettivi.proteine_min_g),
+    carboidrati_max_g: scala(obiettivi.carboidrati_max_g),
+    grassi_max_g: scala(obiettivi.grassi_max_g),
+  };
+}
+
+function formattaObiettivi(obiettivi: ObiettiviNutrizionaliPerPasto): string {
   const parti: string[] = [];
   if (obiettivi.calorie_min != null) parti.push(`almeno ${obiettivi.calorie_min} kcal`);
   if (obiettivi.calorie_max != null) parti.push(`al massimo ${obiettivi.calorie_max} kcal`);
   if (obiettivi.proteine_min_g != null) parti.push(`almeno ${obiettivi.proteine_min_g}g di proteine`);
   if (obiettivi.carboidrati_max_g != null) parti.push(`al massimo ${obiettivi.carboidrati_max_g}g di carboidrati`);
   if (obiettivi.grassi_max_g != null) parti.push(`al massimo ${obiettivi.grassi_max_g}g di grassi`);
-
   return parti.length > 0 ? parti.join(", ") : "non specificati";
+}
+
+/**
+ * Testo degli obiettivi nutrizionali per il prompt. Se `tipoPasto` è dato
+ * (regeneratePasto, che rigenera UN pasto di tipo noto), restituisce il
+ * target già scalato per quel pasto. Altrimenti (generateMealPlan/
+ * modificaPiano/adattaBudget, che gestiscono l'intero piano con tutti e 3 i
+ * tipi insieme in una sola chiamata) elenca il target per ciascuno dei 3
+ * tipi, così l'AI sa come ripartirli in un'unica generazione multi-pasto.
+ */
+function obiettiviNutrizionaliTesto(
+  obiettivi: ObiettiviNutrizionaliPerPasto | null | undefined,
+  tipoPasto?: TipoPasto,
+): string {
+  if (!obiettivi) return "non specificati";
+
+  if (tipoPasto) {
+    return formattaObiettivi(scalaObiettivi(obiettivi, FRAZIONE_OBIETTIVO_PER_PASTO[tipoPasto]));
+  }
+
+  return (
+    `colazione (circa 25% del target giornaliero): ${formattaObiettivi(scalaObiettivi(obiettivi, FRAZIONE_OBIETTIVO_PER_PASTO.colazione))}; ` +
+    `pranzo (circa 35%): ${formattaObiettivi(scalaObiettivi(obiettivi, FRAZIONE_OBIETTIVO_PER_PASTO.pranzo))}; ` +
+    `cena (circa 40%): ${formattaObiettivi(scalaObiettivi(obiettivi, FRAZIONE_OBIETTIVO_PER_PASTO.cena))}`
+  );
 }
 
 function obiettivoConNota(obiettivo: string | null): string {
@@ -165,7 +217,7 @@ function obiettivoConNota(obiettivo: string | null): string {
   return obiettivo;
 }
 
-function buildContestoProfilo(profilo: ProfiloPerPiano): string {
+function buildContestoProfilo(profilo: ProfiloPerPiano, tipoPasto?: TipoPasto): string {
   const righe = [
     `Restrizioni alimentari (vincolo rigido, da rispettare SEMPRE senza eccezioni): ${
       profilo.restrizioni.length > 0 ? profilo.restrizioni.join(", ") : "nessuna"
@@ -173,7 +225,7 @@ function buildContestoProfilo(profilo: ProfiloPerPiano): string {
     `Obiettivo: ${obiettivoConNota(profilo.obiettivo)}`,
     `Obiettivi nutrizionali per pasto (vincolo aggiuntivo, stessa priorità dell'obiettivo generale — sempre ` +
       `sotto restrizioni alimentari e budget, da rispettare quando possibile senza violarli): ` +
-      obiettiviNutrizionaliTesto(profilo.obiettivi_nutrizionali),
+      obiettiviNutrizionaliTesto(profilo.obiettivi_nutrizionali, tipoPasto),
     `Cucina preferita: ${profilo.preferenze?.cucina?.join(", ") || "qualsiasi"}`,
     `Alimenti graditi: ${profilo.preferenze?.graditi || "nessuna preferenza specifica"}`,
     `Alimenti non graditi (da evitare): ${profilo.preferenze?.non_graditi || "nessuno"}`,
@@ -208,6 +260,12 @@ const ISTRUZIONI_PREPARAZIONE =
   "Per ogni pasto indica anche il campo preparazione: un array di 3-6 passaggi brevi e chiari, in italiano, " +
   "che spiegano come cucinare il piatto dall'inizio alla fine, scritti per chi ha poca esperienza in cucina.";
 
+const ISTRUZIONI_COLAZIONE =
+  "Per il pasto di tipo 'colazione': proponi piatti tipici da colazione, non una variante ridotta di pranzo o " +
+  "cena — es. yogurt con frutta e cereali, pane/fette biscottate con marmellata o miele, uova, frutta fresca, " +
+  "a seconda delle preferenze e restrizioni del profilo. Più leggera di pranzo e cena, coerente con il target " +
+  "nutrizionale indicato per quel pasto.";
+
 const ISTRUZIONE_SCOPERTA =
   "L'utente ha scelto la modalità 'Scoperta': non vuole il piano più prevedibile e sicuro, vuole provare cose " +
   "diverse dal solito. Proponi ricette, cucine, tecniche di cottura e ingredienti che normalmente non sceglieresti " +
@@ -226,13 +284,13 @@ const ISTRUZIONE_SCOPERTA =
  * strutturato, questo compone solo il testo del system prompt.
  *
  * Moduli usati da ciascuna funzione, oggi:
- *   generateMealPlan — varietà, batch cooking, scoperta (se attiva),
+ *   generateMealPlan — varietà, batch cooking, colazione, scoperta (se attiva),
  *     ingredienti, nutrizione, preparazione, dispensa, stagionalità
- *   modificaPiano     — varietà, ingredienti, nutrizione, preparazione,
+ *   modificaPiano     — varietà, colazione, ingredienti, nutrizione, preparazione,
  *     dispensa, stagionalità
- *   adattaBudget      — nota costo confezioni, varietà, batch cooking,
+ *   adattaBudget      — nota costo confezioni, varietà, batch cooking, colazione,
  *     ingredienti, nutrizione, preparazione, dispensa, stagionalità
- *   regeneratePasto   — ingredienti, nutrizione, preparazione, dispensa,
+ *   regeneratePasto   — colazione, ingredienti, nutrizione, preparazione, dispensa,
  *     stagionalità (la varietà qui è gestita per-chiamata da nomiDaEvitare,
  *     più precisa del modulo generale)
  */
@@ -249,7 +307,7 @@ export async function generateMealPlan(
     model: MODEL,
     max_tokens: 16000,
     system:
-      "Sei un assistente che genera piani settimanali di pasti (pranzo e cena, 7 giorni) in italiano. " +
+      "Sei un assistente che genera piani settimanali di pasti (colazione, pranzo e cena, 7 giorni) in italiano. " +
       "Le restrizioni alimentari sono un vincolo rigido e non negoziabile: non includere MAI, nemmeno in tracce dichiarate, un ingrediente incompatibile con le restrizioni indicate. " +
       "Se è indicato un budget settimanale, è anch'esso un vincolo rigido: il totale stimato della spesa (somma di tutti i prezzo_stimato_eur dell'intero piano) non deve superarlo. " +
       "Rispetta anche l'obiettivo generale e gli eventuali obiettivi nutrizionali per pasto (stessa priorità " +
@@ -258,6 +316,7 @@ export async function generateMealPlan(
       componiIstruzioni([
         ISTRUZIONE_VARIETA,
         ISTRUZIONE_BATCH_COOKING,
+        ISTRUZIONI_COLAZIONE,
         modalita === "scoperta" ? ISTRUZIONE_SCOPERTA : null,
         ISTRUZIONI_INGREDIENTI,
         ISTRUZIONI_NUTRIZIONE,
@@ -268,7 +327,7 @@ export async function generateMealPlan(
     messages: [
       {
         role: "user",
-        content: `Genera il piano settimanale (pranzo e cena per ognuno dei 7 giorni) per questo profilo:\n\n${buildContestoProfilo(
+        content: `Genera il piano settimanale (colazione, pranzo e cena per ognuno dei 7 giorni) per questo profilo:\n\n${buildContestoProfilo(
           profilo,
         )}`,
       },
@@ -339,7 +398,7 @@ export async function modificaPiano(
       "In quel caso imposta modifica_applicata a false, spiega brevemente il motivo in motivo_rifiuto (in italiano, " +
       "rivolgendoti direttamente all'utente) e restituisci il piano INVARIATO. Se invece la richiesta è compatibile, " +
       "applicala, imposta modifica_applicata a true e motivo_rifiuto a null. " +
-      "Il piano ha sempre esattamente 14 pasti fissi (7 giorni, pranzo e cena): non puoi aggiungere o togliere " +
+      "Il piano ha sempre esattamente 21 pasti fissi (7 giorni, colazione pranzo e cena): non puoi aggiungere o togliere " +
       "pasti, ma puoi cambiarne liberamente la composizione. Se la richiesta implica un cambiamento significativo " +
       "nella quantità settimanale di un ingrediente o di un nutriente (es. usarne molto di più o di meno), la " +
       "soluzione migliore è quasi sempre cambiare QUALI pasti lo contengono — sostituendo un piatto con un altro " +
@@ -347,6 +406,7 @@ export async function modificaPiano(
       "fino a renderle irrealistiche per una persona (es. non proporre mai 800g di pollo in un solo piatto). " +
       componiIstruzioni([
         ISTRUZIONE_VARIETA,
+        ISTRUZIONI_COLAZIONE,
         ISTRUZIONI_INGREDIENTI,
         ISTRUZIONI_NUTRIZIONE,
         ISTRUZIONI_PREPARAZIONE,
@@ -367,7 +427,7 @@ export async function modificaPiano(
     output_config: {
       // "medium", non "low" come le generazioni massive: qui l'AI deve
       // interpretare con più cura una richiesta mirata (es. "aumenta le
-      // proteine di tot grammi"), non solo elencare 14 pasti.
+      // proteine di tot grammi"), non solo elencare 21 pasti.
       effort: "medium",
       format: zodOutputFormat(ModificaOutputSchema),
     },
@@ -412,6 +472,7 @@ export async function adattaBudget(
         NOTA_COSTO_CONFEZIONI,
         ISTRUZIONE_VARIETA,
         ISTRUZIONE_BATCH_COOKING,
+        ISTRUZIONI_COLAZIONE,
         ISTRUZIONI_INGREDIENTI,
         ISTRUZIONI_NUTRIZIONE,
         ISTRUZIONI_PREPARAZIONE,
@@ -427,7 +488,7 @@ export async function adattaBudget(
           `Il costo REALE di questo piano, calcolato dopo l'acquisto (confezioni intere e fascia del supermercato), è €${totaleAttualeEur.toFixed(2)}, ma il budget settimanale è €${budgetEur}. ` +
           "Il modo più efficace per abbassarlo non è ridurre di poco ogni quantità, ma RIDURRE IL NUMERO DI INGREDIENTI DI BASE DIVERSI E SPECIFICI usati nella settimana " +
           "(riusa le stesse spezie/condimenti/basi in RICETTE DIVERSE invece di introdurre un ingrediente nuovo ogni volta) e sostituire gli ingredienti più costosi — " +
-          "le 14 ricette devono però restare 14 piatti distinti, mai lo stesso piatto ripetuto più volte nella settimana. " +
+          "le 21 ricette devono però restare 21 piatti distinti, mai lo stesso piatto ripetuto più volte nella settimana. " +
           "Punta a un costo comodamente sotto il budget (non appena sotto), perché l'arrotondamento alle confezioni reali può far risalire il totale. " +
           "Rivedi il piano per rientrare nel budget, restituendo tutti i 7 giorni.",
       },
@@ -460,6 +521,7 @@ export async function regeneratePasto(
       "Sei un assistente che rigenera un singolo pasto di un piano settimanale, in italiano. " +
       "Le restrizioni alimentari sono un vincolo rigido: non includere MAI un ingrediente incompatibile. " +
       componiIstruzioni([
+        ISTRUZIONI_COLAZIONE,
         ISTRUZIONI_INGREDIENTI,
         ISTRUZIONI_NUTRIZIONE,
         ISTRUZIONI_PREPARAZIONE,
@@ -470,7 +532,7 @@ export async function regeneratePasto(
       {
         role: "user",
         content:
-          `Rigenera il ${pasto.tipo} di ${giorno} per questo profilo:\n\n${buildContestoProfilo(profilo)}\n\n` +
+          `Rigenera il ${pasto.tipo} di ${giorno} per questo profilo:\n\n${buildContestoProfilo(profilo, pasto.tipo)}\n\n` +
           (ingredientiDaEvitare.length > 0
             ? `Il pasto precedente proposto (${pasto.nome}) conteneva questi ingredienti a rischio, da evitare assolutamente nella nuova proposta: ${ingredientiDaEvitare.join(", ")}.\n\n`
             : "") +
