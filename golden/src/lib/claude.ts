@@ -9,8 +9,9 @@ import { calcolaCostoUsd, type UsageChiamataAI } from "./costo-ai";
 // Sonnet invece di Opus: elencare pasti/ingredienti/prezzi non richiede un
 // ragionamento complesso, e Sonnet genera molto più velocemente — importante
 // per restare entro i tempi di esecuzione di una funzione serverless. La
-// sicurezza celiaca non dipende dal modello: resta garantita dal controllo
-// statico in glutine-check.ts, applicato comunque dopo la generazione.
+// sicurezza su celiachia/allergeni non dipende dal modello: resta garantita
+// dal controllo statico in allergeni-check.ts, applicato comunque dopo la
+// generazione.
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
 
 const client = new Anthropic();

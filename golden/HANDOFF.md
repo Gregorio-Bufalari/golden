@@ -153,7 +153,9 @@ src/lib/piano-validazione.ts — pipeline di validazione POST-generazione, nessu
                                 nella settimana), adattaEntroBudget (retry budget — chiama SEMPRE
                                 assicuraVarieta anche internamente, sui giorni iniziali e dopo
                                 ogni tentativo, così qualunque chiamante la ottiene gratis)
-src/lib/glutine-check.ts     — classificazione statica per ingrediente a 4 categorie (vedi sotto)
+src/lib/allergeni-check.ts   — classificazione statica per ingrediente a 4 categorie, per 4
+                                allergeni (glutine, frutta a guscio, uova, pesce/crostacei —
+                                vedi sotto)
 src/lib/grocery.ts           — costruzione lista della spesa da un piano validato
 src/lib/dispensa.ts          — saldo "rimanenze" tra una settimana e l'altra
 src/lib/conservazione.ts     — categoria di conservazione per ingrediente (Frigo)
@@ -405,19 +407,32 @@ src/app/manifest.ts — web manifest, richiesto perché il service worker possa 
   `fonte_nutrizione` nello snapshot (nuova migration) — indipendente dal piano live, che la
   ricalcola sempre fresca ogni volta che passa da `validaGiorni`.
 
-## Validazione sicurezza glutine — a 4 livelli (cambiata di recente)
+## Validazione sicurezza allergeni — a 4 livelli, 4 allergeni (generalizzata di recente)
 
-`src/lib/glutine-check.ts`: `categorizzaIngrediente(nome)` restituisce una di:
-- `"verificato"` — certificazione esplicita ("senza glutine", "certificato")
+`src/lib/allergeni-check.ts` (prima `glutine-check.ts`, rinominato quando generalizzato — vedi
+voce cronologica dedicata): `categorizzaIngrediente(nome, allergeni)` restituisce una di, per
+ciascuno degli allergeni attivi per il profilo (unione per sicurezza: basta che un ingrediente sia
+rischioso per UNO degli allergeni richiesti):
+- `"verificato"` — certificazione esplicita ("senza glutine", "vegan", "certificato")
 - `"informazioni_sufficienti"` — nessun segnale di rischio, o sicuro per natura (es. "pasta di riso")
-- `"da_verificare"` — dipende da marca/formulazione (dado vegetale, salsa di soia, besciamella,
-  avena, cuscus, malto) — **non blocca** il pasto, solo segnalato per controllo etichetta
-- `"non_adatto"` — glutine senza ambiguità (farina di frumento, pane, pasta, orzo, segale, farro,
-  kamut, seitan) — **blocca** il pasto, fa scattare un tentativo di rigenerazione AI
-  (`regeneratePasto`, max 2 tentativi)
+- `"da_verificare"` — dipende da marca/formulazione (es. dado vegetale/salsa di soia per il
+  glutine, pesto/cioccolato per la frutta a guscio, pasta fresca/pane per le uova, salsa worcester
+  per pesce/crostacei) — **non blocca** il pasto, solo segnalato per controllo etichetta
+- `"non_adatto"` — rischio senza ambiguità (es. farina di frumento/pane/pasta per il glutine,
+  mandorle/noci/arachidi per la frutta a guscio, uova/maionese per le uova, salmone/gamberi/cozze
+  per pesce e crostacei) — **blocca** il pasto, fa scattare un tentativo di rigenerazione AI
+  (`regeneratePasto`, max 2 tentativi, generico: non menziona mai un allergene specifico nel
+  prompt, riceve solo l'elenco di nomi ingrediente da evitare)
 
-Il banner nel Menu ("Verifica necessaria" di una volta) ora distingue rosso/clay ("Non adatto",
-rigenerazione fallita) da ambra/honey ("Da verificare", solo da controllare in etichetta).
+Allergeni gestiti con questo controllo deterministico: glutine (celiachia), frutta a guscio, uova,
+pesce/crostacei — mappati dalle esatte stringhe di `profiles.restrizioni` tramite
+`allergeniDalProfilo()`. Le altre restrizioni selezionabili in onboarding (Lattosio, Vegetariano,
+Vegano) **non hanno ancora** un controllo deterministico: restano affidate solo al prompt AI,
+esattamente come tutte e quattro erano prima di questa generalizzazione.
+
+Il banner nel Menu ("Verifica necessaria" di una volta) distingue rosso/clay ("Non adatto",
+rigenerazione fallita) da ambra/honey ("Da verificare", solo da controllare in etichetta) — stesso
+comportamento di prima, ora alimentato da più allergeni insieme.
 
 ## Ordine cronologico di cosa è stato costruito (PR #16 → #54, tutte mergiate)
 
@@ -605,8 +620,28 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     vero della calibrazione prezzi dopo un check-in (richiede scrivere/leggere `checkins` su
     Supabase, irraggiungibile da questo sandbox) e la persistenza degli scenari budget dopo un
     cambio tab nel browser reale (nessun fix del genere trovato nel codice).
-
-## Cose da sapere / residuo noto
+26. **(questa sessione)**: **Validazione sicurezza generalizzata a 4 allergeni** (prima solo
+    glutine). Verifica preliminare (come richiesto, prima di scrivere codice): la selezione
+    restrizioni in onboarding era **già** un multi-select generico (`RESTRIZIONI_OPTIONS`) e
+    includeva **già** "Frutta a guscio"/"Uova"/"Pesce/Crostacei" come opzioni — nulla da aggiungere
+    in UI. La validazione a 4 livelli invece era scritta specificamente per il glutine (liste di
+    parole chiave hardcoded, nessun parametro "quale allergene"); `regeneratePasto` era già
+    completamente generico (mai la parola "glutine" nel suo prompt). Nessun campo ingrediente
+    dedicato per gli allergeni, ma non serve: lo stesso meccanismo a parole chiave sul nome
+    dell'ingrediente già usato per il glutine si estende naturalmente, nessun gap bloccante.
+    **Rinominato** `glutine-check.ts` → `allergeni-check.ts`: nuovo tipo `Allergene`, una
+    `RegoleAllergene` (4 liste di parole chiave) per ciascuno dei 4 allergeni,
+    `allergeniDalProfilo()` mappa le restrizioni esatte del profilo agli allergeni gestiti,
+    `categorizzaIngrediente`/`ingredientiNonAdatti`/`ingredientiDaVerificare`/
+    `ingredientiDaSegnalare` ora accettano `Allergene[]` invece di operare implicitamente sul
+    glutine — per un profilo con più restrizioni attive, un ingrediente rischioso per UNO
+    qualsiasi degli allergeni richiesti blocca/segnala il pasto (unione per sicurezza, mai la
+    media o il livello più permissivo). `piano-validazione.ts` aggiornato di conseguenza
+    (`richiedeControlloGlutine` booleano → `allergeniAttivi: Allergene[]`), stessa identica
+    struttura del ciclo di rigenerazione, nessun'altra modifica. Bug trovato e corretto durante i
+    test: i qualificatori "vegano"/"vegetariano" non matchavano le forme declinate per genere
+    ("maionese **vegana**" non conteneva la sottostringa esatta "vegano") — corretti in prefissi
+    "vegan"/"vegetarian". Nessuna modifica alla generazione del piano o alla UI.
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —

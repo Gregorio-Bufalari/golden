@@ -157,6 +157,107 @@ describe("validaGiorni — controllo glutine con rigenerazione simulata dall'AI"
   });
 });
 
+describe("validaGiorni — più allergeni attivi insieme (profilo con più restrizioni)", () => {
+  const profiloCeliacoEUova: ProfiloPerPiano = {
+    ...profiloCeliaco,
+    restrizioni: ["Glutine (celiachia)", "Uova"],
+  };
+
+  it("rigenera un pasto a rischio per il SECONDO allergene (uova), non solo il primo (glutine)", async () => {
+    const giorni = [
+      {
+        giorno: "Lunedì" as const,
+        pasti: [
+          pasto({
+            tipo: "pranzo",
+            nome: "Frittata di verdure",
+            ingredienti: [ingrediente({ nome: "Uova", quantita: 3, unita: "pz", reparto: "Latticini e uova" })],
+          }),
+          pasto({
+            tipo: "cena",
+            nome: "Riso al pomodoro",
+            ingredienti: [ingrediente({ nome: "Riso", quantita: 100, unita: "g", reparto: "Dispensa" })],
+          }),
+        ],
+      },
+    ];
+    mockRegeneratePasto.mockResolvedValueOnce(
+      pasto({
+        tipo: "pranzo",
+        nome: "Verdure saltate",
+        ingredienti: [ingrediente({ nome: "Zucchine", quantita: 200, unita: "g", reparto: "Frutta e verdura" })],
+      }),
+    );
+
+    const risultato = await validaGiorni(profiloCeliacoEUova, giorni);
+
+    expect(mockRegeneratePasto).toHaveBeenCalledTimes(1);
+    expect(mockRegeneratePasto).toHaveBeenCalledWith(profiloCeliacoEUova, "Lunedì", giorni[0].pasti[0], ["Uova"], expect.anything());
+    expect(risultato[0].pasti[0].nome).toBe("Verdure saltate");
+  });
+
+  it("un pasto a rischio su ENTRAMBI gli allergeni passa entrambi i nomi da evitare alla rigenerazione", async () => {
+    const giorni = [
+      {
+        giorno: "Lunedì" as const,
+        pasti: [
+          pasto({
+            tipo: "pranzo",
+            nome: "Pasta all'uovo",
+            ingredienti: [
+              ingrediente({ nome: "Pasta", quantita: 100, unita: "g", reparto: "Pane e cereali" }),
+              ingrediente({ nome: "Uova", quantita: 2, unita: "pz", reparto: "Latticini e uova" }),
+            ],
+          }),
+          pasto({
+            tipo: "cena",
+            nome: "Riso al pomodoro",
+            ingredienti: [ingrediente({ nome: "Riso", quantita: 100, unita: "g", reparto: "Dispensa" })],
+          }),
+        ],
+      },
+    ];
+    mockRegeneratePasto.mockResolvedValueOnce(pastoRiso());
+
+    await validaGiorni(profiloCeliacoEUova, giorni);
+
+    expect(mockRegeneratePasto).toHaveBeenCalledWith(
+      profiloCeliacoEUova,
+      "Lunedì",
+      giorni[0].pasti[0],
+      expect.arrayContaining(["Pasta", "Uova"]),
+      expect.anything(),
+    );
+  });
+
+  it("un profilo con un solo allergene non reagisce a un ingrediente a rischio per un allergene diverso non dichiarato", async () => {
+    const giorni = [
+      {
+        giorno: "Lunedì" as const,
+        pasti: [
+          pasto({
+            tipo: "pranzo",
+            nome: "Frittata di verdure",
+            ingredienti: [ingrediente({ nome: "Uova", quantita: 3, unita: "pz", reparto: "Latticini e uova" })],
+          }),
+          pasto({
+            tipo: "cena",
+            nome: "Riso al pomodoro",
+            ingredienti: [ingrediente({ nome: "Riso", quantita: 100, unita: "g", reparto: "Dispensa" })],
+          }),
+        ],
+      },
+    ];
+
+    // profiloCeliaco ha SOLO glutine tra le restrizioni: le uova non sono un allergene attivo per questo profilo.
+    const risultato = await validaGiorni(profiloCeliaco, giorni);
+
+    expect(mockRegeneratePasto).not.toHaveBeenCalled();
+    expect(risultato[0].pasti[0].nome).toBe("Frittata di verdure");
+    expect(risultato[0].pasti[0].verificare).toBeUndefined();
+  });
+});
+
 describe("validaGiorni — fonte_nutrizione (CREA/INRAN vs stima AI)", () => {
   it("usa il dato CREA/INRAN quando tutti gli ingredienti del pasto sono coperti", async () => {
     const giorni = [

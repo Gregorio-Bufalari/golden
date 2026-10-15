@@ -1,6 +1,6 @@
 import "server-only";
 import { regeneratePasto, adattaBudget, type Pasto, type Giorno, type ProfiloPerPiano } from "./claude";
-import { ingredientiNonAdatti, ingredientiDaVerificare } from "./glutine-check";
+import { ingredientiNonAdatti, ingredientiDaVerificare, allergeniDalProfilo } from "./allergeni-check";
 import { buildGroceryList, type GroceryList, type ConsumoDispensa } from "./grocery";
 import { calcolaNutrizionePasto, type FonteNutrizione } from "./nutrizione-crea";
 
@@ -29,16 +29,17 @@ export type GiornoValidato = {
 
 /**
  * Controlla ogni pasto con la validazione a quattro livelli (vedi
- * glutine-check.ts) e rigenera solo quelli con un ingrediente "non
- * adatto" (glutine senza ambiguità): un ingrediente "da verificare"
- * (dipende dalla marca, es. dado vegetale) resta nel piano e viene solo
- * segnalato più sotto, senza sprecare un tentativo dell'AI su un
- * ingrediente che è spesso comunque sicuro. Le rigenerazioni di un
+ * allergeni-check.ts) e rigenera solo quelli con un ingrediente "non
+ * adatto" per almeno uno degli allergeni attivi per il profilo (glutine
+ * senza ambiguità, frutta a guscio, uova, pesce/crostacei): un ingrediente
+ * "da verificare" (dipende dalla marca, es. dado vegetale) resta nel piano
+ * e viene solo segnalato più sotto, senza sprecare un tentativo dell'AI su
+ * un ingrediente che è spesso comunque sicuro. Le rigenerazioni di un
  * singolo giro vengono lanciate in parallelo (non un pasto alla volta in
  * sequenza) per restare entro i tempi di esecuzione della funzione su
  * Vercel.
  *
- * Unica validazione di sicurezza glutine dell'app: ogni punto che
+ * Unica validazione di sicurezza allergeni dell'app: ogni punto che
  * modifica il piano (generazione, "Proponi un piatto diverso",
  * "Sostituisci"/"Non l'ho trovato" nella lista della spesa, lo scambio
  * pasti) passa da qui — nessun controllo separato altrove.
@@ -48,15 +49,15 @@ export async function validaGiorni(
   giorni: Giorno[],
   dispensa: Map<string, number> = new Map(),
 ): Promise<GiornoValidato[]> {
-  const richiedeControlloGlutine = profilo.restrizioni?.includes("Glutine (celiachia)");
+  const allergeniAttivi = allergeniDalProfilo(profilo.restrizioni);
   const pasti: PastoValidato[][] = giorni.map((g) => [...g.pasti]);
 
-  if (richiedeControlloGlutine) {
+  if (allergeniAttivi.length > 0) {
     for (let tentativo = 0; tentativo < MAX_RIGENERAZIONI; tentativo++) {
       const daRigenerare: { gi: number; pi: number; nonAdatti: string[] }[] = [];
       for (let gi = 0; gi < pasti.length; gi++) {
         for (let pi = 0; pi < pasti[gi].length; pi++) {
-          const nonAdatti = ingredientiNonAdatti(pasti[gi][pi].ingredienti.map((i) => i.nome));
+          const nonAdatti = ingredientiNonAdatti(pasti[gi][pi].ingredienti.map((i) => i.nome), allergeniAttivi);
           if (nonAdatti.length > 0) daRigenerare.push({ gi, pi, nonAdatti });
         }
       }
@@ -77,8 +78,8 @@ export async function validaGiorni(
     for (let gi = 0; gi < pasti.length; gi++) {
       for (let pi = 0; pi < pasti[gi].length; pi++) {
         const nomi = pasti[gi][pi].ingredienti.map((i) => i.nome);
-        const nonAdatti = ingredientiNonAdatti(nomi);
-        const daVerificare = ingredientiDaVerificare(nomi);
+        const nonAdatti = ingredientiNonAdatti(nomi, allergeniAttivi);
+        const daVerificare = ingredientiDaVerificare(nomi, allergeniAttivi);
         const daSegnalare = [...nonAdatti, ...daVerificare];
         if (daSegnalare.length > 0) {
           pasti[gi][pi] = {

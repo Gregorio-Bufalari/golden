@@ -4,7 +4,7 @@ import type { Giorno, Ingrediente, Nutrizione, Pasto } from "@/lib/claude";
 // piano settimanale completo (7 giorni x pranzo/cena = 14 pasti). Pensato
 // per esercitare in un colpo solo i casi che contano:
 // - "Pasta al pomodoro" (Lunedì pranzo): ingrediente a rischio glutine
-//   ("pasta"), per i test di glutine-check.ts / validaGiorni.
+//   ("pasta"), per i test di allergeni-check.ts / validaGiorni.
 // - "Petto di pollo alla griglia" (Lunedì cena): 300g di pollo, confezione
 //   reale da 500g -> 200g di avanzo, lo stesso scenario verificato con
 //   l'utente durante lo sviluppo della dispensa.
