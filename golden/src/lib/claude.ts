@@ -305,7 +305,17 @@ export async function generateMealPlan(
 ): Promise<MealPlan> {
   const response = await client.messages.parse({
     model: MODEL,
-    max_tokens: 16000,
+    // 20000 invece di 16000: con colazione+pranzo+cena (21 pasti, non più
+    // 14) il modello può esaurire l'intero budget nel solo "pensiero"
+    // interno (thinking, condiviso con max_tokens su Sonnet 5.5, nessun
+    // tetto separato possibile) prima di scrivere il piano — osservato dal
+    // vivo (stop_reason "max_tokens", 16000/16000 token tutti di thinking,
+    // zero output). Non si può alzare oltre ~21333 restando non-streaming
+    // (l'SDK rifiuta e impone lo streaming sopra quella soglia, calcolata
+    // da max_tokens) senza passare a client.messages.stream(), cambio più
+    // ampio non ancora fatto — questo valore è la mitigazione massima
+    // possibile senza quel cambio.
+    max_tokens: 20000,
     system:
       "Sei un assistente che genera piani settimanali di pasti (colazione, pranzo e cena, 7 giorni) in italiano. " +
       "Le restrizioni alimentari sono un vincolo rigido e non negoziabile: non includere MAI, nemmeno in tracce dichiarate, un ingrediente incompatibile con le restrizioni indicate. " +
@@ -389,7 +399,9 @@ export async function modificaPiano(
 ): Promise<RisultatoModifica> {
   const response = await client.messages.parse({
     model: MODEL,
-    max_tokens: 16000,
+    // Vedi commento in generateMealPlan: stesso rischio di esaurire
+    // max_tokens nel solo thinking con un piano a 21 pasti.
+    max_tokens: 20000,
     system:
       "Sei un assistente che modifica un piano settimanale di pasti già esistente, in base a una richiesta " +
       "dell'utente in linguaggio naturale, in italiano. Applica SOLO la modifica richiesta, lasciando invariato " +
@@ -462,7 +474,9 @@ export async function adattaBudget(
 ): Promise<MealPlan> {
   const response = await client.messages.parse({
     model: MODEL,
-    max_tokens: 16000,
+    // Vedi commento in generateMealPlan: stesso rischio di esaurire
+    // max_tokens nel solo thinking con un piano a 21 pasti.
+    max_tokens: 20000,
     system:
       "Sei un assistente che riduce il costo di un piano settimanale di pasti già esistente, in italiano, " +
       "senza violare le restrizioni alimentari (vincolo rigido, non negoziabile) e senza stravolgere le preferenze. " +
