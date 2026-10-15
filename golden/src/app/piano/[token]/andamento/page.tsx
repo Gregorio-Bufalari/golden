@@ -102,7 +102,7 @@ export default async function AndamentoPage({
       <PageHeader token={token} title="Andamento" />
 
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-5 pb-10">
-        <div className="bg-panel rounded-[14px] px-5 py-[18px]">
+        <div className="bg-paper rounded-[14px] px-5 py-[18px]">
           <div className="text-[13px] font-medium text-ink/65">Risparmiato rispetto al budget</div>
           <div className="mt-1 font-mono text-[28px] font-semibold text-ink">
             {risparmioCumulativo !== null ? `€${risparmioCumulativo.toFixed(2)}` : "—"}
@@ -133,7 +133,7 @@ export default async function AndamentoPage({
           )}
         </div>
 
-        <div className="bg-panel rounded-[14px] px-5 py-[18px]">
+        <div className="bg-paper rounded-[14px] px-5 py-[18px]">
           <div className="text-[13px] font-medium text-ink/65">Sprechi dichiarati</div>
           <div className="mt-1 text-lg font-bold text-ink">
             {percentualeSenzaSprechi !== null
@@ -147,7 +147,7 @@ export default async function AndamentoPage({
           )}
         </div>
 
-        <div className="bg-panel rounded-[14px] px-5 py-[18px]">
+        <div className="bg-paper rounded-[14px] px-5 py-[18px]">
           <div className="text-[13px] font-medium text-ink/65">Sprechi evitati</div>
           <div className="mt-1 font-mono text-[28px] font-semibold text-ink">
             €{sprechiEvitati.totale.toFixed(2)}

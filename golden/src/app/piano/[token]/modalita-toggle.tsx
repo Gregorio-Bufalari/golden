@@ -10,12 +10,12 @@ export function ModalitaToggle({
   disabled?: boolean;
 }) {
   return (
-    <div className={`flex w-full rounded-[10px] bg-panel p-[3px] transition-opacity ${disabled ? "opacity-50" : ""}`}>
+    <div className={`flex w-full rounded-[10px] bg-paper p-[3px] transition-opacity ${disabled ? "opacity-50" : ""}`}>
       <button
         onClick={() => onSwitch("routine")}
         disabled={disabled}
         className={`flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition-colors ${
-          modalita === "routine" ? "bg-accent text-accent-fill-text" : "text-ink"
+          modalita === "routine" ? "bg-dark text-dark-fill-text" : "text-ink"
         }`}
       >
         Routine
@@ -24,7 +24,7 @@ export function ModalitaToggle({
         onClick={() => onSwitch("scoperta")}
         disabled={disabled}
         className={`flex-1 rounded-lg py-2.5 text-[13px] font-medium transition-colors ${
-          modalita === "scoperta" ? "bg-accent text-accent-fill-text" : "text-ink"
+          modalita === "scoperta" ? "bg-dark text-dark-fill-text" : "text-ink"
         }`}
       >
         Scoperta

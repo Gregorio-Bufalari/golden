@@ -88,14 +88,14 @@ export function NotifichePush({ token }: { token: string }) {
 
   if (stato === "attivo") {
     return (
-      <div className="bg-panel px-4 py-3 text-[13px] text-ink">
+      <div className="bg-paper px-4 py-3 text-[13px] text-ink">
         Notifiche attive: ti avviseremo prima che qualcosa scada, anche senza aprire l&apos;app.
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 bg-panel px-4 py-3">
+    <div className="flex items-center justify-between gap-3 bg-paper px-4 py-3">
       <p className="text-[13px] text-ink">
         Vuoi essere avvertito prima che qualcosa scada, anche senza aprire l&apos;app?
       </p>
@@ -112,7 +112,7 @@ export function NotifichePush({ token }: { token: string }) {
           type="button"
           onClick={handleAttiva}
           disabled={stato === "attivando"}
-          className="rounded-full bg-accent px-4 py-2 text-xs font-semibold text-accent-fill-text disabled:opacity-50"
+          className="rounded-full bg-dark px-4 py-2 text-xs font-semibold text-dark-fill-text disabled:opacity-50"
         >
           {stato === "attivando" ? "Attivo..." : "Attiva notifiche"}
         </button>

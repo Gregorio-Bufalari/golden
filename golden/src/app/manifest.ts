@@ -11,8 +11,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Meal planning settimanale con attenzione a restrizioni alimentari e sprechi",
     start_url: "/",
     display: "standalone",
-    background_color: "#fbfbf6",
-    theme_color: "#425a30",
+    background_color: "#f3e8d9",
+    theme_color: "#f3e8d9",
     icons: [
       {
         src: "/logo.png",

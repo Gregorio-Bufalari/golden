@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createProfile, type OnboardingInput } from "./actions";
 import { Spinner } from "@/components/spinner";
+import { Logo } from "@/components/logo";
+import { RestrizioneIcon } from "@/components/restrizione-icon";
 import { inputClass, labelClass, checkboxClass, optionRowClass, Pill } from "@/components/form-kit";
 import { SupermercatoSelector } from "@/components/supermercato-selector";
 import {
@@ -128,15 +129,15 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center bg-paper px-6 py-10">
+    <div className="flex flex-1 flex-col items-center bg-bg px-6 py-10">
       <div className="w-full max-w-xl">
         <div className="mb-8 flex flex-col items-center gap-6">
-          <Image src="/logo.png" alt="Groci" height={40} width={132} style={{ height: 40, width: "auto" }} priority />
+          <Logo size={78} />
           <div className="flex w-full items-center justify-between text-sm text-ink/60">
             <span>
               Passo {step + 1} di {totalSteps}
             </span>
-            <div className="mx-4 h-1.5 flex-1 rounded-full bg-panel">
+            <div className="mx-4 h-1.5 flex-1 rounded-full bg-paper">
               <div
                 className="h-1.5 rounded-full bg-accent transition-all"
                 style={{ width: `${((step + 1) / totalSteps) * 100}%` }}
@@ -174,6 +175,7 @@ export default function OnboardingPage() {
                       onChange={() => toggleRestrizione(opt)}
                       className={checkboxClass}
                     />
+                    <RestrizioneIcon opzione={opt} />
                     {opt}
                   </label>
                 ))}
@@ -412,7 +414,7 @@ export default function OnboardingPage() {
                 type="button"
                 onClick={() => setStep((s) => s + 1)}
                 disabled={!canAdvance}
-                className="min-h-11 rounded-full bg-accent px-6 text-sm font-semibold text-accent-fill-text disabled:opacity-40"
+                className="min-h-11 rounded-full bg-dark px-6 text-sm font-semibold text-dark-fill-text disabled:opacity-40"
               >
                 Avanti
               </button>
@@ -421,7 +423,7 @@ export default function OnboardingPage() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="flex min-h-11 items-center gap-2 rounded-full bg-accent px-6 text-sm font-semibold text-accent-fill-text disabled:opacity-40"
+                className="flex min-h-11 items-center gap-2 rounded-full bg-dark px-6 text-sm font-semibold text-dark-fill-text disabled:opacity-40"
               >
                 {submitting && <Spinner className="h-4 w-4" />}
                 {submitting ? "Creazione in corso..." : "Crea il mio piano"}
@@ -430,7 +432,7 @@ export default function OnboardingPage() {
           </div>
         </div>
 
-        <div className="mt-8 bg-panel px-5 py-4 text-center text-sm text-ink/70">
+        <div className="mt-8 bg-paper px-5 py-4 text-center text-sm text-ink/70">
           Non vendiamo i tuoi dati ai supermercati. Non ti spingiamo prodotti a margine. L&apos;abbonamento
           è la nostra unica fonte di guadagno.
         </div>

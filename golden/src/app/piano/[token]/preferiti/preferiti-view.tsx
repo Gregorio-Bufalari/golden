@@ -76,7 +76,7 @@ export function PreferitiView({ token, initialPreferiti }: { token: string; init
                 type="button"
                 onClick={() => haPreparazione && setEspanso(aperto ? null : p.nome)}
                 disabled={!haPreparazione}
-                className="block w-full rounded-[14px] bg-panel px-5 py-[18px] pr-14 text-left disabled:cursor-default"
+                className="block w-full rounded-[14px] bg-paper px-5 py-[18px] pr-14 text-left disabled:cursor-default"
               >
                 <div className="text-[13px] font-medium text-ink/60">
                   {ETICHETTA_TIPO_PASTO[p.tipo]}
@@ -112,14 +112,14 @@ export function PreferitiView({ token, initialPreferiti }: { token: string; init
                 onClick={() => handleRimuovi(p.nome)}
                 aria-label={`Rimuovi ${p.nome} dai preferiti`}
                 aria-pressed="true"
-                className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center text-accent"
+                className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center text-dark"
               >
                 <HeartIcon pieno />
               </button>
             </div>
 
             {aperto && haPreparazione && (
-              <ol className="flex list-decimal flex-col gap-1 rounded-[14px] bg-panel px-5 py-4 pl-9 text-sm text-ink/80">
+              <ol className="flex list-decimal flex-col gap-1 rounded-[14px] bg-paper px-5 py-4 pl-9 text-sm text-ink/80">
                 {p.preparazione?.map((passo, j) => (
                   <li key={j}>{passo}</li>
                 ))}

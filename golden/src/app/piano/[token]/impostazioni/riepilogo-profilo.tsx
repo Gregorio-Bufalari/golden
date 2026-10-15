@@ -53,7 +53,7 @@ export function RiepilogoProfilo({
 }) {
   return (
     <div className="flex flex-col gap-6 pb-10 text-left">
-      <div className="bg-panel rounded-[14px] p-5">
+      <div className="bg-paper rounded-[14px] p-5">
         <Riga label="Nome" value={profile.nome || NON_IMPOSTATO} />
         <Riga
           label="Restrizioni alimentari"
@@ -84,7 +84,7 @@ export function RiepilogoProfilo({
           Opzionali. Servono solo per mostrarti, nella sezione Menu, un confronto indicativo tra il piano e i
           valori di riferimento nutrizionali generali. Nessun dato viene usato per generare il piano.
         </p>
-        <div className="bg-panel rounded-[14px] p-5">
+        <div className="bg-paper rounded-[14px] p-5">
           <Riga label="Sesso" value={formattaSesso(profile.sesso)} />
           <Riga label="Età" value={profile.eta ? String(profile.eta) : NON_IMPOSTATO} />
           <Riga label="Peso" value={profile.peso_kg ? `${profile.peso_kg} kg` : NON_IMPOSTATO} />
@@ -99,14 +99,14 @@ export function RiepilogoProfilo({
           Opzionali. Un vincolo in più per il motore, con la stessa priorità dell&apos;obiettivo generale — sempre
           sotto restrizioni alimentari e budget.
         </p>
-        <div className="bg-panel rounded-[14px] p-5">
+        <div className="bg-paper rounded-[14px] p-5">
           <Riga label="Target per pasto" value={formattaObiettiviNutrizionali(profile.obiettivi_nutrizionali)} />
         </div>
       </div>
 
       <Link
         href={`/piano/${token}/archivio`}
-        className="flex min-h-11 items-center justify-center self-start rounded-full bg-panel px-6 text-sm font-semibold text-ink"
+        className="flex min-h-11 items-center justify-center self-start rounded-full bg-paper px-6 text-sm font-semibold text-ink"
       >
         Settimane passate
       </Link>
@@ -114,7 +114,7 @@ export function RiepilogoProfilo({
       <button
         type="button"
         onClick={onModifica}
-        className="flex min-h-11 items-center justify-center self-start rounded-full bg-accent px-6 text-sm font-semibold text-accent-fill-text"
+        className="flex min-h-11 items-center justify-center self-start rounded-full bg-dark px-6 text-sm font-semibold text-dark-fill-text"
       >
         Modifica
       </button>

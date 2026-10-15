@@ -72,7 +72,7 @@ export function BottomNav({ token }: { token: string }) {
 
   return (
     <nav
-      className="sticky bottom-0 z-10 flex shrink-0 border-t border-ink/10 bg-paper px-1.5 pb-[calc(10px+env(safe-area-inset-bottom,0px))] pt-1.5 print:hidden"
+      className="sticky bottom-0 z-10 flex shrink-0 border-t border-ink/10 bg-bg px-1.5 pb-[calc(10px+env(safe-area-inset-bottom,0px))] pt-1.5 print:hidden"
       style={{ paddingBottom: "calc(10px + env(safe-area-inset-bottom, 0px))" }}
     >
       {TABS.map((tab) => {

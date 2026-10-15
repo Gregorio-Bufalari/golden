@@ -17,9 +17,9 @@ export function SupermercatoSelector({
   onChange: (supermercato: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="grid grid-cols-4 gap-1.5">
       {SUPERMERCATO_OPTIONS.map((opt) => (
-        <Pill key={opt} label={opt} selected={value === opt} onClick={() => onChange(opt)} />
+        <Pill key={opt} label={opt} selected={value === opt} onClick={() => onChange(opt)} compact />
       ))}
     </div>
   );
