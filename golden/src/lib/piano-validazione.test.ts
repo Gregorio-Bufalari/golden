@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { creaPianoEsempio, ingrediente, pasto } from "@/test/fixtures/piano-esempio";
+import { creaPianoEsempio, ingrediente, pasto, nutrizione } from "@/test/fixtures/piano-esempio";
 import type { ProfiloPerPiano, Pasto, Giorno } from "@/lib/claude";
 import { validaGiorni, assicuraVarieta, adattaEntroBudget } from "./piano-validazione";
 
@@ -412,6 +412,47 @@ describe("assicuraVarieta — niente due pasti con lo stesso nome nella settiman
     expect(mockRegeneratePasto).toHaveBeenCalledTimes(1);
     expect(risultato[0].pasti[0].nome).toBe("Yogurt con frutta");
     expect(risultato[1].pasti[0].nome).toBe("Pane e marmellata");
+  });
+
+  it("non rigenera un 'pasto fuori casa' (ingredienti vuoti) anche se il nome si ripete nella settimana", async () => {
+    // Convenzione introdotta per "giovedì mangio fuori" (vedi istruzione
+    // dedicata in modificaPiano): ingredienti/preparazione vuoti, nutrizione
+    // a zero. Più occorrenze dello stesso nome placeholder nella settimana
+    // sono normali, non un doppione — assicuraVarieta non deve rigenerarle.
+    const fuoriCasa = () =>
+      pasto({
+        tipo: "pranzo",
+        nome: "Fuori casa — nessuna preparazione necessaria",
+        ingredienti: [],
+        nutrizione: nutrizione({ calorie: 0, proteine_g: 0, carboidrati_g: 0, grassi_g: 0, fibre_g: 0 }),
+        preparazione: [],
+      });
+
+    const giorni: Giorno[] = [
+      {
+        giorno: "Lunedì",
+        pasti: [
+          pasto({ tipo: "colazione", nome: "Yogurt con frutta", ingredienti: [ingrediente({ nome: "Yogurt" })] }),
+          fuoriCasa(),
+          pasto({ tipo: "cena", nome: "Frittata", ingredienti: [ingrediente({ nome: "Uova" })] }),
+        ],
+      },
+      {
+        giorno: "Giovedì",
+        pasti: [
+          pasto({ tipo: "colazione", nome: "Pane e marmellata", ingredienti: [ingrediente({ nome: "Pane" })] }),
+          fuoriCasa(),
+          pasto({ tipo: "cena", nome: "Pasta al tonno", ingredienti: [ingrediente({ nome: "Pasta" })] }),
+        ],
+      },
+    ];
+
+    const giorniValidati = await validaGiorni(profiloSenzaRestrizioni, giorni);
+    const risultato = await assicuraVarieta(profiloSenzaRestrizioni, giorniValidati);
+
+    expect(mockRegeneratePasto).not.toHaveBeenCalled();
+    expect(risultato[0].pasti[1].nome).toBe("Fuori casa — nessuna preparazione necessaria");
+    expect(risultato[1].pasti[1].nome).toBe("Fuori casa — nessuna preparazione necessaria");
   });
 });
 

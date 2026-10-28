@@ -411,11 +411,22 @@ export async function modificaPiano(
       "rivolgendoti direttamente all'utente) e restituisci il piano INVARIATO. Se invece la richiesta è compatibile, " +
       "applicala, imposta modifica_applicata a true e motivo_rifiuto a null. " +
       "Il piano ha sempre esattamente 21 pasti fissi (7 giorni, colazione pranzo e cena): non puoi aggiungere o togliere " +
-      "pasti, ma puoi cambiarne liberamente la composizione. Se la richiesta implica un cambiamento significativo " +
+      "pasti, ma puoi cambiarne liberamente la composizione. Se la richiesta dice che l'utente mangerà fuori, salterà " +
+      "un pasto o non ha bisogno di cucinare per uno specifico pasto (es. 'giovedì mangio fuori', 'salta il pranzo di " +
+      "sabato'), NON rifiutarla e non lasciare il pasto invariato: applicala impostando per quel pasto ingredienti: [] " +
+      "(array vuoto), nutrizione tutta a 0, preparazione: [] (array vuoto) e nome descrittivo del motivo (es. 'Fuori " +
+      "casa — nessuna preparazione necessaria'), diverso per ogni giorno interessato in modo che il nome non si " +
+      "ripeta identico più volte nella settimana. Resta comunque un pasto valido nello schema (tutti i campi " +
+      "richiesti sono presenti), semplicemente senza ingredienti da comprare né valore nutrizionale. " +
+      "Se la richiesta implica un cambiamento significativo " +
       "nella quantità settimanale di un ingrediente o di un nutriente (es. usarne molto di più o di meno), la " +
       "soluzione migliore è quasi sempre cambiare QUALI pasti lo contengono — sostituendo un piatto con un altro " +
       "che usa di più (o di meno) quell'ingrediente — piuttosto che alterare le porzioni di una singola ricetta " +
       "fino a renderle irrealistiche per una persona (es. non proporre mai 800g di pollo in un solo piatto). " +
+      "Se la richiesta nomina un ingrediente specifico (es. 'ho già comprato il pollo', 'non voglio più usare le " +
+      "uova'), controlla TUTTI i 7 giorni del piano per quell'ingrediente, non solo il pasto più ovvio o il primo " +
+      "che lo contiene: se compare in più pasti, applica la stessa modifica a ciascuno di essi in modo coerente — " +
+      "altrimenti l'ingrediente resterebbe comunque necessario per gli altri pasti non toccati. " +
       componiIstruzioni([
         ISTRUZIONE_VARIETA,
         ISTRUZIONI_COLAZIONE,

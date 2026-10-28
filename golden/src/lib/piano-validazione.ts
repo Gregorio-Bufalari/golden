@@ -140,6 +140,12 @@ export async function assicuraVarieta(
     const daRigenerare: { gi: number; pi: number }[] = [];
     for (let gi = 0; gi < pasti.length; gi++) {
       for (let pi = 0; pi < pasti[gi].length; pi++) {
+        // "Pasto fuori casa" (ingredienti: [], vedi istruzione dedicata in
+        // modificaPiano): non è una ricetta vera, più occorrenze nella
+        // stessa settimana sono normali e previste, non un doppione da
+        // rigenerare — altrimenti l'AI reinventerebbe un piatto vero al
+        // posto del pasto saltato, vanificando la richiesta dell'utente.
+        if (pasti[gi][pi].ingredienti.length === 0) continue;
         const chiave = chiaveNomePasto(pasti[gi][pi].nome);
         if (viste.has(chiave)) {
           daRigenerare.push({ gi, pi });
