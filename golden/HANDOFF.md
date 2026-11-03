@@ -960,6 +960,40 @@ Questa sessione (dalla PR #32 in poi), in ordine:
       revisione del codice.
     - 258 test, lint, build puliti (nessuna logica di business toccata, solo UI/testo/tipo di un
       campo).
+35. **(questa sessione, dopo che il founder ha segnalato lentezza e poi il log Vercel esatto)**:
+    risolto il timeout 🔴 CRITICO su `/api/piano/generate` già previsto in BACKLOG — confermato dal
+    founder con il log reale: `Vercel Runtime Timeout Error: Task timed out after 300 seconds`.
+    - **Causa**: con un budget impostato, Equilibrato girava sempre per primo in sequenza (con fino
+      a 2 tentativi di `adattaBudget` se sopra budget, ognuno un'intera chiamata AI in streaming su
+      21 pasti), e SOLO DOPO partivano Risparmio/Abbondante — in parallelo tra loro, ma non con
+      Equilibrato. Tempo totale = `tempo(Equilibrato) + max(Risparmio, Abbondante)`, facile da
+      superare 300s con più tentativi budget in gioco.
+    - **Fix 1** (`src/app/api/piano/generate/route.ts`): quando il profilo ha un budget
+      settimanale, i target di Risparmio (-20%) e Abbondante (+20%) sono ora calcolati da QUEL
+      budget invece che dal costo reale di Equilibrato — questo permette di lanciare tutti e 3 gli
+      scenari in `Promise.allSettled` insieme fin da subito, circa dimezzando il tempo totale.
+      **Cambio di comportamento deliberato e concordato con l'utente**: prima i delta erano sempre
+      relativi al costo EFFETTIVO di Equilibrato (anche con budget impostato); ora, quando c'è un
+      budget, sono relativi al budget DICHIARATO. Senza budget impostato nessun cambiamento (resta
+      sequenziale, serve comunque il costo reale di Equilibrato come riferimento).
+    - **Fix 2** (`src/lib/piano-validazione.ts`): `MAX_TENTATIVI_BUDGET` da 2 a 1 — un tentativo
+      `adattaBudget` in meno per scenario nel caso peggiore. Non tocca `MAX_RIGENERAZIONI`
+      (allergeni) né `MAX_RIGENERAZIONI_VARIETA`, lasciati a 2 — sicurezza invariata. Un test in
+      `piano-validazione.test.ts` aggiornato di conseguenza (atteso 1 tentativo, non più 2).
+    - **`maxDuration` NON alzato** (resta 300, non portato a 800): valutato ma scartato dopo aver
+      verificato via web search che Vercel Pro arriva a 800s SOLO con "Fluid Compute" attivo
+      esplicitamente nelle impostazioni del progetto — non verificabile da questo sandbox, e
+      dichiarare un valore più alto senza quello rischia di far fallire il build/deploy invece di
+      limitarsi a non avere effetto. Se il timeout si ripresenta nonostante questo fix, il prossimo
+      passo è verificare Fluid Compute con l'utente.
+    - **Verificato dal vivo**: replicata la logica di `generaScenario` (bypassando le parti
+      Supabase — dispensa/calibrazione/favorito, non toccate da questo fix) con un budget
+      volutamente irrealistico (35€) per forzare `adattaBudget` su tutti e 3 gli scenari (caso
+      quasi-peggiore) — **122.9s totali per i 3 scenari insieme**, ben sotto i 300s (contro i 236s
+      misurati il 15 ottobre con la struttura sequenziale, in un caso meno estremo).
+    - Smoke test temporaneo (`__verifica-parallelizzazione.smoke.test.ts`) scritto, eseguito,
+      cancellato prima del commit — nessuna traccia nel diff.
+    - 258 test, lint, build puliti.
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —

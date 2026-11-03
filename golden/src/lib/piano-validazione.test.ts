@@ -502,8 +502,8 @@ describe("adattaEntroBudget — adattamento costi con risposta AI simulata", () 
 
     const risultato = await adattaEntroBudget(profiloSenzaRestrizioni, giorni, "Esselunga", 0.01);
 
-    // Al massimo 2 tentativi (MAX_TENTATIVI_BUDGET), non all'infinito.
-    expect(mockAdattaBudget).toHaveBeenCalledTimes(2);
+    // Al massimo 1 tentativo (MAX_TENTATIVI_BUDGET), non all'infinito.
+    expect(mockAdattaBudget).toHaveBeenCalledTimes(1);
     expect(risultato.budgetSuperato).toBe(true);
   });
 
