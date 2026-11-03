@@ -413,7 +413,7 @@ export function ImpostazioniForm({
         </div>
       </div>
 
-      {errore && <p className="text-sm text-clay">{errore}</p>}
+      {errore && <p className="text-sm text-error">{errore}</p>}
 
       <div className="flex items-center gap-2">
         <button

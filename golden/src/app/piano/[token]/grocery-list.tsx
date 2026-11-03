@@ -367,7 +367,7 @@ export function GroceryList({
         </button>
       </div>
 
-      {errore && <p className="text-sm text-clay print:hidden">{errore}</p>}
+      {errore && <p className="text-sm text-error print:hidden">{errore}</p>}
       {rifiuto && <div className="bg-honey-soft px-3.5 py-2.5 text-sm text-ink print:hidden">{rifiuto}</div>}
       {sostituzioneInfo && <div className="bg-paper px-3.5 py-2.5 text-sm text-ink print:hidden">{sostituzioneInfo}</div>}
 

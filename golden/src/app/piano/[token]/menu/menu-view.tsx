@@ -526,7 +526,7 @@ export function MenuView({
               {loading ? "Genero il piano..." : "Genera il piano della settimana"}
             </button>
             {loading && <p className="text-xs text-ink/50">Può richiedere qualche secondo...</p>}
-            {error && <p className="text-sm text-clay">{error}</p>}
+            {error && <p className="text-sm text-error">{error}</p>}
           </div>
         )}
 
@@ -541,7 +541,7 @@ export function MenuView({
               </p>
             </div>
 
-            {erroreConferma && <p className="text-sm text-clay">{erroreConferma}</p>}
+            {erroreConferma && <p className="text-sm text-error">{erroreConferma}</p>}
 
             <div className="flex flex-col gap-3">
               {scenari.map((scenario) => {
@@ -608,7 +608,7 @@ export function MenuView({
                 {loading ? "Genero..." : "Altri suggerimenti"}
               </button>
             )}
-            {error && <p className="text-sm text-clay">{error}</p>}
+            {error && <p className="text-sm text-error">{error}</p>}
 
             {budgetSuperato && budgetSettimanale && budgetStimato && (
               <div className="bg-honey-soft px-4 py-3 text-sm text-ink">
@@ -696,7 +696,7 @@ export function MenuView({
                 </div>
               </div>
             )}
-            {erroreScambio && <p className="text-sm text-clay">{erroreScambio}</p>}
+            {erroreScambio && <p className="text-sm text-error">{erroreScambio}</p>}
 
             <div className="flex flex-col gap-7">
               {giorni.map((giorno) => (
@@ -922,7 +922,7 @@ export function MenuView({
                 placeholder="Scrivi qui la modifica..."
                 className="w-full rounded-xl bg-paper px-3.5 py-3 text-sm text-ink placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-accent/40"
               />
-              {erroreModifica && <p className="mt-2 text-sm text-clay">{erroreModifica}</p>}
+              {erroreModifica && <p className="mt-2 text-sm text-error">{erroreModifica}</p>}
               {rifiutoModifica && (
                 <div className="mt-2 bg-honey-soft px-3.5 py-2.5 text-sm text-ink">{rifiutoModifica}</div>
               )}

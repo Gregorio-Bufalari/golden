@@ -11,12 +11,17 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Meal planning settimanale con attenzione a restrizioni alimentari e sprechi",
     start_url: "/",
     display: "standalone",
-    background_color: "#f3e8d9",
-    theme_color: "#f3e8d9",
+    background_color: "#fbfaf6",
+    theme_color: "#fbfaf6",
     icons: [
       {
-        src: "/logo.png",
-        sizes: "883x412",
+        src: "/icon-192",
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        src: "/icon-512",
+        sizes: "512x512",
         type: "image/png",
       },
     ],

@@ -835,6 +835,50 @@ Questa sessione (dalla PR #32 in poi), in ordine:
       dimensione simile dell'output (21 pasti).
     - Smoke test di nuovo in file temporaneo cancellato dopo l'uso, nessuna traccia nel diff.
       `BACKLOG.md` aggiornato in-place.
+32. **(questa sessione)**: implementato il nuovo design system "Groci" (palette navy + logo
+    Fredoka), specificato dal founder con valori esatti (hex, font, formule per letter-spacing e
+    icona app). Sostituisce la precedente palette crema/terracotta-scuro.
+    - **Palette** (`globals.css`): `--dark` passa da `#7a3b22` (terracotta scuro) a `#192338`
+      (navy) — ripaint automatico di tutti i bottoni primari/badge/chip selezionati che già
+      usavano `bg-dark`/`text-dark`, nessuna modifica ai singoli componenti necessaria.
+      `--accent` (`#c4713e`) e `--ink` (`#1c1b17`) restano invariati (stesso hex di prima). Nuovi
+      token `--error` (`#b14b3c`, messaggi di errore) e `--icon-bg` (`#d9e1f1`, solo per la tile
+      dell'icona app). `--bg` unificato a `#fbfaf6` (bianco caldo) per pagina E card — prima erano
+      due toni distinti (`--bg` crema `#f3e8d9` per la pagina, `--paper` bianco per le card);
+      `--paper` resta come alias dello stesso valore per non dover rinominare le classi
+      `bg-paper` già usate ovunque. `clay`/`honey`/`tan-soft` invariati (restano la coppia
+      semantica di rischio/attenzione alimentare, non fanno parte di questo restyle).
+    - **Migrazione semantica error vs rischio**: gli ~9 punti che mostravano un vero messaggio di
+      errore testuale (stato `error`/`errore*`, validazione form o errori di rete) sono passati da
+      `text-clay` al nuovo `text-error` — `impostazioni-form.tsx`, `menu-view.tsx` (4 punti),
+      `grocery-list.tsx`, `checkin-form.tsx` (2 punti), `onboarding/page.tsx`. Lasciati `text-clay`
+      invece i 3 punti che sono avvisi di rischio alimentare, non errori: "Non adatto." in
+      `menu-view.tsx` (allergeni) e "Scaduti."/"In scadenza domani." in `frigo/page.tsx`
+      (scadenze) — stesso principio della coppia semantica già descritta sopra.
+    - **Font**: aggiunto Fredoka (peso 500, via `next/font/google`) solo per il wordmark, non per
+      testo UI (resta Jost). `components/logo.tsx` riscritto: testo sempre minuscolo `"groci"`
+      (mai "Groci"), colore `text-dark` (prima `text-ink`), letter-spacing calcolato
+      (`size * -0.097`px), niente più rotazione -3° (era un tocco "scritto a mano" in Caveat
+      Brush, non più coerente con un wordmark Fredoka pulito). Verificato visivamente con
+      Playwright su `/onboarding` (size 78) — reso correttamente.
+    - **Icona app**: nuovo modulo `src/lib/app-icon.tsx` (condiviso) genera via `next/og`
+      `ImageResponse` una tile squircle (`border-radius` ~22% della dimensione, sfondo
+      `--icon-bg`) col wordmark "groci" centrato (font-size ~43% della tile, letter-spacing
+      -9.7% del font-size, `transform: translateY` di circa -11% del font-size per compensare
+      otticamente la gambetta discendente della "g" di Fredoka — confermato via satori/`next/og`,
+      che supporta `transform`). Font Fredoka-Medium.ttf scaricato da Google Fonts in
+      `src/assets/fonts/` (satori non può usare `next/font`, richiede il buffer del file
+      direttamente). File creati: `app/icon.tsx` (32×32, favicon), `app/apple-icon.tsx` (180×180),
+      `app/icon-192/route.tsx` e `app/icon-512/route.tsx` (Route Handler semplici, URL stabili
+      `/icon-192`/`/icon-512` non generate-dal-convention-file, referenziate direttamente in
+      `manifest.ts` per l'installazione PWA — il convention file `icon.tsx` con
+      `generateImageMetadata` avrebbe prodotto URL con hash, scomode da hardcodare lì).
+      Rimossi `src/app/favicon.ico` e `public/logo.png` (branding vecchio, non più referenziati
+      da nessuna parte dopo l'aggiornamento di `manifest.ts`) — **nota**: alcuni browser datati
+      richiedono `/favicon.ico` direttamente ignorando il `<link rel="icon">`; senza quel file
+      danno un 404 innocuo in console, non un errore visibile all'utente. Verificato con
+      screenshot reali (`icon-512`, `icon-192`): centratura e proporzioni corrette.
+    - 258 test invariati (nessuna logica di business toccata), lint e build puliti.
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —

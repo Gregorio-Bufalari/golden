@@ -276,7 +276,7 @@ export function CheckinForm({ token }: { token: string }) {
             solo il totale precompila il campo sopra.
           </p>
 
-          {erroreScontrino && <p className="mt-2 text-xs text-clay">{erroreScontrino}</p>}
+          {erroreScontrino && <p className="mt-2 text-xs text-error">{erroreScontrino}</p>}
 
           {confrontoScontrino && (
             <div className="mt-3 flex flex-col gap-1.5">
@@ -306,7 +306,7 @@ export function CheckinForm({ token }: { token: string }) {
         </div>
       </div>
 
-      {error && <p className="text-sm text-clay">{error}</p>}
+      {error && <p className="text-sm text-error">{error}</p>}
 
       <button
         onClick={handleSubmit}
