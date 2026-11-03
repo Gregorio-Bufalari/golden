@@ -797,6 +797,88 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     258 test passano (255 + 3 nuovi), lint e build puliti. Dettagli completi, incluse le citazioni
     esatte dei commit e dei file toccati, in `BACKLOG.md` (voci aggiornate, non nuove voci
     separate, per tenere la cronologia di ciascun problema in un unico punto).
+30. **(questa sessione, dopo upgrade a Vercel Pro)**: verifica dal vivo (2 chiamate reali a
+    `modificaPiano`, Sonnet 5.5) dei fix di Task 1 e Task 3 sopra, con l'API key fornita
+    direttamente dal founder in chat e scritta solo in `.env.local` (gitignored, mai committata).
+    - **Task 1 confermato risolto**: piano di test con "Petto di pollo" condiviso tra due piatti
+      (Lunedì 300g, Mercoledì 400g), richiesta "ho già comprato il petto di pollo" ->
+      `modificaApplicata: true`, l'AI ha sostituito ENTRAMBI i piatti, zero "pollo" residuo.
+    - **Task 3 parzialmente confermato**: con la frase esatta del bug originale ("Giovedì mangio
+      fuori") il rifiuto è sparito e la convenzione pasto-vuoto viene applicata correttamente
+      (`ingredienti: []`). Ma con una frase paraphrasata di intento identico ("non devo cucinare
+      per la cena di giovedì") l'AI ha smesso di rifiutare ma ha proposto una ricetta vera invece
+      del pasto vuoto — il bug principale (rifiuto) è risolto, la convenzione specifica non è
+      robusta a ogni fraseggio. Non ancora verificato: comportamento UI con un pasto a
+      ingredienti/nutrizione vuoti.
+    - Smoke test scritti in file temporanei `src/lib/__*.smoke.test.ts`, eseguiti, output
+      catturato, poi cancellati prima di qualunque commit (nessuna traccia nel diff). `BACKLOG.md`
+      aggiornato in-place con gli esiti verificati. **Non verificabile da questo sandbox**: se
+      Vercel Pro (300s) risolve davvero il timeout di generazione piano — richiede un test
+      sull'app deployata vera, non riproducibile qui.
+31. **(questa sessione, su richiesta esplicita del founder di un test end-to-end più rigoroso)**:
+    riverificati Task 1 e Task 3 con un piano generato REALMENTE da `generateMealPlan` (non più
+    una fixture scritta a mano) e, per Task 3, passando anche dalla pipeline di produzione
+    completa (`validaGiorni` + `assicuraVarieta`, non solo `modificaPiano` isolato) — chiude i due
+    gap lasciati aperti dalla verifica precedente (entry #30).
+    - **Task 3**: "Giovedì mangio fuori, togli il pasto" -> accettata, slot vuoto creato. Passato
+      lo slot per `assicuraVarieta` (stesso percorso della route reale dopo ogni modifica): lo
+      slot vuoto non viene rigenerato come doppione — l'esenzione funziona anche su un piano AI
+      reale, non solo nei test mockati.
+    - **Task 1 su scala maggiore**: nel piano generato, "olio extravergine d'oliva" compariva in
+      5 giorni su 7. Richiesta di rimozione -> zero occorrenze residue in tutti i 5 giorni,
+      confermato assente anche dalla lista spesa ricostruita con `buildGroceryList` (non solo nel
+      piano stesso).
+    - Costo misurato delle 2 chiamate `modificaPiano`: $0.21763. Costo di `generateMealPlan` non
+      misurabile dall'esterno (quella funzione non restituisce `usage`, a differenza di
+      `modificaPiano`/`adattaBudget` — solo le modifiche via chat vengono loggate per costo in
+      questa app) — stimato per ordine di grandezza comparabile (~$0.08–0.12) in base alla
+      dimensione simile dell'output (21 pasti).
+    - Smoke test di nuovo in file temporaneo cancellato dopo l'uso, nessuna traccia nel diff.
+      `BACKLOG.md` aggiornato in-place.
+32. **(questa sessione)**: implementato il nuovo design system "Groci" (palette navy + logo
+    Fredoka), specificato dal founder con valori esatti (hex, font, formule per letter-spacing e
+    icona app). Sostituisce la precedente palette crema/terracotta-scuro.
+    - **Palette** (`globals.css`): `--dark` passa da `#7a3b22` (terracotta scuro) a `#192338`
+      (navy) — ripaint automatico di tutti i bottoni primari/badge/chip selezionati che già
+      usavano `bg-dark`/`text-dark`, nessuna modifica ai singoli componenti necessaria.
+      `--accent` (`#c4713e`) e `--ink` (`#1c1b17`) restano invariati (stesso hex di prima). Nuovi
+      token `--error` (`#b14b3c`, messaggi di errore) e `--icon-bg` (`#d9e1f1`, solo per la tile
+      dell'icona app). `--bg` unificato a `#fbfaf6` (bianco caldo) per pagina E card — prima erano
+      due toni distinti (`--bg` crema `#f3e8d9` per la pagina, `--paper` bianco per le card);
+      `--paper` resta come alias dello stesso valore per non dover rinominare le classi
+      `bg-paper` già usate ovunque. `clay`/`honey`/`tan-soft` invariati (restano la coppia
+      semantica di rischio/attenzione alimentare, non fanno parte di questo restyle).
+    - **Migrazione semantica error vs rischio**: gli ~9 punti che mostravano un vero messaggio di
+      errore testuale (stato `error`/`errore*`, validazione form o errori di rete) sono passati da
+      `text-clay` al nuovo `text-error` — `impostazioni-form.tsx`, `menu-view.tsx` (4 punti),
+      `grocery-list.tsx`, `checkin-form.tsx` (2 punti), `onboarding/page.tsx`. Lasciati `text-clay`
+      invece i 3 punti che sono avvisi di rischio alimentare, non errori: "Non adatto." in
+      `menu-view.tsx` (allergeni) e "Scaduti."/"In scadenza domani." in `frigo/page.tsx`
+      (scadenze) — stesso principio della coppia semantica già descritta sopra.
+    - **Font**: aggiunto Fredoka (peso 500, via `next/font/google`) solo per il wordmark, non per
+      testo UI (resta Jost). `components/logo.tsx` riscritto: testo sempre minuscolo `"groci"`
+      (mai "Groci"), colore `text-dark` (prima `text-ink`), letter-spacing calcolato
+      (`size * -0.097`px), niente più rotazione -3° (era un tocco "scritto a mano" in Caveat
+      Brush, non più coerente con un wordmark Fredoka pulito). Verificato visivamente con
+      Playwright su `/onboarding` (size 78) — reso correttamente.
+    - **Icona app**: nuovo modulo `src/lib/app-icon.tsx` (condiviso) genera via `next/og`
+      `ImageResponse` una tile squircle (`border-radius` ~22% della dimensione, sfondo
+      `--icon-bg`) col wordmark "groci" centrato (font-size ~43% della tile, letter-spacing
+      -9.7% del font-size, `transform: translateY` di circa -11% del font-size per compensare
+      otticamente la gambetta discendente della "g" di Fredoka — confermato via satori/`next/og`,
+      che supporta `transform`). Font Fredoka-Medium.ttf scaricato da Google Fonts in
+      `src/assets/fonts/` (satori non può usare `next/font`, richiede il buffer del file
+      direttamente). File creati: `app/icon.tsx` (32×32, favicon), `app/apple-icon.tsx` (180×180),
+      `app/icon-192/route.tsx` e `app/icon-512/route.tsx` (Route Handler semplici, URL stabili
+      `/icon-192`/`/icon-512` non generate-dal-convention-file, referenziate direttamente in
+      `manifest.ts` per l'installazione PWA — il convention file `icon.tsx` con
+      `generateImageMetadata` avrebbe prodotto URL con hash, scomode da hardcodare lì).
+      Rimossi `src/app/favicon.ico` e `public/logo.png` (branding vecchio, non più referenziati
+      da nessuna parte dopo l'aggiornamento di `manifest.ts`) — **nota**: alcuni browser datati
+      richiedono `/favicon.ico` direttamente ignorando il `<link rel="icon">`; senza quel file
+      danno un 404 innocuo in console, non un errore visibile all'utente. Verificato con
+      screenshot reali (`icon-512`, `icon-192`): centratura e proporzioni corrette.
+    - 258 test invariati (nessuna logica di business toccata), lint e build puliti.
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —

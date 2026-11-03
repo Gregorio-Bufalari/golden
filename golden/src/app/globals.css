@@ -1,31 +1,38 @@
 @import "tailwindcss";
 
 /*
- * Palette Groci — crema/terracotta (sostituisce la precedente palette
- * verde). Sempre questa combinazione, a prescindere dalla preferenza
- * chiaro/scuro del dispositivo: nessuna variante scura è mai stata parte
- * del piano di design.
+ * Design system Groci — palette navy/terracotta (sostituisce la precedente
+ * palette crema/terracotta-scuro). Sempre questa combinazione, a
+ * prescindere dalla preferenza chiaro/scuro del dispositivo: nessuna
+ * variante scura è mai stata parte del piano di design.
  *
- * - bg: sfondo pagina (crema caldo).
- * - paper: superfici/card (bianco caldo), invariato rispetto a prima.
+ * - bg: sfondo pagina E superfici/card (bianco caldo unico, non più due
+ *   toni distinti) — "paper" resta come alias dello stesso valore, non
+ *   introduce un secondo colore.
  * - ink: SOLO testo/icone, mai riempimento di bottoni.
  * - accent: bordi decorativi, puntini, link, icone di dettaglio — mai un
  *   riempimento pieno di bottoni/badge/chip selezionati (vedi "dark").
- * - dark: riempimento di bottoni primari, badge, chip/checkbox/radio
- *   selezionati, cuori preferiti attivi — sempre abbinato a
- *   dark-fill-text (bianco).
+ * - dark: colore primario del brand (navy) — logo, riempimento di bottoni
+ *   primari, badge, chip/checkbox/radio selezionati, cuori preferiti
+ *   attivi — sempre abbinato a dark-fill-text (bianco).
+ * - error: messaggi di errore testuali (validazione form, errori di rete) —
+ *   diverso da "clay": clay resta la coppia semantica di rischio/attenzione
+ *   alimentare (glutine, "da verificare", scadenze Frigo), non un errore.
+ * - icon-bg: SOLO sfondo della tile dell'icona app, non usato altrove.
  * - tan-soft: sfondo di box informativi neutri (disclaimer, note).
  * - clay/honey: restano le coppie semantiche di rischio/attenzione
  *   (es. rischio glutine, avviso "da verificare") — non fanno parte del
  *   restyle, il loro significato resta invariato.
  */
 :root {
-  --bg: #f3e8d9;
+  --bg: #fbfaf6;
   --paper: #fbfaf6;
   --ink: #1c1b17;
   --accent: #c4713e;
-  --dark: #7a3b22;
+  --dark: #192338;
   --dark-fill-text: #ffffff;
+  --error: #b14b3c;
+  --icon-bg: #d9e1f1;
   --tan-soft: #f0dcc4;
   --clay: #8c3b32;
   --clay-soft: #f3e3df;
@@ -40,12 +47,15 @@
   --color-accent: var(--accent);
   --color-dark: var(--dark);
   --color-dark-fill-text: var(--dark-fill-text);
+  --color-error: var(--error);
+  --color-icon-bg: var(--icon-bg);
   --color-tan-soft: var(--tan-soft);
   --color-clay: var(--clay);
   --color-clay-soft: var(--clay-soft);
   --color-honey: var(--honey);
   --color-honey-soft: var(--honey-soft);
   --font-sans: var(--font-jost);
+  --font-fredoka: var(--font-fredoka);
   --font-caveat: var(--font-caveat);
   --font-caveat-brush: var(--font-caveat-brush);
   --font-mono: var(--font-geist-mono);

@@ -397,7 +397,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {error && <p className="text-sm text-clay">{error}</p>}
+          {error && <p className="text-sm text-error">{error}</p>}
 
           <div className="flex items-center justify-between">
             <button
