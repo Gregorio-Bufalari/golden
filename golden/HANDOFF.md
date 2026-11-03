@@ -879,6 +879,37 @@ Questa sessione (dalla PR #32 in poi), in ordine:
       danno un 404 innocuo in console, non un errore visibile all'utente. Verificato con
       screenshot reali (`icon-512`, `icon-192`): centratura e proporzioni corrette.
     - 258 test invariati (nessuna logica di business toccata), lint e build puliti.
+33. **(questa sessione, dopo che il founder ha segnalato in produzione "Non sono riuscito a
+    generare il piano. Riprova.")**: applicato il fix vero per il bug 🔴 CRITICO già diagnosticato
+    il 15 ottobre (max_tokens esaurito dal thinking interno su un piano a 21 pasti), mai fatto
+    prima per limiti di budget API in quella sessione.
+    - **Fix** (`src/lib/claude.ts`): `generateMealPlan`, `modificaPiano`, `adattaBudget` convertite
+      da `client.messages.parse()` a `client.messages.stream()` + `.finalMessage()` — stessa forma
+      del risultato (`parsed_output`, `usage`), nessun altro codice chiamante toccato.
+      `max_tokens` alzato da 20000 a 64000 (nuova costante `MAX_TOKENS_PIANO_COMPLETO`): possibile
+      solo in streaming, perché il tetto ~21333 che l'SDK impone alle chiamate non-streaming (vedi
+      commento preesistente in BACKLOG) non si applica quando `stream: true`. Confermato via
+      lettura del sorgente dell'SDK (`node_modules/@anthropic-ai/sdk/client.js`,
+      `calculateNonstreamingTimeout`) che il limite è calcolato come `maxTokens > 128000*10/60`
+      (~21333) SOLO quando `!body.stream` — nessun limite equivalente lato SDK per lo streaming.
+      `regeneratePasto`/`confrontaScontrino` NON toccate (output piccolo, mai stati a rischio).
+    - **Mock test aggiornati** (`claude.test.ts`): il finto `client.messages.stream()` delega a
+      `mockParse` (stesso `vi.fn()` già usato per `.parse`), così ogni test esistente continua a
+      configurare la risposta con `mockParse.mockResolvedValueOnce(...)` senza sapere quale dei
+      due venga chiamato dalla funzione sotto test — zero test riscritti, solo il mock esteso.
+    - **Verifica dal vivo**: prima un baseline col codice VECCHIO (3 generazioni reali, tutte
+      riuscite, 60-68s ciascuna) poi 3 generazioni reali col codice NUOVO (streaming, tutte
+      riuscite, 67-74s ciascuna, 21 pasti completi ogni volta). **Il bug non si è ripresentato né
+      prima né dopo il fix in questi campioni** — è intermittente/probabilistico, non riproducibile
+      a comando, quindi questa verifica NON dimostra con certezza che il fix risolva l'esatto
+      errore segnalato dal founder lo stesso giorno. Resta comunque il fix corretto per il
+      meccanismo già diagnosticato (max_tokens condiviso col thinking), e il tetto più alto in
+      streaming rende l'esaurimento strutturalmente più difficile. **Se l'errore si ripresenta**,
+      considerare altre cause non ancora escluse (errore Supabase, rate limit Anthropic, timeout di
+      rete) — i log Vercel della chiamata fallita aiuterebbero a restringere il campo.
+    - Smoke test temporanei (`__repro-timeout.smoke.test.ts`, `__verifica-streaming.smoke.test.ts`)
+      scritti, eseguiti, cancellati prima del commit — nessuna traccia nel diff.
+    - 258 test, lint, build puliti dopo il fix.
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —
