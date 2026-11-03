@@ -815,6 +815,26 @@ Questa sessione (dalla PR #32 in poi), in ordine:
       aggiornato in-place con gli esiti verificati. **Non verificabile da questo sandbox**: se
       Vercel Pro (300s) risolve davvero il timeout di generazione piano — richiede un test
       sull'app deployata vera, non riproducibile qui.
+31. **(questa sessione, su richiesta esplicita del founder di un test end-to-end più rigoroso)**:
+    riverificati Task 1 e Task 3 con un piano generato REALMENTE da `generateMealPlan` (non più
+    una fixture scritta a mano) e, per Task 3, passando anche dalla pipeline di produzione
+    completa (`validaGiorni` + `assicuraVarieta`, non solo `modificaPiano` isolato) — chiude i due
+    gap lasciati aperti dalla verifica precedente (entry #30).
+    - **Task 3**: "Giovedì mangio fuori, togli il pasto" -> accettata, slot vuoto creato. Passato
+      lo slot per `assicuraVarieta` (stesso percorso della route reale dopo ogni modifica): lo
+      slot vuoto non viene rigenerato come doppione — l'esenzione funziona anche su un piano AI
+      reale, non solo nei test mockati.
+    - **Task 1 su scala maggiore**: nel piano generato, "olio extravergine d'oliva" compariva in
+      5 giorni su 7. Richiesta di rimozione -> zero occorrenze residue in tutti i 5 giorni,
+      confermato assente anche dalla lista spesa ricostruita con `buildGroceryList` (non solo nel
+      piano stesso).
+    - Costo misurato delle 2 chiamate `modificaPiano`: $0.21763. Costo di `generateMealPlan` non
+      misurabile dall'esterno (quella funzione non restituisce `usage`, a differenza di
+      `modificaPiano`/`adattaBudget` — solo le modifiche via chat vengono loggate per costo in
+      questa app) — stimato per ordine di grandezza comparabile (~$0.08–0.12) in base alla
+      dimensione simile dell'output (21 pasti).
+    - Smoke test di nuovo in file temporaneo cancellato dopo l'uso, nessuna traccia nel diff.
+      `BACKLOG.md` aggiornato in-place.
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —
