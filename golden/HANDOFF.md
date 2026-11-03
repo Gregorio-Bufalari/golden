@@ -759,6 +759,44 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     il vecchio verde (`--panel`, ECF3E0) era usato per superfici secondarie, non per lo sfondo
     pagina vero e proprio; mappato comunque sul nuovo `--bg` per intento (il token che sostituisce
     "lo sfondo che si vede ovunque"), non per corrispondenza letterale col CSS precedente.
+29. **(questa sessione)**: **3 task diagnostici/fix su richiesta esplicita "zero chiamate AI reali"**
+    (credito esaurito) — solo lettura codice, ragionamento statico, test con AI simulata. Nessuna
+    chiamata reale in nessuno dei tre task.
+    - **Task 1 — "ho già comprato [ingrediente]" non lo toglie dalla lista spesa**: l'ipotesi
+      iniziale (bug nel ricalcolo deterministico della lista, legato a ingredienti condivisi tra
+      piatti) è stata **esclusa**: `buildGroceryList` aggrega correttamente, confermato con 2
+      nuovi test in `claude.test.ts` che simulano l'AI (mockParse) a modificare un solo piatto su
+      due che condividono "Petto di pollo" — la lista riflette correttamente il fabbisogno
+      residuo (400g, non 0 né 700g), comportamento corretto non un bug. Causa reale spostata a
+      monte, nel prompt di `modificaPiano`: nessuna istruzione a cercare l'ingrediente nominato in
+      TUTTI i 7 giorni prima di questa sessione. **Fix applicato** (non verificabile senza una
+      chiamata reale): aggiunta istruzione esplicita in `claude.ts`.
+    - **Task 2 — verifica (senza esecuzione) del fix di parallelizzazione su "Genera piano"**:
+      confermato via lettura codice che la parallelizzazione C'È (Risparmio+Abbondante con
+      `Promise.allSettled` in `route.ts`, rigenerazione multi-pasto con `Promise.all` in
+      `piano-validazione.ts`) — ma risale a commit del 2-7 ottobre, non del 14 come il founder
+      credeva (quella data è probabilmente la verifica dal vivo, non la scrittura del fix).
+      Limite strutturale non risolto dalla parallelizzazione: lo scenario Equilibrato gira sempre
+      per primo e in sequenza (gli altri due dipendono dal suo costo reale) — dal timing reale
+      misurato il 15 ottobre in questa stessa sessione, Equilibrato da solo impiega 157.8s, già
+      oltre il limite Hobby di Vercel. Nessuna modifica al codice in questo task, solo verifica.
+    - **Task 3 — "giovedì mangio fuori" rifiutato dall'AI**: diagnosi confermata (non una novità,
+      già in BACKLOG dal 13-14 ottobre): lo schema Zod non ha campi nullable, l'AI non può
+      rappresentare uno slot vuoto e non può né aggiungere né togliere pasti (vincolo esplicito
+      nel prompt), quindi rifiuta piuttosto che inventare un piatto falso. **Fix applicato** (non
+      verificato dal vivo): invece di un nuovo campo schema (lavoro ampio, rimandato), una
+      convenzione via prompt — `ingredienti: []`, `nutrizione` a 0, `preparazione: []`, nome
+      descrittivo — è già valida contro lo schema attuale (nessun campo richiede un minimo).
+      Aggiunta anche un'esenzione in `assicuraVarieta` (`piano-validazione.ts`): un pasto a
+      ingredienti vuoti non conta più come doppione anche se il nome placeholder si ripete nella
+      settimana, altrimenti l'AI lo avrebbe rigenerato in un piatto vero, vanificando la
+      richiesta. Nuovo test mirato in `piano-validazione.test.ts` (con `regeneratePasto` mockato,
+      non AI reale) conferma l'esenzione funziona. **Non verificato**: se l'AI reale adotta
+      davvero questa convenzione, e come si comporta la UI con un pasto a ingredienti/nutrizione
+      vuoti (non toccata in questa sessione).
+    258 test passano (255 + 3 nuovi), lint e build puliti. Dettagli completi, incluse le citazioni
+    esatte dei commit e dei file toccati, in `BACKLOG.md` (voci aggiornate, non nuove voci
+    separate, per tenere la cronologia di ciascun problema in un unico punto).
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —

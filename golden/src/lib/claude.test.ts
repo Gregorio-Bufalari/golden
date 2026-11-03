@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { creaPianoEsempio } from "@/test/fixtures/piano-esempio";
-import { generateMealPlan, modificaPiano, confrontaScontrino, type ProfiloPerPiano } from "./claude";
+import { creaPianoEsempio, pasto, ingrediente } from "@/test/fixtures/piano-esempio";
+import { generateMealPlan, modificaPiano, confrontaScontrino, type ProfiloPerPiano, type Giorno } from "./claude";
+import { buildGroceryList } from "./grocery";
 
 // Il client Anthropic reale non viene mai istanziato in questi test: si
 // sostituisce l'intero SDK con una classe finta il cui .messages.parse()
@@ -306,6 +307,134 @@ describe("modificaPiano — risposta AI simulata", () => {
     expect(risultato.usage.output_tokens).toBe(1000);
     // claude-sonnet-5-5: $2/1M input, $10/1M output -> 2000*2/1e6 + 1000*10/1e6
     expect(risultato.costoStimatoUsd).toBeCloseTo(0.004 + 0.01, 6);
+  });
+
+  // Scenario "ho già comprato [ingrediente]" (14 ottobre 2026): verificato dal
+  // vivo che modificaApplicata torna true ma l'ingrediente resta nella lista
+  // della spesa ricostruita. Questi due test isolano DOVE sta il
+  // comportamento: non c'è nessuna chiamata reale qui (AI simulata), quindi
+  // non possono dimostrare cosa fa l'AI vera — dimostrano solo che il
+  // ricalcolo deterministico della lista (buildGroceryList) è corretto dato
+  // un output di modificaPiano, in entrambi i casi possibili.
+  it("se l'AI toglie l'ingrediente da un SOLO piatto condiviso, la lista riflette il fabbisogno residuo (non zero, non il totale originale)", async () => {
+    const giorniPrima: Giorno[] = [
+      {
+        giorno: "Lunedì",
+        pasti: [
+          pasto({
+            tipo: "pranzo",
+            nome: "Pollo al forno",
+            ingredienti: [ingrediente({ nome: "Petto di pollo", quantita: 300, unita: "g", reparto: "Carne e pesce", prezzo_stimato_eur: 3 })],
+          }),
+        ],
+      },
+      {
+        giorno: "Mercoledì",
+        pasti: [
+          pasto({
+            tipo: "cena",
+            nome: "Pollo alla griglia",
+            ingredienti: [ingrediente({ nome: "Petto di pollo", quantita: 400, unita: "g", reparto: "Carne e pesce", prezzo_stimato_eur: 4 })],
+          }),
+        ],
+      },
+    ];
+
+    // Risposta AI simulata plausibile: modifica SOLO il piatto di lunedì
+    // (quello più "ovvio" nel contesto della richiesta), lascia intatto
+    // mercoledì — il prompt chiede di limitare la modifica al minimo
+    // necessario, senza istruzione esplicita a cercare l'ingrediente in
+    // TUTTI i pasti della settimana.
+    const giorniDopo: Giorno[] = [
+      {
+        giorno: "Lunedì",
+        pasti: [
+          pasto({
+            tipo: "pranzo",
+            nome: "Tofu saltato",
+            ingredienti: [ingrediente({ nome: "Tofu", quantita: 300, unita: "g", reparto: "Dispensa", prezzo_stimato_eur: 2 })],
+          }),
+        ],
+      },
+      giorniPrima[1],
+    ];
+
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: giorniDopo },
+      usage: { input_tokens: 1000, output_tokens: 500 },
+    });
+
+    const risultato = await modificaPiano(profiloBase, giorniPrima, "ho già comprato il pollo");
+    expect(risultato.modificaApplicata).toBe(true);
+
+    const { groceryList } = buildGroceryList(risultato.giorni, null);
+    const pollo = groceryList.reparti.flatMap((r) => r.items).find((i) => i.nome === "Petto di pollo");
+
+    // Il pollo resta in lista: serve ancora per il piatto di mercoledì non
+    // toccato dalla modifica — comportamento CORRETTO del ricalcolo
+    // deterministico (rifletterebbe fedelmente l'ingrediente ancora
+    // richiesto), non il bug segnalato dal 14 ottobre.
+    expect(pollo).toBeDefined();
+    expect(pollo?.quantitaNecessaria).toBe(400); // solo mercoledì, non più 700 (300+400) né 0
+  });
+
+  it("se l'AI toglie l'ingrediente da TUTTI i piatti che lo usano, sparisce correttamente dalla lista", async () => {
+    const giorniPrima: Giorno[] = [
+      {
+        giorno: "Lunedì",
+        pasti: [
+          pasto({
+            tipo: "pranzo",
+            nome: "Pollo al forno",
+            ingredienti: [ingrediente({ nome: "Petto di pollo", quantita: 300, unita: "g", reparto: "Carne e pesce", prezzo_stimato_eur: 3 })],
+          }),
+        ],
+      },
+      {
+        giorno: "Mercoledì",
+        pasti: [
+          pasto({
+            tipo: "cena",
+            nome: "Pollo alla griglia",
+            ingredienti: [ingrediente({ nome: "Petto di pollo", quantita: 400, unita: "g", reparto: "Carne e pesce", prezzo_stimato_eur: 4 })],
+          }),
+        ],
+      },
+    ];
+
+    const giorniDopo: Giorno[] = [
+      {
+        giorno: "Lunedì",
+        pasti: [
+          pasto({
+            tipo: "pranzo",
+            nome: "Tofu saltato",
+            ingredienti: [ingrediente({ nome: "Tofu", quantita: 300, unita: "g", reparto: "Dispensa", prezzo_stimato_eur: 2 })],
+          }),
+        ],
+      },
+      {
+        giorno: "Mercoledì",
+        pasti: [
+          pasto({
+            tipo: "cena",
+            nome: "Tempeh alla griglia",
+            ingredienti: [ingrediente({ nome: "Tempeh", quantita: 400, unita: "g", reparto: "Dispensa", prezzo_stimato_eur: 3 })],
+          }),
+        ],
+      },
+    ];
+
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: giorniDopo },
+      usage: { input_tokens: 1000, output_tokens: 500 },
+    });
+
+    const risultato = await modificaPiano(profiloBase, giorniPrima, "ho già comprato il pollo");
+    const { groceryList } = buildGroceryList(risultato.giorni, null);
+    const pollo = groceryList.reparti.flatMap((r) => r.items).find((i) => i.nome === "Petto di pollo");
+
+    expect(pollo).toBeUndefined();
   });
 });
 
