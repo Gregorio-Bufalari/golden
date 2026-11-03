@@ -514,6 +514,11 @@ export function MenuView({
           onSwitch={handleSwitchModalita}
           disabled={cambiandoModalita || loading}
         />
+        <p className="-mt-2 text-xs text-ink/60">
+          {modalita === "routine"
+            ? "I piatti che fanno già parte della tua routine, quelli che rifai più spesso."
+            : "Nuove ricette da provare, scelte in base ai tuoi gusti e alle tue restrizioni."}
+        </p>
 
         {!giorni && !scenari && (
           <div className="flex flex-col items-center gap-3 py-10">

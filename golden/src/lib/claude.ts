@@ -209,7 +209,10 @@ function obiettiviNutrizionaliTesto(
 
 function obiettivoConNota(obiettivo: string | null): string {
   if (!obiettivo) return "non specificato";
-  if (obiettivo === "Ridurre gli sprechi") {
+  // .includes (non ===): dall'Onboarding l'utente può selezionare più
+  // obiettivi insieme, uniti in un'unica stringa (es. "Mangiare meglio,
+  // Ridurre gli sprechi") — la nota resta comunque necessaria in quel caso.
+  if (obiettivo.includes("Ridurre gli sprechi")) {
     // Senza questa precisazione l'AI tende a interpretare "ridurre gli
     // sprechi" come "comprare meno ingredienti diversi", collassando le
     // ricette su pochissimi piatti ripetuti — esattamente l'effetto

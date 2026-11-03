@@ -910,6 +910,56 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     - Smoke test temporanei (`__repro-timeout.smoke.test.ts`, `__verifica-streaming.smoke.test.ts`)
       scritti, eseguiti, cancellati prima del commit — nessuna traccia nel diff.
     - 258 test, lint, build puliti dopo il fix.
+    - **Addendum (stessa sessione, dopo il deploy)**: il founder ha rivisto lo stesso errore anche
+      dopo il merge del fix — causa reale diversa, un `401 authentication_error` dall'API
+      Anthropic (letto dal log Vercel: `generateMealPlan error (equilibrato): Error: 401 ...
+      type: "authentication_error"`). La chiave `ANTHROPIC_API_KEY` configurata su Vercel era
+      scaduta/sbagliata (probabilmente non aggiornata dopo che il founder ne aveva generata una
+      nuova su console.anthropic.com, la stessa data mi in chat per i test di questa sessione — che
+      infatti ha funzionato per tutte le chiamate reali fatte qui). **Nessuna modifica al codice
+      necessaria**: il fix è stato aggiornare `ANTHROPIC_API_KEY` nelle Environment Variables del
+      progetto su Vercel e rifare un deploy. Lezione per diagnosi future: un `401` è sempre e solo
+      un problema di credenziali/ambiente, mai un bug applicativo — prima di cercare nel codice,
+      chiedere il log Vercel della chiamata fallita.
+34. **(questa sessione)**: implementati i campi mancanti del design system Onboarding/Menu (la
+    palette/logo/icona erano già stati completati in una sessione precedente, vedi entry #32) —
+    tutti i cambi erano richiesti con una spec esatta (titoli, opzioni, stile).
+    - **`src/components/form-kit.tsx`**: nuovo componente `Select` condiviso (sfondo `bg`, nessun
+      bordo, radius 14px, padding 14px, Jost 15px, chevron SVG a destra assoluto) — accetta sia
+      `string[]` sia `{value,label}[]` come opzioni, riusato in tutti i select sotto.
+    - **`src/lib/opzioni-profilo.ts`**: nuova `PERSONE_OPTIONS` (value/label "1 persona" … "6 o più
+      persone").
+    - **`src/components/supermercato-selector.tsx`**: aggiunta prop `variant?: "chips" | "select"`
+      (default `"chips"`, comportamento invariato per `impostazioni-form.tsx`/`checkin-form.tsx`,
+      che non passano la prop) — `"select"` usata solo dall'Onboarding, stesse opzioni in entrambe
+      le rese.
+    - **`src/app/onboarding/page.tsx`**:
+      - Passo 2 (persone a tavola): da `<input type="number">` a `<Select>` con `PERSONE_OPTIONS`.
+      - Passo 3 (obiettivi): `form.obiettivo` cambiato da `string` a `string[]`; titolo "Quali sono
+        i tuoi obiettivi?" + sottotitolo "Puoi selezionarne più di uno."; radio → checkbox
+        (`toggleInArray`, già esistente). `canAdvance`/validazione invariati (`.length > 0`
+        funziona identico su stringa e array). In `handleSubmit`, `form.obiettivo.join(", ")` per
+        il backend che si aspetta ancora un'unica stringa (schema DB/`ProfiloPerPiano` non
+        toccato, fuori scope).
+      - Passo 4 (cucina preferita): da chip multi-toggle a `<Select>` a scelta singola — il valore
+        resta `form.cucina: string[]` per compatibilità con `preferenze.cucina?: string[]` a valle
+        (`ProfiloPerPiano`), ma lo `<select>` nativo permette una sola scelta (`onChange` imposta
+        `[value]`).
+      - Passo 7 (supermercato): `<SupermercatoSelector variant="select">`.
+    - **`src/lib/claude.ts`**: `obiettivoConNota` — match da `===` a `.includes()` su "Ridurre gli
+      sprechi", per restare valido anche quando l'obiettivo arriva come stringa composta da più
+      valori uniti (es. "Mangiare meglio, Ridurre gli sprechi") — altrimenti quella nota importante
+      (vedi commento nella funzione, evita che l'AI interpreti "ridurre sprechi" come "comprare
+      meno ingredienti diversi") smetteva di scattare ogni volta che non era l'UNICO obiettivo
+      scelto.
+    - **`src/app/piano/[token]/menu/menu-view.tsx`**: riga di testo sotto `<ModalitaToggle>`,
+      condizionale su `modalita` (routine/scoperta), testo esatto dalla spec.
+    - Verificato visivamente con Playwright tutti e 4 i passi onboarding modificati (screenshot
+      reali, non solo lettura codice) — la descrizione Routine/Scoperta nel Menu NON verificata dal
+      vivo (richiede un piano reale via Supabase, irraggiungibile da questo sandbox), solo
+      revisione del codice.
+    - 258 test, lint, build puliti (nessuna logica di business toccata, solo UI/testo/tipo di un
+      campo).
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —

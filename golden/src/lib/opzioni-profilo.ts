@@ -19,6 +19,15 @@ export const OBIETTIVO_OPTIONS = [
 
 export const CUCINA_OPTIONS = ["Italiana", "Mediterranea", "Asiatica", "Messicana", "Altro"];
 
+export const PERSONE_OPTIONS: { value: string; label: string }[] = [
+  { value: "1", label: "1 persona" },
+  { value: "2", label: "2 persone" },
+  { value: "3", label: "3 persone" },
+  { value: "4", label: "4 persone" },
+  { value: "5", label: "5 persone" },
+  { value: "6", label: "6 o più persone" },
+];
+
 export const TEMPO_OPTIONS = [
   { value: 15, label: "Fino a 15 minuti" },
   { value: 30, label: "Fino a 30 minuti" },

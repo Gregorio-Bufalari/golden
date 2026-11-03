@@ -6,12 +6,13 @@ import { createProfile, type OnboardingInput } from "./actions";
 import { Spinner } from "@/components/spinner";
 import { Logo } from "@/components/logo";
 import { RestrizioneIcon } from "@/components/restrizione-icon";
-import { inputClass, labelClass, checkboxClass, optionRowClass, Pill } from "@/components/form-kit";
+import { inputClass, labelClass, checkboxClass, optionRowClass, Pill, Select } from "@/components/form-kit";
 import { SupermercatoSelector } from "@/components/supermercato-selector";
 import {
   RESTRIZIONI_OPTIONS,
   OBIETTIVO_OPTIONS,
   CUCINA_OPTIONS,
+  PERSONE_OPTIONS,
   TEMPO_OPTIONS,
   LIVELLO_ATTIVITA_OPTIONS,
 } from "@/lib/opzioni-profilo";
@@ -20,7 +21,7 @@ type FormState = {
   nome: string;
   restrizioni: string[];
   household_size: string;
-  obiettivo: string;
+  obiettivo: string[];
   cucina: string[];
   graditi: string;
   non_graditi: string;
@@ -38,7 +39,7 @@ const initialState: FormState = {
   nome: "",
   restrizioni: [],
   household_size: "",
-  obiettivo: "",
+  obiettivo: [],
   cucina: [],
   graditi: "",
   non_graditi: "",
@@ -101,7 +102,9 @@ export default function OnboardingPage() {
       nome: form.nome,
       restrizioni: form.restrizioni,
       household_size: Number(form.household_size) || 0,
-      obiettivo: form.obiettivo,
+      // Il backend conserva un unico campo testuale (vedi obiettivoConNota in
+      // claude.ts): più obiettivi selezionati vengono uniti in una stringa.
+      obiettivo: form.obiettivo.join(", "),
       preferenze: {
         cucina: form.cucina,
         graditi: form.graditi,
@@ -189,28 +192,28 @@ export default function OnboardingPage() {
                 <h2 className="text-xl font-bold text-ink">Quante persone a tavola</h2>
                 <p className="mt-1 text-sm text-ink/60">Quante persone mangiano abitualmente insieme a te?</p>
               </div>
-              <input
-                type="number"
-                min={1}
+              <Select
                 value={form.household_size}
-                onChange={(e) => setForm((p) => ({ ...p, household_size: e.target.value }))}
-                placeholder="Es. 2"
-                className={inputClass}
+                onChange={(value) => setForm((p) => ({ ...p, household_size: value }))}
+                options={PERSONE_OPTIONS}
+                placeholder="Seleziona"
               />
             </div>
           )}
 
           {step === 2 && (
             <div className="flex flex-col gap-6">
-              <h2 className="text-xl font-bold text-ink">Qual è il tuo obiettivo principale?</h2>
+              <div>
+                <h2 className="text-xl font-bold text-ink">Quali sono i tuoi obiettivi?</h2>
+                <p className="mt-1 text-sm text-ink/60">Puoi selezionarne più di uno.</p>
+              </div>
               <div className="flex flex-col gap-1.5">
                 {OBIETTIVO_OPTIONS.map((opt) => (
                   <label key={opt} className={optionRowClass}>
                     <input
-                      type="radio"
-                      name="obiettivo"
-                      checked={form.obiettivo === opt}
-                      onChange={() => setForm((p) => ({ ...p, obiettivo: opt }))}
+                      type="checkbox"
+                      checked={form.obiettivo.includes(opt)}
+                      onChange={() => setForm((p) => ({ ...p, obiettivo: toggleInArray(p.obiettivo, opt) }))}
                       className={checkboxClass}
                     />
                     {opt}
@@ -225,16 +228,12 @@ export default function OnboardingPage() {
               <h2 className="text-xl font-bold text-ink">Le tue preferenze</h2>
               <div>
                 <label className={labelClass}>Cucina preferita</label>
-                <div className="flex flex-wrap gap-2">
-                  {CUCINA_OPTIONS.map((opt) => (
-                    <Pill
-                      key={opt}
-                      label={opt}
-                      selected={form.cucina.includes(opt)}
-                      onClick={() => setForm((p) => ({ ...p, cucina: toggleInArray(p.cucina, opt) }))}
-                    />
-                  ))}
-                </div>
+                <Select
+                  value={form.cucina[0] || ""}
+                  onChange={(value) => setForm((p) => ({ ...p, cucina: [value] }))}
+                  options={CUCINA_OPTIONS}
+                  placeholder="Seleziona"
+                />
               </div>
               <div>
                 <label className={labelClass}>Alimenti che ti piacciono</label>
@@ -310,6 +309,7 @@ export default function OnboardingPage() {
               <SupermercatoSelector
                 value={form.supermercato}
                 onChange={(opt) => setForm((p) => ({ ...p, supermercato: opt }))}
+                variant="select"
               />
             </div>
           )}
