@@ -5,7 +5,14 @@ import { buildGroceryList, type GroceryList, type ConsumoDispensa } from "./groc
 import { calcolaNutrizionePasto, type FonteNutrizione } from "./nutrizione-crea";
 
 const MAX_RIGENERAZIONI = 2;
-const MAX_TENTATIVI_BUDGET = 2;
+// 1 (non più 2): ogni tentativo è un'intera chiamata AI in streaming su un
+// piano a 21 pasti (60-90s+), eseguita in SEQUENZA per ogni scenario di
+// budget in /api/piano/generate — con 2 tentativi su più scenari il totale
+// rischiava di superare il maxDuration della funzione Vercel (vedi BACKLOG,
+// "timeout dopo 300s"). Un tentativo in meno costa un po' di precisione sul
+// budget nel caso peggiore, non la sicurezza (allergeni/varietà restano a 2
+// tentativi, non toccati qui).
+const MAX_TENTATIVI_BUDGET = 1;
 
 export type PastoValidato = Pasto & {
   verificare?: boolean;

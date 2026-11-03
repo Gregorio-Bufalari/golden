@@ -17,6 +17,15 @@ import { buildGroceryList, type GroceryList, type ConsumoDispensa } from "@/lib/
 // budget) per OGNI scenario di budget (vedi sotto): il limite di default
 // di Vercel per una funzione serverless è troppo basso e interromperebbe
 // la richiesta a metà.
+//
+// Resta a 300 (non alzato) deliberatamente: Vercel Pro permette fino a 800s
+// ma SOLO con "Fluid Compute" attivo nelle impostazioni del progetto — senza
+// quello, dichiarare un maxDuration più alto può far fallire il build/deploy
+// invece di limitarsi a non avere effetto. Non verificabile da qui se Fluid
+// Compute è attivo sul progetto: se il timeout del "Task timed out after 300
+// seconds" si ripresenta anche con la parallelizzazione dei 3 scenari sotto,
+// il prossimo passo è verificare Fluid Compute con l'utente E SOLO ALLORA
+// alzare questo valore.
 export const maxDuration = 300;
 
 function mondayOfThisWeek(d = new Date()): string {
@@ -28,12 +37,18 @@ function mondayOfThisWeek(d = new Date()): string {
 }
 
 // Scenari di budget mostrati in confronto, oltre al piano principale
-// ("equilibrato"): le percentuali sono relative al costo EFFETTIVO dello
-// scenario equilibrato appena generato, non al budget nominale impostato
-// in Profilo (che l'AI potrebbe non raggiungere esattamente) — così il
-// confronto resta significativo anche quando il budget non è impostato.
-// Ogni scenario è un piano generato da zero per quel target (piatti e
-// ingredienti diversi, non solo porzioni ridotte dello stesso piano).
+// ("equilibrato"). Ogni scenario è un piano generato da zero per quel
+// target (piatti e ingredienti diversi, non solo porzioni ridotte dello
+// stesso piano).
+//
+// Se il profilo ha un budget settimanale impostato, i target di Risparmio/
+// Abbondante sono calcolati direttamente da QUEL budget — questo permette
+// di lanciare tutti e 3 gli scenari in parallelo fin da subito (vedi sotto),
+// circa dimezzando il tempo totale rispetto a prima, quando Equilibrato
+// doveva finire per primo per sapere il suo costo reale. Se il budget NON è
+// impostato, non c'è un valore dichiarato da cui partire: i target restano
+// relativi al costo EFFETTIVO di Equilibrato (comportamento originale),
+// quindi Equilibrato va comunque generato per primo in quel caso.
 const DELTA_RISPARMIO = 0.8;
 const DELTA_ABBONDANTE = 1.2;
 
@@ -207,21 +222,50 @@ export async function POST(request: Request) {
   }
 
   let equilibrato: RisultatoScenario;
-  try {
-    equilibrato = await generaScenario(profile.budget_settimanale);
-  } catch (err) {
-    console.error("generateMealPlan error (equilibrato):", err);
-    return NextResponse.json({ error: "Non sono riuscito a generare il piano. Riprova." }, { status: 502 });
+  let targetRisparmio: number;
+  let targetAbbondante: number;
+  let risparmioEsito: PromiseSettledResult<RisultatoScenario>;
+  let abbondanteEsito: PromiseSettledResult<RisultatoScenario>;
+
+  if (profile.budget_settimanale) {
+    // Budget impostato: i 3 target sono già noti in anticipo, nessun bisogno
+    // di aspettare il costo reale di Equilibrato — tutti e 3 gli scenari
+    // partono insieme.
+    targetRisparmio = Math.round(profile.budget_settimanale * DELTA_RISPARMIO);
+    targetAbbondante = Math.round(profile.budget_settimanale * DELTA_ABBONDANTE);
+
+    const [equilibratoEsito, risparmioEsitoParallelo, abbondanteEsitoParallelo] = await Promise.allSettled([
+      generaScenario(profile.budget_settimanale),
+      generaScenario(targetRisparmio),
+      generaScenario(targetAbbondante),
+    ]);
+    risparmioEsito = risparmioEsitoParallelo;
+    abbondanteEsito = abbondanteEsitoParallelo;
+
+    if (equilibratoEsito.status === "rejected") {
+      console.error("generateMealPlan error (equilibrato):", equilibratoEsito.reason);
+      return NextResponse.json({ error: "Non sono riuscito a generare il piano. Riprova." }, { status: 502 });
+    }
+    equilibrato = equilibratoEsito.value;
+  } else {
+    // Nessun budget dichiarato: i target dipendono dal costo reale di
+    // Equilibrato, quindi va generato per primo (comportamento originale).
+    try {
+      equilibrato = await generaScenario(null);
+    } catch (err) {
+      console.error("generateMealPlan error (equilibrato):", err);
+      return NextResponse.json({ error: "Non sono riuscito a generare il piano. Riprova." }, { status: 502 });
+    }
+
+    const baseTotale = equilibrato.groceryList.totale_stimato;
+    targetRisparmio = Math.round(baseTotale * DELTA_RISPARMIO);
+    targetAbbondante = Math.round(baseTotale * DELTA_ABBONDANTE);
+
+    [risparmioEsito, abbondanteEsito] = await Promise.allSettled([
+      generaScenario(targetRisparmio),
+      generaScenario(targetAbbondante),
+    ]);
   }
-
-  const baseTotale = equilibrato.groceryList.totale_stimato;
-  const targetRisparmio = Math.round(baseTotale * DELTA_RISPARMIO);
-  const targetAbbondante = Math.round(baseTotale * DELTA_ABBONDANTE);
-
-  const [risparmioEsito, abbondanteEsito] = await Promise.allSettled([
-    generaScenario(targetRisparmio),
-    generaScenario(targetAbbondante),
-  ]);
 
   if (risparmioEsito.status === "rejected") {
     console.error("generateMealPlan error (risparmio):", risparmioEsito.reason);
