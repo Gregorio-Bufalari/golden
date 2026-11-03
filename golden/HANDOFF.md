@@ -797,6 +797,24 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     258 test passano (255 + 3 nuovi), lint e build puliti. Dettagli completi, incluse le citazioni
     esatte dei commit e dei file toccati, in `BACKLOG.md` (voci aggiornate, non nuove voci
     separate, per tenere la cronologia di ciascun problema in un unico punto).
+30. **(questa sessione, dopo upgrade a Vercel Pro)**: verifica dal vivo (2 chiamate reali a
+    `modificaPiano`, Sonnet 5.5) dei fix di Task 1 e Task 3 sopra, con l'API key fornita
+    direttamente dal founder in chat e scritta solo in `.env.local` (gitignored, mai committata).
+    - **Task 1 confermato risolto**: piano di test con "Petto di pollo" condiviso tra due piatti
+      (Lunedì 300g, Mercoledì 400g), richiesta "ho già comprato il petto di pollo" ->
+      `modificaApplicata: true`, l'AI ha sostituito ENTRAMBI i piatti, zero "pollo" residuo.
+    - **Task 3 parzialmente confermato**: con la frase esatta del bug originale ("Giovedì mangio
+      fuori") il rifiuto è sparito e la convenzione pasto-vuoto viene applicata correttamente
+      (`ingredienti: []`). Ma con una frase paraphrasata di intento identico ("non devo cucinare
+      per la cena di giovedì") l'AI ha smesso di rifiutare ma ha proposto una ricetta vera invece
+      del pasto vuoto — il bug principale (rifiuto) è risolto, la convenzione specifica non è
+      robusta a ogni fraseggio. Non ancora verificato: comportamento UI con un pasto a
+      ingredienti/nutrizione vuoti.
+    - Smoke test scritti in file temporanei `src/lib/__*.smoke.test.ts`, eseguiti, output
+      catturato, poi cancellati prima di qualunque commit (nessuna traccia nel diff). `BACKLOG.md`
+      aggiornato in-place con gli esiti verificati. **Non verificabile da questo sandbox**: se
+      Vercel Pro (300s) risolve davvero il timeout di generazione piano — richiede un test
+      sull'app deployata vera, non riproducibile qui.
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —
