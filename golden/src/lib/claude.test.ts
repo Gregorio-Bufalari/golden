@@ -10,11 +10,23 @@ import { buildGroceryList } from "./grocery";
 // né una chiamata di rete reale. vi.hoisted serve perché vi.mock viene
 // issato sopra ogni import/const del file. Serve una vera "function" (non
 // una arrow function) perché claude.ts fa `new Anthropic()`.
+//
+// generateMealPlan/modificaPiano/adattaBudget usano client.messages.stream
+// (non .parse, vedi commento in claude.ts), ma .finalMessage() ha la stessa
+// forma del risultato di .parse(): il finto .stream() delega subito a
+// mockParse, così ogni test continua a configurare la risposta con
+// mockParse.mockResolvedValueOnce(...) indipendentemente da quale dei due
+// venga chiamato dalla funzione sotto test.
 const { mockParse } = vi.hoisted(() => ({ mockParse: vi.fn() }));
 
 vi.mock("@anthropic-ai/sdk", () => ({
   default: vi.fn().mockImplementation(function FakeAnthropic() {
-    return { messages: { parse: mockParse } };
+    return {
+      messages: {
+        parse: mockParse,
+        stream: (...args: unknown[]) => ({ finalMessage: () => mockParse(...args) }),
+      },
+    };
   }),
 }));
 

@@ -14,6 +14,13 @@ import { calcolaCostoUsd, type UsageChiamataAI } from "./costo-ai";
 // generazione.
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
 
+// Le 3 chiamate che generano/riscrivono il piano COMPLETO (21 pasti:
+// generateMealPlan, modificaPiano, adattaBudget) usano client.messages.stream
+// (mai .parse) proprio per poter usare questo valore alto in sicurezza — vedi
+// commento in generateMealPlan per il perché. 64000 è il valore che Anthropic
+// raccomanda di default per richieste in streaming.
+const MAX_TOKENS_PIANO_COMPLETO = 64000;
+
 const client = new Anthropic();
 
 export const REPARTI = [
@@ -303,19 +310,20 @@ export async function generateMealPlan(
   modalita: "routine" | "scoperta" = "routine",
   dispensa: Map<string, number> = new Map(),
 ): Promise<MealPlan> {
-  const response = await client.messages.parse({
+  // client.messages.stream (non .parse) per poter usare MAX_TOKENS_PIANO_COMPLETO
+  // in sicurezza: con colazione+pranzo+cena (21 pasti) il modello può
+  // esaurire l'intero max_tokens nel solo "pensiero" interno (thinking,
+  // condiviso con max_tokens su Sonnet 5.5, nessun tetto separato
+  // possibile) prima di scrivere il piano — osservato dal vivo (stop_reason
+  // "max_tokens", tutto il budget consumato in thinking, zero output). Una
+  // chiamata non-streaming è limitata a max_tokens ~21333 dall'SDK stesso
+  // (oltre quella soglia rifiuta esplicitamente e impone lo streaming), un
+  // margine che si è rivelato ancora insufficiente in alcuni casi (stesso
+  // sintomo, piano troncato a metà invece che vuoto). .finalMessage() ha
+  // la stessa forma del risultato di .parse() (incluso parsed_output).
+  const response = await client.messages.stream({
     model: MODEL,
-    // 20000 invece di 16000: con colazione+pranzo+cena (21 pasti, non più
-    // 14) il modello può esaurire l'intero budget nel solo "pensiero"
-    // interno (thinking, condiviso con max_tokens su Sonnet 5.5, nessun
-    // tetto separato possibile) prima di scrivere il piano — osservato dal
-    // vivo (stop_reason "max_tokens", 16000/16000 token tutti di thinking,
-    // zero output). Non si può alzare oltre ~21333 restando non-streaming
-    // (l'SDK rifiuta e impone lo streaming sopra quella soglia, calcolata
-    // da max_tokens) senza passare a client.messages.stream(), cambio più
-    // ampio non ancora fatto — questo valore è la mitigazione massima
-    // possibile senza quel cambio.
-    max_tokens: 20000,
+    max_tokens: MAX_TOKENS_PIANO_COMPLETO,
     system:
       "Sei un assistente che genera piani settimanali di pasti (colazione, pranzo e cena, 7 giorni) in italiano. " +
       "Le restrizioni alimentari sono un vincolo rigido e non negoziabile: non includere MAI, nemmeno in tracce dichiarate, un ingrediente incompatibile con le restrizioni indicate. " +
@@ -346,7 +354,7 @@ export async function generateMealPlan(
       effort: "low",
       format: zodOutputFormat(MealPlanSchema),
     },
-  });
+  }).finalMessage();
 
   if (!response.parsed_output) {
     throw new Error("Claude non ha restituito un piano valido.");
@@ -397,11 +405,9 @@ export async function modificaPiano(
   dispensa: Map<string, number> = new Map(),
   cronologia: MessaggioCronologia[] = [],
 ): Promise<RisultatoModifica> {
-  const response = await client.messages.parse({
+  const response = await client.messages.stream({
     model: MODEL,
-    // Vedi commento in generateMealPlan: stesso rischio di esaurire
-    // max_tokens nel solo thinking con un piano a 21 pasti.
-    max_tokens: 20000,
+    max_tokens: MAX_TOKENS_PIANO_COMPLETO,
     system:
       "Sei un assistente che modifica un piano settimanale di pasti già esistente, in base a una richiesta " +
       "dell'utente in linguaggio naturale, in italiano. Applica SOLO la modifica richiesta, lasciando invariato " +
@@ -454,7 +460,7 @@ export async function modificaPiano(
       effort: "medium",
       format: zodOutputFormat(ModificaOutputSchema),
     },
-  });
+  }).finalMessage();
 
   if (!response.parsed_output) {
     throw new Error("Claude non ha restituito un piano valido.");
@@ -483,11 +489,9 @@ export async function adattaBudget(
   budgetEur: number,
   dispensa: Map<string, number> = new Map(),
 ): Promise<MealPlan> {
-  const response = await client.messages.parse({
+  const response = await client.messages.stream({
     model: MODEL,
-    // Vedi commento in generateMealPlan: stesso rischio di esaurire
-    // max_tokens nel solo thinking con un piano a 21 pasti.
-    max_tokens: 20000,
+    max_tokens: MAX_TOKENS_PIANO_COMPLETO,
     system:
       "Sei un assistente che riduce il costo di un piano settimanale di pasti già esistente, in italiano, " +
       "senza violare le restrizioni alimentari (vincolo rigido, non negoziabile) e senza stravolgere le preferenze. " +
@@ -522,7 +526,7 @@ export async function adattaBudget(
       effort: "low",
       format: zodOutputFormat(MealPlanSchema),
     },
-  });
+  }).finalMessage();
 
   if (!response.parsed_output) {
     throw new Error("Claude non ha restituito un piano valido.");
