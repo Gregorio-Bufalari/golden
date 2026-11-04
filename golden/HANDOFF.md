@@ -1104,6 +1104,79 @@ Questa sessione (dalla PR #32 in poi), in ordine:
       l'ambiguità del bottone a livello giorno. Rimossi `handleMangioFuori`,
       `giornoMangioFuoriInCorso`, `ForchettaIcon` (tutti introdotti nell'entry #36, ora morti).
     - 268 test, lint, build puliti (nessuna logica toccata, solo riposizionamento JSX + CSS).
+39. **(questa sessione, Bug E — "ancora lento" riaperto dal founder dopo conferma nell'uso reale)**:
+    profiling vero con una generazione reale (non solo lettura del codice come il 28/10), stesso
+    percorso della route di produzione (3 scenari paralleli, profilo celiaco, budget 70€). Dettagli
+    numerici completi in `BACKLOG.md`. In sintesi: **confermato che il parallelismo reale funziona**
+    (i 3 `generateMealPlan` partono insieme, 65-81s ciascuno) — la causa vera è che **tutti e 3 gli
+    scenari hanno superato il budget alla prima generazione**, facendo scattare `adattaBudget` (1
+    chiamata AI in più per scenario, 34.5-49.5s) che di fatto raddoppia il tempo di ogni scenario.
+    Tempo totale wall-clock: 130.5s. Nessun fix applicato: la causa è una scelta di design (quanto
+    irrigidire il prompt sul budget, se saltare la correzione per gli scenari di confronto,
+    se cambiare strategia di risposta a progressive loading) — tre opzioni presentate al founder,
+    in attesa di decisione.
+    - **Nota per profiling futuri**: `adattaBudget` (a differenza di `modificaPiano`/
+      `confrontaScontrino`) non restituisce `usage`/costo — il costo di questo profiling (6
+      chiamate reali: 3× `generateMealPlan` + 3× `adattaBudget`) è stato stimato (~$0.60) non
+      misurato con precisione. Se si ripete un profiling simile, valutare se vale la pena
+      aggiungere quel tracking anche lì.
+    - Smoke test temporaneo (`__profiling-genera-piano.smoke.test.ts`) scritto, eseguito,
+      cancellato prima del commit — nessuna traccia nel diff, nessuna modifica al codice di
+      produzione in questo giro.
+40. **(questa sessione, Bug E — fix applicato dopo decisione del founder)**: tra le 3 opzioni
+    presentate nell'entry #39, il founder ha chiesto la mia raccomandazione e ha approvato prima
+    Opzione A, poi (dopo che A è risultata peggiorativa nel test dal vivo) Opzione C.
+    - **Opzione A (irrigidire il prompt budget in `buildContestoProfilo`, in `claude.ts`) — PROVATA
+      E REVERTITA**: aggiunta un'istruzione "punta comodamente sotto il budget, margine 15-20%"
+      (mirror della frase già usata in `adattaBudget`). Testata dal vivo con una generazione reale:
+      risultato PEGGIORE, non migliore — overshoot +140.4% contro il +39.7% di base (confronto
+      n=1 vs n=1, quindi statisticamente debole, ma comunque un segnale negativo netto che non
+      giustificava altre iterazioni a pagamento). Revertita per intero, testo del prompt tornato
+      esattamente quello originale.
+    - **Opzione C (progressive loading per scenario) — IMPLEMENTATA**: nel percorso con budget
+      impostato, invece di generare tutti e 3 gli scenari in un'unica risposta HTTP (fino a 130s
+      di attesa prima di vedere qualunque cosa), il client ora fa 3 chiamate parallele indipendenti
+      a un nuovo endpoint `/api/piano/generate/scenario` (`{ token, chiave, favorito }`), e ogni
+      scenario appare in UI non appena il SUO è pronto.
+      - Estratta la pipeline di generazione (`generateMealPlan` → `validaGiorni` →
+        `adattaEntroBudget` → eventuale inclusione Preferito) dalla route in una funzione
+        condivisa `generaScenario` (nuovo file `src/lib/piano-scenario.ts`, insieme a
+        `DELTA_RISPARMIO`/`DELTA_ABBONDANTE`, `ETICHETTA_SCENARIO`, `targetBudgetScenario`), usata
+        sia dalla route principale che dalla nuova.
+      - `POST /api/piano/generate` (percorso budget impostato): non genera più nulla, risponde
+        subito con `{ needsScenari: true, settimana, favorito }` (il `favorito` è scelto UNA sola
+        volta qui — la scelta è in parte casuale — e riusato identico nelle 3 chiamate successive,
+        stesso invariante di prima).
+      - Nuova `POST /api/piano/generate/scenario`: rilegge il profilo da Supabase per token (MAI
+        fidata della chiave `restrizioni` dal client — invariante di sicurezza allergeni
+        invariato, `validaGiorni` rivalida sempre), ricalcola dispensa/fattore di calibrazione
+        (lookup deterministici, ripeterli 3 volte costa pochi ms, non chiamate AI), genera UN SOLO
+        scenario con `generaScenario` e lo ritorna.
+      - Percorso SENZA budget impostato: invariato, stessa logica sequenziale-poi-parallela di
+        prima in un'unica risposta (non coinvolto dal profiling, nessun motivo di toccarlo).
+      - `menu-view.tsx`: `handleGenerate` smista su `data.needsScenari` — se vero, inizializza
+        `scenari` a `[]` e `scenariInCorso` a tutte e 3 le chiavi, poi lancia le 3 chiamate a una
+        nuova `generaScenarioSingolo` SENZA attenderle (fire-and-forget: ognuna aggiorna lo stato
+        React in autonomia quando risponde). Il rendering ora itera su un ordine fisso
+        `["risparmio","equilibrato","abbondante"]` (non sull'ordine di arrivo, che varierebbe ad
+        ogni richiesta) mostrando la card pronta se lo scenario è arrivato, un placeholder con
+        spinner se è ancora in `scenariInCorso`, altrimenti nulla. Il badge di variazione % (es.
+        "-20%") resta nascosto per Risparmio/Abbondante finché Equilibrato (la base del confronto)
+        non è arrivato, invece di calcolarlo su una base inesistente/zero.
+      - Verificato: `npm run build`, `npm run lint`, `npx vitest run` (268 test) puliti. Verifica
+        visiva con una pagina di preview temporanea (`preview-scenari-progressivi-tmp`, cancellata
+        prima del commit) che intercetta `fetch` per simulare le 3 risposte con ritardi diversi e
+        fuori ordine (abbondante prima, poi risparmio, poi equilibrato per ultimo) — confermato
+        via screenshot Playwright: i 3 placeholder appaiono subito, ogni scenario sostituisce il
+        proprio placeholder in POSIZIONE fissa appena pronto (non in ordine di arrivo), il badge %
+        resta nascosto finché Equilibrato non arriva e compare corretto (-20%/+20%) a tutti e 3
+        pronti. Nessuna generazione reale aggiuntiva a pagamento per questa verifica (solo dati
+        finti lato client).
+    - **Non ancora verificato dal vivo**: il miglioramento di latenza PERCEPITA reale (il client
+      vede scenari comparire uno alla volta invece che aspettare tutti insieme) non è stato
+      misurato con una generazione reale a pagamento in questa sessione — il comportamento è
+      verificato strutturalmente (le chiamate partono in parallelo, non attendono l'un l'altra) ma
+      non con un cronometro sul caso reale. Da confermare al prossimo uso dal vivo del founder.
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —
