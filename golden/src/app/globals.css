@@ -23,6 +23,10 @@
  * - clay/honey: restano le coppie semantiche di rischio/attenzione
  *   (es. rischio glutine, avviso "da verificare") — non fanno parte del
  *   restyle, il loro significato resta invariato.
+ * - sage: SOLO il pallino "lunga conservazione" nel Frigo, in coppia con
+ *   clay/honey per completare la terna verde/arancione/rosso richiesta
+ *   esplicitamente per quella spia — prima usava "accent" (arancione come
+ *   honey), rendendo verde e arancione quasi indistinguibili.
  */
 :root {
   --bg: #fbfaf6;
@@ -38,6 +42,7 @@
   --clay-soft: #f3e3df;
   --honey: #a8742a;
   --honey-soft: #f4e8d3;
+  --sage: #5b7a52;
 }
 
 @theme inline {
@@ -54,6 +59,7 @@
   --color-clay-soft: var(--clay-soft);
   --color-honey: var(--honey);
   --color-honey-soft: var(--honey-soft);
+  --color-sage: var(--sage);
   --font-sans: var(--font-jost);
   --font-fredoka: var(--font-fredoka);
   --font-caveat: var(--font-caveat);
