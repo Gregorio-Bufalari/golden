@@ -1242,6 +1242,21 @@ Questa sessione (dalla PR #32 in poi), in ordine:
       ancora nel Frigo (quantità × prezzo medio indicativo per categoria, non il prezzo reale
       stimato dall'AI) + (settimane con check-in "nessuno spreco" × €8 di riferimento forfettario
       a settimana). Entrambi sono stime indicative dichiarate come tali in UI, non misure esatte.
+42. **(questa sessione, decisioni del founder dopo l'entry #41 + profiling reale su /api/piano/
+    modifica)**: il founder ha scelto di tenere il badge percentuale com'è (nessuna modifica — vedi
+    `BACKLOG.md`) e di fare un profiling reale sulla lentezza di `/api/piano/modifica` prima di
+    decidere il fix, stesso approccio di Bug E.
+    - **Profiling eseguito**: smoke test temporaneo (`__profiling-modifica-piano.smoke.test.ts`,
+      cancellato prima del commit) che replica la pipeline esatta della route — genera un piano
+      reale (profilo celiaco, budget €50) poi applica "mercoledì mangio fuori, non serve cucinare".
+      Risultato: `modificaPiano` 32.9s, `validaGiorni` 0.0s, `adattaEntroBudget` 40.7s (budget
+      superato, `adattaBudget` scattato) — **73.6s totali percepiti dall'utente per una singola
+      modifica in chat**, stessa causa di Bug E (budget stretto → `adattaBudget` quasi sempre
+      necessario) sommata al fatto che `modificaPiano` rielabora l'intera settimana invece del solo
+      pasto toccato. Costo: 3 chiamate AI reali, ~$0.30. Numeri completi in `BACKLOG.md`.
+    - **Nessun fix applicato in questo giro**: la scelta tra le 3 direzioni possibili (restringere
+      `modificaPiano` al pasto toccato, ridurre la frequenza di `adattaBudget`, o un refactoring più
+      grande verso job in background) resta da fare con il founder nella prossima sessione.
 
 ## Prima di chiudere questa sessione
 
