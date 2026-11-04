@@ -10,7 +10,25 @@ import { NotifichePush } from "./notifiche-push";
 const DOT_PER_COLORE: Record<ColoreScadenza, string> = {
   rosso: "bg-clay",
   arancione: "bg-honey",
-  verde: "bg-accent",
+  verde: "bg-sage",
+};
+
+// Testo esplicito dei giorni rimanenti, accanto al pallino colorato — prima
+// la durata si leggeva solo indirettamente (fascia generica di
+// conservazione + data assoluta), senza un conteggio alla giornata.
+function testoGiorniRimanenti(giorni: number): string {
+  if (giorni < 0) return `Scaduto da ${Math.abs(giorni)} giorn${Math.abs(giorni) === 1 ? "o" : "i"}`;
+  if (giorni === 0) return "Scade oggi";
+  if (giorni === 1) return "Scade domani";
+  return `Scade tra ${giorni} giorni`;
+}
+
+// Colore del testo solo per rosso/arancione (urgenza reale): per verde
+// resta il testo normale, il pallino basta a segnalare "nessuna fretta"
+// senza aggiungere un secondo accento di colore poco utile.
+const TESTO_PER_COLORE: Partial<Record<ColoreScadenza, string>> = {
+  rosso: "text-clay",
+  arancione: "text-honey",
 };
 
 type Rimanenza = {
@@ -40,10 +58,15 @@ function Sezione({ titolo, righe }: { titolo: string; righe: Rimanenza[] }) {
                 />
                 <span className="text-[15px] text-ink">{r.ingrediente}</span>
               </div>
-              <div className="mt-0.5 text-[13px] text-ink/65">
-                {conservazioneTipica(r.ingrediente)}
-                {r.scadenza && ` · scade circa il ${formattaData(r.scadenza)}`}
-              </div>
+              <div className="mt-0.5 text-[13px] text-ink/65">{conservazioneTipica(r.ingrediente)}</div>
+              {r.giorni !== null && (
+                <div
+                  className={`mt-0.5 text-[13px] font-semibold ${TESTO_PER_COLORE[coloreUrgenza(r.giorni)] ?? "text-ink/75"}`}
+                >
+                  {testoGiorniRimanenti(r.giorni)}
+                  {r.scadenza && ` · ${formattaData(r.scadenza)}`}
+                </div>
+              )}
             </div>
             <span className="shrink-0 font-mono text-sm text-ink/70">
               {formattaQuantita(r.quantita, r.unita)}

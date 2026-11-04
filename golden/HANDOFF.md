@@ -1191,6 +1191,103 @@ Questa sessione (dalla PR #32 in poi), in ordine:
 - Non esiste ancora un controllo statico analogo al glutine per le altre restrizioni (lattosio,
   vegano, ecc.) — si affidano solo al prompt dell'AI, nessuna validazione post-generazione.
 
+41. **(questa sessione, feedback dal vivo del founder dopo il deploy di Bug E)**: 9 segnalazioni in
+    un colpo solo, dalla pagina di uso reale. Triage:
+    - **Frigo — pallini colore non distinguibili (CORRETTO)**: "verde" usava `bg-accent`, quasi
+      identico visivamente a `bg-honey` ("arancione") — nessuno dei due è davvero verde nella
+      palette navy/terracotta esistente. Aggiunto `--sage` (verde vero), SOLO per questo pallino.
+      Dettagli in PR #75.
+    - **Frigo — durata non evidenziata (CORRETTO)**: aggiunto testo esplicito "Scade tra N
+      giorni"/"Scade oggi"/"Scade domani"/"Scaduto da N giorni", colorato per rosso/arancione.
+    - **Frigo — decremento di 1 giorno al giorno (VERIFICATO, nessun bug)**: simulato con uno
+      script su 7 giorni consecutivi (acquisto con scadenza stimata a 5 giorni): la sequenza è
+      esattamente 5→4→3→2→1→0→-1, un giorno alla volta, nessun off-by-one. Se il founder rivede il
+      comportamento sbagliato dal vivo, non è nella funzione `giorniAllaScadenza` — da
+      indagare altrove (dato stale, cache, fuso orario del device) con un caso concreto.
+    - **Badge percentuale scenari (SOLO INVESTIGAZIONE, nessuna modifica)**: il founder ha
+      segnalato "+53% su €57" con budget dichiarato €50 come implausibile. Il calcolo
+      (`percentualeSuBase` in `menu-view.tsx`) è matematicamente corretto ma usa come base il
+      costo REALE di Equilibrato (€37.59 in quel caso), non il budget dichiarato (€50) né il
+      ±20% nominale (`DELTA_RISPARMIO`/`DELTA_ABBONDANTE` in `piano-scenario.ts`) usato solo per
+      calcolare i TARGET di generazione. Quando Equilibrato realizza un costo ben sotto il proprio
+      target (qui: €37.59 contro €50), lo scarto percentuale rispetto agli altri scenari si
+      allontana molto dal ±20% nominale, pur essendo ciascuno scenario entro il proprio target
+      individuale — risultato tecnicamente corretto ma percepito come "impossibile". Decisione
+      sulla base di calcolo (Equilibrato reale, vs budget dichiarato, vs target nominale di quello
+      scenario) rimandata al founder — vedi `BACKLOG.md`.
+    - **4 segnalazioni di lentezza (generazione piano ancora lenta anche con Opzione C, cambio
+      valori nutrizionali, chat "mangio fuori", "Non l'ho trovato" in Spesa, click "Scoperta") —
+      SOLO INVESTIGAZIONE, nessuna modifica**: causa comune identificata per lettura del codice
+      (nessun nuovo profiling reale a pagamento in questo giro). Tutte e 4 le azioni, più lo switch
+      a "Scoperta", passano per `/api/piano/generate` o `/api/piano/modifica`, che eseguono 1-3
+      chiamate AI REALI IN SEQUENZA: la chiamata principale (`generateMealPlan`/`modificaPiano`,
+      quest'ultima rielabora l'INTERA settimana anche per modificare un solo pasto) + eventuale
+      `regeneratePasto` (se un pasto viene segnalato per allergeni) + eventuale `adattaBudget` (se
+      il piano risultante supera il budget — con un budget stretto come €50 questo scatta quasi
+      sempre, vedi entry #39/#40). Il progressive loading (Opzione C, entry #40) migliora SOLO la
+      latenza percepita della schermata dei 3 scenari iniziali: non tocca `/api/piano/modifica`
+      (nutrizione, mangio fuori, non trovato), che resta un'unica richiesta bloccante con 1-2
+      chiamate AI sequenziali e uno spinner generico (già presente, non è un problema di feedback
+      mancante — verificato in `menu-view.tsx`: spinner già renderizzato per `modificando`,
+      `nutrienteInCorso`, `pastoInCorso`). Nessun fix applicato: le vie percorribili (ridurre
+      `modificaPiano` al singolo pasto invece dell'intera settimana, saltare `adattaBudget` più
+      spesso, un refactoring verso job in background + polling) sono scelte di design/costo,
+      rimandate al founder — vedi `BACKLOG.md`.
+    - **"Sprechi evitati" e "Spesa stimata vs reale" — SOLO SPIEGAZIONE, nessuna modifica**: già
+      documentato chiaramente sia nel codice (`src/lib/sprechi-evitati.ts`) sia nell'UI stessa
+      (`andamento/page.tsx` mostra già la scomposizione sotto il numero). "Spesa stimata vs reale"
+      per settimana: stimato = `grocery_list.totale_stimato` salvato quando il piano di quella
+      settimana fu generato/modificato l'ultima volta; reale = quanto l'utente ha dichiarato di
+      aver speso nel check-in di quella settimana. "Sprechi evitati" = valore stimato del cibo
+      ancora nel Frigo (quantità × prezzo medio indicativo per categoria, non il prezzo reale
+      stimato dall'AI) + (settimane con check-in "nessuno spreco" × €8 di riferimento forfettario
+      a settimana). Entrambi sono stime indicative dichiarate come tali in UI, non misure esatte.
+42. **(questa sessione, decisioni del founder dopo l'entry #41 + profiling reale su /api/piano/
+    modifica)**: il founder ha scelto di tenere il badge percentuale com'è (nessuna modifica — vedi
+    `BACKLOG.md`) e di fare un profiling reale sulla lentezza di `/api/piano/modifica` prima di
+    decidere il fix, stesso approccio di Bug E.
+    - **Profiling eseguito**: smoke test temporaneo (`__profiling-modifica-piano.smoke.test.ts`,
+      cancellato prima del commit) che replica la pipeline esatta della route — genera un piano
+      reale (profilo celiaco, budget €50) poi applica "mercoledì mangio fuori, non serve cucinare".
+      Risultato: `modificaPiano` 32.9s, `validaGiorni` 0.0s, `adattaEntroBudget` 40.7s (budget
+      superato, `adattaBudget` scattato) — **73.6s totali percepiti dall'utente per una singola
+      modifica in chat**, stessa causa di Bug E (budget stretto → `adattaBudget` quasi sempre
+      necessario) sommata al fatto che `modificaPiano` rielabora l'intera settimana invece del solo
+      pasto toccato. Costo: 3 chiamate AI reali, ~$0.30. Numeri completi in `BACKLOG.md`.
+    - **Nessun fix applicato in questo giro**: la scelta tra le 3 direzioni possibili (restringere
+      `modificaPiano` al pasto toccato, ridurre la frequenza di `adattaBudget`, o un refactoring più
+      grande verso job in background) resta da fare con il founder nella prossima sessione.
+43. **(questa sessione, subito dopo l'entry #42)**: il founder ha scelto la direzione (a) —
+    restringere `modificaPiano` ai soli pasti toccati. Implementato e verificato dal vivo.
+    - **`src/lib/claude.ts`**: `ModificaOutputSchema` non chiede più l'intero piano (`giorni: 7
+      giorni completi`, come prima) ma `pasti_modificati: {giorno, pasto}[]` — un elemento per
+      ciascun pasto EFFETTIVAMENTE cambiato, non tutti e 21. `modificaPiano` ricompone il piano
+      completo internamente (merge sui `giorniAttuali` ricevuti in input: sostituisce solo le
+      coppie giorno+tipo presenti in `pasti_modificati`, il resto resta esattamente quello passato
+      in input, mai ripassato dall'AI). Il contratto PUBBLICO di `modificaPiano` non cambia
+      (restituisce ancora `giorni: Giorno[]` completo di 7 giorni) — zero modifiche necessarie in
+      `/api/piano/modifica/route.ts` o in qualunque altro chiamante. Prompt aggiornato di
+      conseguenza (sia nel system sia nel messaggio finale) per chiedere esplicitamente solo i
+      pasti cambiati.
+    - **Verificato dal vivo con lo STESSO scenario del profiling precedente** (stesso messaggio
+      "mercoledì mangio fuori", stesso profilo, stesso budget €50): `modificaPiano` **32.9s → 5.5s
+      (~6x più veloce)** — conferma che il costo era quasi tutto output token sprecati a
+      ridescrivere pasti rimasti identici. **Tempo totale percepito: 73.6s → 48.8s (-34%)**.
+      Verificata anche la correttezza: gli altri 6 giorni risultano byte-per-byte identici al piano
+      di partenza, Mercoledì riflette correttamente "fuori casa" su colazione/pranzo/cena. Costo di
+      questa verifica: altre 3 chiamate AI reali, ~$0.30 (totale sessione per Bug E + questo fix:
+      ~$1.20 circa, su più round di profiling approvati singolarmente dal founder).
+    - **Margine NON affrontato in questo giro**: i restanti ~43s sono quasi tutti `adattaBudget`
+      (budget ancora superato nel test, €55.15 contro €50) — stessa dinamica di Bug E, causa (b)
+      del triage, non scelta oggi. Resta in `BACKLOG.md` se la lentezza residua resta un problema.
+    - **Test aggiornati**: `src/lib/claude.test.ts`, tutti i mock della describe
+      "modificaPiano — risposta AI simulata" (12 test) convertiti dal vecchio formato
+      (`giorni: creaPianoEsempio()`) al nuovo (`pasti_modificati: [...]`) — incluse le due prove
+      sul ricalcolo della lista della spesa (ingrediente condiviso tra un pasto toccato e uno no),
+      ora più naturali: prima dovevano simulare "a mano" che l'AI riecheggiasse il pasto invariato,
+      ora basta ometterlo da `pasti_modificati` e il merge lo preserva da sé. 268 test (stesso
+      conteggio di prima, solo mock riscritti), build e lint puliti.
+
 ## Prima di chiudere questa sessione
 
 Se stai per esaurire lo spazio di contesto: aggiorna questo file con quello che hai fatto in più
