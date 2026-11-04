@@ -243,7 +243,7 @@ function buildContestoProfilo(profilo: ProfiloPerPiano, tipoPasto?: TipoPasto): 
     `Numero di persone per cui cucinare: ${profilo.household_size || 1}`,
     `Budget settimanale per la spesa: ${
       profilo.budget_settimanale
-        ? `€${profilo.budget_settimanale} (vincolo rigido: il totale stimato della spesa, somma di tutti i prezzo_stimato_eur, NON deve superarlo). ${NOTA_COSTO_CONFEZIONI} Punta a un totale REALE (dopo l'arrotondamento a confezioni intere, non solo la somma delle quantità usate in ricetta) comodamente sotto il budget, non appena sotto — un margine indicativo del 15-20% è più sicuro, perché la stima per singola ricetta tende a sottovalutare il costo della confezione intera che bisogna comprare davvero.`
+        ? `€${profilo.budget_settimanale} (vincolo rigido: il totale stimato della spesa, somma di tutti i prezzo_stimato_eur, NON deve superarlo). ${NOTA_COSTO_CONFEZIONI}`
         : "non specificato"
     }`,
   ];

@@ -1,31 +1,22 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateMealPlan, type ProfiloPerPiano, type Giorno } from "@/lib/claude";
-import { validaGiorni, adattaEntroBudget, type GiornoValidato } from "@/lib/piano-validazione";
+import type { ProfiloPerPiano } from "@/lib/claude";
 import { leggiDispensa } from "@/lib/dispensa";
 import { calcolaFattoreCalibrazionePerProfilo } from "@/lib/calibrazione-prezzi";
-import {
-  leggiPreferitiPerRotazione,
-  sceglieFavoritoScoperta,
-  includiFavoritoNelPiano,
-  type PreferitoPerRotazione,
-} from "@/lib/preferiti-scoperta";
-import { buildGroceryList, type GroceryList, type ConsumoDispensa } from "@/lib/grocery";
+import { leggiPreferitiPerRotazione, sceglieFavoritoScoperta, type PreferitoPerRotazione } from "@/lib/preferiti-scoperta";
+import { generaScenario, DELTA_RISPARMIO, DELTA_ABBONDANTE, type RisultatoScenario } from "@/lib/piano-scenario";
+import type { GiornoValidato } from "@/lib/piano-validazione";
+import type { GroceryList } from "@/lib/grocery";
 
 // Generare un piano può richiedere diverse chiamate a Claude in sequenza
 // (generazione, eventuali rigenerazioni per il glutine, adattamento al
-// budget) per OGNI scenario di budget (vedi sotto): il limite di default
-// di Vercel per una funzione serverless è troppo basso e interromperebbe
-// la richiesta a metà.
+// budget): il limite di default di Vercel per una funzione serverless è
+// troppo basso e interromperebbe la richiesta a metà.
 //
 // Resta a 300 (non alzato) deliberatamente: Vercel Pro permette fino a 800s
 // ma SOLO con "Fluid Compute" attivo nelle impostazioni del progetto — senza
 // quello, dichiarare un maxDuration più alto può far fallire il build/deploy
-// invece di limitarsi a non avere effetto. Non verificabile da qui se Fluid
-// Compute è attivo sul progetto: se il timeout del "Task timed out after 300
-// seconds" si ripresenta anche con la parallelizzazione dei 3 scenari sotto,
-// il prossimo passo è verificare Fluid Compute con l'utente E SOLO ALLORA
-// alzare questo valore.
+// invece di limitarsi a non avere effetto.
 export const maxDuration = 300;
 
 function mondayOfThisWeek(d = new Date()): string {
@@ -35,29 +26,6 @@ function mondayOfThisWeek(d = new Date()): string {
   monday.setDate(d.getDate() + diffToMonday);
   return monday.toISOString().slice(0, 10);
 }
-
-// Scenari di budget mostrati in confronto, oltre al piano principale
-// ("equilibrato"). Ogni scenario è un piano generato da zero per quel
-// target (piatti e ingredienti diversi, non solo porzioni ridotte dello
-// stesso piano).
-//
-// Se il profilo ha un budget settimanale impostato, i target di Risparmio/
-// Abbondante sono calcolati direttamente da QUEL budget — questo permette
-// di lanciare tutti e 3 gli scenari in parallelo fin da subito (vedi sotto),
-// circa dimezzando il tempo totale rispetto a prima, quando Equilibrato
-// doveva finire per primo per sapere il suo costo reale. Se il budget NON è
-// impostato, non c'è un valore dichiarato da cui partire: i target restano
-// relativi al costo EFFETTIVO di Equilibrato (comportamento originale),
-// quindi Equilibrato va comunque generato per primo in quel caso.
-const DELTA_RISPARMIO = 0.8;
-const DELTA_ABBONDANTE = 1.2;
-
-type RisultatoScenario = {
-  giorni: GiornoValidato[];
-  groceryList: GroceryList;
-  consumiDispensa: ConsumoDispensa[];
-  budgetSuperato: boolean;
-};
 
 export type ScenarioPiano = {
   chiave: "risparmio" | "equilibrato" | "abbondante";
@@ -159,113 +127,54 @@ export async function POST(request: Request) {
     }
   }
 
-  // Da qui in poi: generazione fresca (routine senza piano riusabile, o
-  // scoperta). Genera tre scenari a budget diverso e li restituisce SENZA
-  // salvarli né toccare dispensa/rotazione Preferiti: l'utente sceglie
-  // quale confermare (/api/piano/conferma), solo lì si applicano gli
-  // effetti collaterali e si scrive weekly_plans — altrimenti generare due
-  // scenari che l'utente scarta consumerebbe comunque la dispensa o la
-  // rotazione di un Preferito mai davvero usato.
-  const dispensa = await leggiDispensa(supabase, profileId);
-  const fattore = await calcolaFattoreCalibrazionePerProfilo(supabase, profileId, supermercato);
-
   // Stesso Preferito (se capita) per tutti gli scenari, così il confronto
   // varia solo per il budget — non per quale piatto preferito compare.
+  // Scelto UNA volta qui (la scelta è in parte casuale, vedi
+  // sceglieFavoritoScoperta) e riusato identico in ogni scenario, generato
+  // qui sotto o dalla route /scenario per il percorso con budget.
   let favorito: PreferitoPerRotazione | null = null;
   if (modalitaProfilo === "scoperta") {
     const preferiti = await leggiPreferitiPerRotazione(supabase, profileId);
     favorito = sceglieFavoritoScoperta(preferiti);
   }
 
-  async function generaScenario(targetBudget: number | null): Promise<RisultatoScenario> {
-    const profiloScenario: ProfiloPerPiano = { ...profiloInput, budget_settimanale: targetBudget };
-    const plan = await generateMealPlan(profiloScenario, modalitaProfilo, dispensa);
-    const giorniBase = await validaGiorni(profiloScenario, plan.giorni, dispensa);
-    // adattaEntroBudget applica anche il controllo varietà internamente
-    // (sui giorni iniziali e dopo ogni eventuale adattamento budget), non
-    // serve richiamare assicuraVarieta qui.
-    const adattato = await adattaEntroBudget(
-      profiloScenario,
-      giorniBase,
-      supermercato,
-      targetBudget,
-      dispensa,
-      fattore,
-    );
-
-    let giorniFinali = adattato.giorni;
-    let groceryList = adattato.groceryList;
-    let consumiDispensa = adattato.consumiDispensa;
-
-    if (favorito) {
-      // Inserito DOPO l'adattamento budget, non prima: l'AI che riduce il
-      // costo rivede liberamente tutti i pasti e potrebbe alterare anche
-      // questo se fosse già presente durante quel passaggio. Ricontrolla
-      // comunque la sicurezza sul pasto appena inserito (potrebbe non
-      // essere mai passato da validaGiorni con QUESTE restrizioni, se
-      // salvato tra i preferiti prima che cambiassero) e ricalcola la
-      // lista della spesa, dato che il suo costo non ha partecipato
-      // all'ottimizzazione budget sopra.
-      giorniFinali = includiFavoritoNelPiano(giorniFinali, favorito);
-      giorniFinali = await validaGiorni(profiloScenario, giorniFinali as Giorno[], dispensa);
-      const ricalcolo = buildGroceryList(giorniFinali, supermercato, dispensa, fattore);
-      groceryList = ricalcolo.groceryList;
-      consumiDispensa = ricalcolo.consumiDispensa;
-    }
-
-    return {
-      giorni: giorniFinali,
-      groceryList,
-      consumiDispensa,
-      budgetSuperato: Boolean(targetBudget && groceryList.totale_stimato > targetBudget),
-    };
+  if (profile.budget_settimanale) {
+    // Budget impostato: i 3 target sono già calcolabili dal budget
+    // dichiarato, senza aspettare il costo reale di Equilibrato. Invece di
+    // generare tutti e 3 gli scenari qui dentro una singola richiesta (il
+    // client aspetterebbe il più lento dei 3 prima di vedere qualunque
+    // cosa, misurato dal vivo: ~130s), il client fa 3 chiamate HTTP
+    // indipendenti e parallele a /api/piano/generate/scenario, mostrando
+    // ogni scenario in UI non appena il SUO scenario è pronto (vedi
+    // BACKLOG.md, "Bug E" — causa reale: adattaBudget scatta quasi sempre,
+    // raddoppiando il tempo per scenario, non un problema di
+    // parallelizzazione).
+    return NextResponse.json({ needsScenari: true, settimana, favorito });
   }
+
+  // Nessun budget dichiarato: non c'è un valore da cui calcolare i target
+  // di Risparmio/Abbondante in anticipo, serve il costo EFFETTIVO di
+  // Equilibrato — resta quindi il comportamento sequenziale originale,
+  // in un'unica risposta con tutti e 3 gli scenari già pronti.
+  const dispensa = await leggiDispensa(supabase, profileId);
+  const fattore = await calcolaFattoreCalibrazionePerProfilo(supabase, profileId, supermercato);
 
   let equilibrato: RisultatoScenario;
-  let targetRisparmio: number;
-  let targetAbbondante: number;
-  let risparmioEsito: PromiseSettledResult<RisultatoScenario>;
-  let abbondanteEsito: PromiseSettledResult<RisultatoScenario>;
-
-  if (profile.budget_settimanale) {
-    // Budget impostato: i 3 target sono già noti in anticipo, nessun bisogno
-    // di aspettare il costo reale di Equilibrato — tutti e 3 gli scenari
-    // partono insieme.
-    targetRisparmio = Math.round(profile.budget_settimanale * DELTA_RISPARMIO);
-    targetAbbondante = Math.round(profile.budget_settimanale * DELTA_ABBONDANTE);
-
-    const [equilibratoEsito, risparmioEsitoParallelo, abbondanteEsitoParallelo] = await Promise.allSettled([
-      generaScenario(profile.budget_settimanale),
-      generaScenario(targetRisparmio),
-      generaScenario(targetAbbondante),
-    ]);
-    risparmioEsito = risparmioEsitoParallelo;
-    abbondanteEsito = abbondanteEsitoParallelo;
-
-    if (equilibratoEsito.status === "rejected") {
-      console.error("generateMealPlan error (equilibrato):", equilibratoEsito.reason);
-      return NextResponse.json({ error: "Non sono riuscito a generare il piano. Riprova." }, { status: 502 });
-    }
-    equilibrato = equilibratoEsito.value;
-  } else {
-    // Nessun budget dichiarato: i target dipendono dal costo reale di
-    // Equilibrato, quindi va generato per primo (comportamento originale).
-    try {
-      equilibrato = await generaScenario(null);
-    } catch (err) {
-      console.error("generateMealPlan error (equilibrato):", err);
-      return NextResponse.json({ error: "Non sono riuscito a generare il piano. Riprova." }, { status: 502 });
-    }
-
-    const baseTotale = equilibrato.groceryList.totale_stimato;
-    targetRisparmio = Math.round(baseTotale * DELTA_RISPARMIO);
-    targetAbbondante = Math.round(baseTotale * DELTA_ABBONDANTE);
-
-    [risparmioEsito, abbondanteEsito] = await Promise.allSettled([
-      generaScenario(targetRisparmio),
-      generaScenario(targetAbbondante),
-    ]);
+  try {
+    equilibrato = await generaScenario(profiloInput, modalitaProfilo, dispensa, fattore, supermercato, favorito, null);
+  } catch (err) {
+    console.error("generateMealPlan error (equilibrato):", err);
+    return NextResponse.json({ error: "Non sono riuscito a generare il piano. Riprova." }, { status: 502 });
   }
+
+  const baseTotale = equilibrato.groceryList.totale_stimato;
+  const targetRisparmio = Math.round(baseTotale * DELTA_RISPARMIO);
+  const targetAbbondante = Math.round(baseTotale * DELTA_ABBONDANTE);
+
+  const [risparmioEsito, abbondanteEsito] = await Promise.allSettled([
+    generaScenario(profiloInput, modalitaProfilo, dispensa, fattore, supermercato, favorito, targetRisparmio),
+    generaScenario(profiloInput, modalitaProfilo, dispensa, fattore, supermercato, favorito, targetAbbondante),
+  ]);
 
   if (risparmioEsito.status === "rejected") {
     console.error("generateMealPlan error (risparmio):", risparmioEsito.reason);

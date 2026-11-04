@@ -70,6 +70,22 @@ type Scenario = {
   budget_superato: boolean;
 };
 
+// Ordine di visualizzazione fisso, indipendente dall'ordine di arrivo delle
+// 3 chiamate parallele a /api/piano/generate/scenario (percorso con budget
+// impostato): senza questo, lo scenario che risponde prima comparirebbe in
+// cima, spostando gli altri ogni volta.
+const ORDINE_SCENARI: Scenario["chiave"][] = ["risparmio", "equilibrato", "abbondante"];
+
+// Etichette per il placeholder di caricamento di uno scenario non ancora
+// pronto — duplicate da ETICHETTA_SCENARIO in piano-scenario.ts perché qui
+// servono PRIMA che la relativa chiamata risponda (lo scenario stesso, con
+// la sua etichetta dal server, non esiste ancora).
+const ETICHETTA_SCENARIO_IN_CORSO: Record<Scenario["chiave"], string> = {
+  risparmio: "Risparmio",
+  equilibrato: "Equilibrato",
+  abbondante: "Più abbondante",
+};
+
 // Due piatti di assaggio per scenario, non l'intera settimana: il
 // confronto serve a farsi un'idea veloce, non a leggere tutti i pasti tre
 // volte — il piano completo si vede solo dopo aver confermato.
@@ -199,6 +215,12 @@ export function MenuView({
   // scelta — in quel caso resta visibile il piano già confermato in
   // `giorni`, invariato, così l'utente può sempre tornare indietro.
   const [scenari, setScenari] = useState<Scenario[] | null>(null);
+  // Chiavi ancora in attesa della propria chiamata a /api/piano/generate/
+  // scenario (percorso con budget impostato, vedi handleGenerate): uno
+  // scenario alla volta compare in `scenari` non appena pronto, invece di
+  // aspettarli tutti e 3 insieme. Vuoto nel percorso senza budget (tutti e
+  // 3 arrivano già pronti in un'unica risposta, come prima).
+  const [scenariInCorso, setScenariInCorso] = useState<Set<Scenario["chiave"]>>(new Set());
   const [settimanaScenari, setSettimanaScenari] = useState("");
   const [favoritoInclusoId, setFavoritoInclusoId] = useState<string | null>(null);
   const [confermandoScenario, setConfermandoScenario] = useState<string | null>(null);
@@ -274,9 +296,25 @@ export function MenuView({
         return;
       }
 
-      // Generazione fresca: tre scenari a budget diverso in attesa di
-      // conferma. `giorni` resta quello di prima (se c'era), così l'utente
-      // può sempre annullare e mantenerlo.
+      // Budget impostato: i 3 scenari arrivano uno alla volta (vedi
+      // generaScenarioSingolo sotto), non tutti insieme in un'unica
+      // risposta — ognuno compare in UI appena pronto invece di far
+      // aspettare il più lento dei 3 (misurato dal vivo: fino a 130s).
+      // `giorni` resta quello di prima (se c'era), così l'utente può
+      // sempre annullare e mantenerlo.
+      if (data.needsScenari) {
+        const chiavi: Scenario["chiave"][] = ["risparmio", "equilibrato", "abbondante"];
+        setScenari([]);
+        setScenariInCorso(new Set(chiavi));
+        setSettimanaScenari(data.settimana);
+        setFavoritoInclusoId(data.favorito?.id ?? null);
+        chiavi.forEach((chiave) => generaScenarioSingolo(chiave, data.favorito ?? null));
+        return;
+      }
+
+      // Nessun budget impostato: tutti e 3 gli scenari arrivano già pronti
+      // in un'unica risposta (comportamento originale, invariato — vedi
+      // commento in /api/piano/generate/route.ts sul perché).
       setScenari(data.scenari || []);
       setSettimanaScenari(data.settimana);
       setFavoritoInclusoId(data.favorito_incluso_id ?? null);
@@ -284,6 +322,34 @@ export function MenuView({
       setError("Qualcosa è andato storto. Riprova.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Genera UN SOLO scenario (percorso con budget impostato) — chiamata in
+  // parallelo una volta per chiave da handleGenerate, senza await lì: ogni
+  // scenario si aggiunge a `scenari` in autonomia non appena pronto. Uno
+  // scenario che fallisce viene semplicemente omesso dalla lista, stessa
+  // scelta già fatta per il percorso senza budget (vedi Promise.allSettled
+  // nella route): l'utente vede comunque gli altri 1-2 scenari riusciti.
+  async function generaScenarioSingolo(chiave: Scenario["chiave"], favorito: unknown) {
+    try {
+      const res = await fetch("/api/piano/generate/scenario", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, chiave, favorito }),
+      });
+      if (res.ok) {
+        const scenario: Scenario = await res.json();
+        setScenari((prev) => [...(prev ?? []), scenario]);
+      }
+    } catch {
+      // Silenzioso, vedi commento sopra.
+    } finally {
+      setScenariInCorso((prev) => {
+        const next = new Set(prev);
+        next.delete(chiave);
+        return next;
+      });
     }
   }
 
@@ -611,10 +677,32 @@ export function MenuView({
             {erroreConferma && <p className="text-sm text-error">{erroreConferma}</p>}
 
             <div className="flex flex-col gap-3">
-              {scenari.map((scenario) => {
-                const base = scenari.find((s) => s.chiave === "equilibrato")?.grocery_list.totale_stimato ?? 0;
+              {ORDINE_SCENARI.map((chiave) => {
+                const scenario = scenari.find((s) => s.chiave === chiave);
+                if (!scenario) {
+                  // Non ancora arrivato: se è nel percorso progressivo
+                  // (budget impostato) e la sua chiamata è ancora in corso,
+                  // mostra un placeholder al posto suo; altrimenti (percorso
+                  // senza budget, dove arrivano già tutti e 3 insieme, o uno
+                  // scenario fallito) non mostra nulla per questa chiave.
+                  if (!scenariInCorso.has(chiave)) return null;
+                  return (
+                    <div key={chiave} className="flex items-center gap-3 rounded-[14px] bg-paper p-5">
+                      <Spinner className="h-4 w-4 shrink-0 text-ink/40" />
+                      <span className="text-sm text-ink/55">Genero {ETICHETTA_SCENARIO_IN_CORSO[chiave]}...</span>
+                    </div>
+                  );
+                }
+
+                // La base per il confronto percentuale è il costo reale di
+                // Equilibrato: se non è ancora pronto (può arrivare dopo
+                // Risparmio/Abbondante nel percorso progressivo), niente
+                // badge invece di uno calcolato su una base inesistente.
+                const base = scenari.find((s) => s.chiave === "equilibrato")?.grocery_list.totale_stimato;
                 const percentuale =
-                  scenario.chiave === "equilibrato" ? "" : percentualeSuBase(scenario.grocery_list.totale_stimato, base);
+                  scenario.chiave === "equilibrato" || base === undefined
+                    ? ""
+                    : percentualeSuBase(scenario.grocery_list.totale_stimato, base);
                 const confermando = confermandoScenario === scenario.chiave;
                 return (
                   <div key={scenario.chiave} className="rounded-[14px] bg-paper p-5">
