@@ -5,7 +5,7 @@ import { ModalitaToggle } from "../modalita-toggle";
 import { PageHeader } from "../page-header";
 import { setModalita, scambiaPasti } from "../actions";
 import { aggiungiPreferito, rimuoviPreferito } from "../preferiti-actions";
-import { etichettaGiorno, giornoAbbreviato, numeroGiorno, rangeSettimana } from "@/lib/settimana";
+import { giornoAbbreviato, numeroGiorno, rangeSettimana } from "@/lib/settimana";
 import { CITAZIONE_CREA } from "@/lib/nutrizione-crea";
 import { conflittiDopoScambio, suggerisciGiornoAlternativo } from "@/lib/varieta-giorno";
 import { formattaQuantita } from "@/lib/quantita";
@@ -126,16 +126,6 @@ function SwapIcon() {
   );
 }
 
-function ForchettaIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7 2v7a2 2 0 0 0 4 0V2" />
-      <path d="M9 2v20" />
-      <path d="M16 2c-1.4 0-2.5 2.2-2.5 5s1.1 5 2.5 5v9" />
-    </svg>
-  );
-}
-
 /**
  * Giorno mostrato di default nel selettore del Menu: oggi, se cade in
  * questa settimana (`settimana` = lunedì della settimana mostrata), altrimenti
@@ -226,7 +216,6 @@ export function MenuView({
   const [nutrienteInCorso, setNutrienteInCorso] = useState<string | null>(null);
   const [pastoInCorso, setPastoInCorso] = useState<string | null>(null);
   const [scambioInCorso, setScambioInCorso] = useState(false);
-  const [giornoMangioFuoriInCorso, setGiornoMangioFuoriInCorso] = useState<string | null>(null);
 
   const [pastoEspanso, setPastoEspanso] = useState<string | null>(null);
   type SelezionePasto = { giorno: string; indice: number; nome: string };
@@ -247,12 +236,7 @@ export function MenuView({
   const scambioInAttesaConferma = Boolean(pastoSelezionato) && Boolean(pastoProposto);
 
   const azioneInCorso =
-    Boolean(nutrienteInCorso) ||
-    Boolean(pastoInCorso) ||
-    Boolean(giornoMangioFuoriInCorso) ||
-    modificando ||
-    scambioInCorso ||
-    scambioInAttesaConferma;
+    Boolean(nutrienteInCorso) || Boolean(pastoInCorso) || modificando || scambioInCorso || scambioInAttesaConferma;
 
   const confrontoLARN = useMemo(() => {
     if (!giorni || !datiBiometrici) return null;
@@ -427,18 +411,6 @@ export function MenuView({
       `Proponi un piatto diverso per ${giorno.giorno} ${pasto.tipo}, stesse restrizioni e preferenze.`,
     );
     setPastoInCorso(null);
-  }
-
-  // Azione "mangio fuori" visibile per il giorno selezionato (prima
-  // raggiungibile solo scrivendola in chat): riusa lo stesso motore di
-  // modifica in linguaggio naturale, nessun percorso parallelo — il prompt
-  // di modificaPiano riconosce già questa frase e produce lo slot vuoto
-  // (ingredienti: [], esentato dal controllo varietà, vedi claude.ts).
-  async function handleMangioFuori(giorno: Giorno) {
-    if (azioneInCorso) return;
-    setGiornoMangioFuoriInCorso(giorno.giorno);
-    await applicaModifica(`${giorno.giorno} mangio fuori, non serve cucinare per nessun pasto di quel giorno.`);
-    setGiornoMangioFuoriInCorso(null);
   }
 
   // Scambio tra due pasti di giorni diversi: puro riordino dei dati già nel
@@ -820,23 +792,32 @@ export function MenuView({
                 </div>
               </div>
 
-              {giornoCorrente && (
+              <div className="rounded-[14px] bg-paper p-5">
+                <h3 className="mb-1.5 text-sm font-semibold text-ink">Modifica il piano</h3>
+                <p className="mb-3 text-xs text-ink/55">
+                  Es. &quot;giovedì mangio fuori&quot;, &quot;ho già comprato il pollo&quot;, &quot;spendi meno
+                  questa settimana&quot;.
+                </p>
+                <textarea
+                  value={messaggio}
+                  onChange={(e) => setMessaggio(e.target.value)}
+                  rows={2}
+                  placeholder="Scrivi qui la modifica..."
+                  className="w-full rounded-xl bg-paper px-3.5 py-3 text-sm text-ink placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-accent/40"
+                />
+                {erroreModifica && <p className="mt-2 text-sm text-error">{erroreModifica}</p>}
+                {rifiutoModifica && (
+                  <div className="mt-2 bg-honey-soft px-3.5 py-2.5 text-sm text-ink">{rifiutoModifica}</div>
+                )}
                 <button
-                  type="button"
-                  onClick={() => handleMangioFuori(giornoCorrente)}
-                  disabled={azioneInCorso}
-                  className="flex min-h-11 items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-accent px-4 py-2.5 text-sm font-semibold text-accent disabled:opacity-50"
+                  onClick={handleModifica}
+                  disabled={!messaggio.trim() || azioneInCorso}
+                  className="mt-3.5 flex min-h-11 items-center gap-2 rounded-full bg-dark px-5 py-2.5 text-sm font-semibold text-dark-fill-text disabled:opacity-40"
                 >
-                  {giornoMangioFuoriInCorso === giornoCorrente.giorno ? (
-                    <Spinner className="h-4 w-4" />
-                  ) : (
-                    <ForchettaIcon />
-                  )}
-                  {giornoMangioFuoriInCorso === giornoCorrente.giorno
-                    ? "Applico la modifica..."
-                    : `${etichettaGiorno(giornoCorrente.giorno, settimana)}: mangio fuori`}
+                  {modificando && <Spinner className="h-4 w-4" />}
+                  {modificando ? "Applico la modifica..." : "Applica modifica"}
                 </button>
-              )}
+              </div>
 
               {giornoCorrente && (
                 <div key={giornoCorrente.giorno} className="flex flex-col gap-3">
@@ -1048,33 +1029,6 @@ export function MenuView({
                 </p>
               </div>
             )}
-
-            <div className="rounded-[14px] bg-paper p-5">
-              <h3 className="mb-1.5 text-sm font-semibold text-ink">Modifica il piano</h3>
-              <p className="mb-3 text-xs text-ink/55">
-                Es. &quot;giovedì mangio fuori&quot;, &quot;ho già comprato il pollo&quot;, &quot;spendi meno
-                questa settimana&quot;.
-              </p>
-              <textarea
-                value={messaggio}
-                onChange={(e) => setMessaggio(e.target.value)}
-                rows={2}
-                placeholder="Scrivi qui la modifica..."
-                className="w-full rounded-xl bg-paper px-3.5 py-3 text-sm text-ink placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-accent/40"
-              />
-              {erroreModifica && <p className="mt-2 text-sm text-error">{erroreModifica}</p>}
-              {rifiutoModifica && (
-                <div className="mt-2 bg-honey-soft px-3.5 py-2.5 text-sm text-ink">{rifiutoModifica}</div>
-              )}
-              <button
-                onClick={handleModifica}
-                disabled={!messaggio.trim() || azioneInCorso}
-                className="mt-3.5 flex min-h-11 items-center gap-2 rounded-full bg-dark px-5 py-2.5 text-sm font-semibold text-dark-fill-text disabled:opacity-40"
-              >
-                {modificando && <Spinner className="h-4 w-4" />}
-                {modificando ? "Applico la modifica..." : "Applica modifica"}
-              </button>
-            </div>
           </div>
         )}
       </div>

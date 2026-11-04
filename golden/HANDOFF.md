@@ -1087,6 +1087,23 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     - 268 test invariati (nessun nuovo test automatico per Bug A: è uno stato di UI/race
       condition, non una funzione pura — coerente con la filosofia di test già in uso nel repo,
       che copre solo funzioni pure/helper, non interazioni di componenti), lint e build puliti.
+38. **(questa sessione)**: 2 correzioni rapide sul Menu, dopo feedback dal vivo del founder.
+    - **Pallini giorni non distribuiti sull'intera riga**: `flex shrink-0` lasciava ogni pill alla
+      sua larghezza naturale, lasciando spazio vuoto a destra su schermi più larghi del mobile
+      (dentro il `max-w-2xl` del contenuto). Cambiato a `flex-1 min-w-11` — condividono la
+      larghezza in parti uguali, `overflow-x-auto` resta come fallback per viewport troppo
+      stretti. Verificato a 1200px, 420px, 320px.
+    - **Rimosso il box dedicato "[giorno]: mangio fuori" introdotto nell'entry #36 (Task 2)**:
+      discussione col founder ha chiarito che applicava "mangio fuori" a TUTTO il giorno
+      (colazione+pranzo+cena insieme) senza modo di scegliere un singolo pasto — ambiguità reale
+      non risolta a sufficienza da un singolo bottone. Invece di aggiungere scelta granulare (3
+      chip per tipo pasto, mia proposta iniziale), il founder ha chiesto di tornare alla chat in
+      linguaggio naturale già esistente (che gestisce correttamente qualsiasi granularità, es.
+      "salta solo il pranzo di giovedì"), ma SPOSTATA dal fondo della pagina a subito sotto il
+      selettore giorni, per risolvere il problema di scopribilità originale senza introdurre
+      l'ambiguità del bottone a livello giorno. Rimossi `handleMangioFuori`,
+      `giornoMangioFuoriInCorso`, `ForchettaIcon` (tutti introdotti nell'entry #36, ora morti).
+    - 268 test, lint, build puliti (nessuna logica toccata, solo riposizionamento JSX + CSS).
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —
