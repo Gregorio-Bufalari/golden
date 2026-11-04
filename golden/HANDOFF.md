@@ -994,6 +994,51 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     - Smoke test temporaneo (`__verifica-parallelizzazione.smoke.test.ts`) scritto, eseguito,
       cancellato prima del commit — nessuna traccia nel diff.
     - 258 test, lint, build puliti.
+36. **(questa sessione)**: 3 task sul Menu e sul flusso "mangio fuori", su richiesta del founder con
+    screenshot di riferimento per il primo.
+    - **Task 1 — selettore giorni orizzontale**: NON era una regressione CSS come pensava il
+      founder — cercato in tutto il codice e nella cronologia git, questo pattern (7 giorni in riga,
+      scrollabile, giorno selezionato evidenziato) non è mai esistito: il Menu mostrava tutti i 7
+      giorni impilati verticalmente, ognuno con tutti i suoi pasti sempre visibili. Costruito da
+      zero in `menu-view.tsx`: nuovo stato `giornoSelezionato` (default: oggi se cade nella
+      settimana mostrata, altrimenti lunedì — calcolato al VOLO in `giornoCorrente`, non con un
+      `useEffect` + `setState`, che l'eslint-plugin di React scoraggia esplicitamente per questo
+      pattern — "compute during render" invece di sincronizzare uno stato derivato), riga di pill
+      orizzontali (`overflow-x-auto`) con giorno abbreviato + numero del giorno, contenuto
+      sottostante filtrato al solo giorno selezionato invece di tutti e 7. La selezione per lo
+      scambio pasti (`pastoSelezionato`/`pastoProposto`) resta invariata: è stato verificato che
+      funziona ancora perché è uno stato indipendente da quale giorno è visibile — cambiare giorno
+      con il selettore non la perde.
+    - Nuovi helper in `src/lib/settimana.ts` (con test): `giornoAbbreviato` (es. "Lun", riusa la
+      mappa già privata usata da `etichettaGiorno`), `numeroGiorno` (solo il numero del mese),
+      `rangeSettimana` (es. "12–18 ottobre", gestisce anche il cambio mese). Rimossa la
+      ridondanza nel subtitle di `PageHeader` del Menu, che prima ripeteva "Settimana del
+      {data grezza ISO}" sopra il nuovo header "Settimana del 12–18 ottobre" (formattato) appena
+      aggiunto — ora dice solo "Ciao {nome}".
+    - **Task 2 — azione "mangio fuori" visibile**: nuovo pulsante evidenziato (bordo tratteggiato
+      accent, icona forchetta) subito sotto il selettore giorni, per il giorno correntemente
+      selezionato — prima l'unico modo era scriverlo in chat, non scopribile. Riusa lo STESSO
+      motore (`applicaModifica`, già usato da "Proponi un piatto diverso") con il messaggio
+      `"${giorno} mangio fuori, non serve cucinare per nessun pasto di quel giorno."` — nessun
+      percorso parallelo, stessa validazione/stesso `modificaPiano` della chat libera.
+    - Verificato tutto visivamente con Playwright: creata una pagina di preview temporanea
+      (`src/app/preview-menu-tmp/`, mai `__preview-menu` — Next.js tratta le cartelle con prefisso
+      `_` come "private folders" escluse dal routing, dà 404) che renderizza `MenuView` con dati
+      finti (`creaPianoEsempio()`), senza bisogno di Supabase dato che il componente prende tutto
+      via props — cancellata prima del commit. Confermato: selettore orizzontale corretto, scroll
+      su viewport stretto, click cambia giorno e contenuto, box "mangio fuori" si aggiorna col
+      giorno giusto. **Attenzione cache**: dopo aver cancellato la pagina di preview, `npm run
+      build` falliva citando un modulo del `validator.ts` generato da Next.js che puntava ancora
+      alla pagina cancellata — `rm -rf .next` prima del rebuild ha risolto (cache stale, non un
+      bug reale).
+    - **Task 3 — ampliamento scope "mangio fuori" a Frigo/Andamento**: investigato su richiesta
+      esplicita (vedi `BACKLOG.md`, voce "Stato dedicato 'pasto fuori/vuoto'") — conclusione:
+      nessuna modifica di logica necessaria, il sistema era già corretto per costruzione (Frigo e
+      Andamento non leggono mai il piano pasto-per-pasto, dipendono solo da `buildGroceryList`,
+      che già ignora correttamente un pasto a `ingredienti: []`). Aggiunti comunque test di
+      regressione in `grocery.test.ts` per blindare questo comportamento esplicitamente.
+    - 268 test (258 + 10 nuovi: 7 in `settimana.test.ts`, 3 in `grocery.test.ts`), lint e build
+      puliti.
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —

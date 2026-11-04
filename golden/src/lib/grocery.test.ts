@@ -197,3 +197,53 @@ describe("buildGroceryList — scenario end-to-end sul piano di esempio", () => 
     expect(copia.length).toBe(ordineReparti.length);
   });
 });
+
+// Un pasto "mangio fuori" (vedi modificaPiano in claude.ts: ingredienti: []
+// quando l'utente dice che mangerà fuori) non ha un flag dedicato — è
+// riconosciuto solo dall'array ingredienti vuoto. Questi test blindano che
+// l'intera catena a valle (lista spesa -> consumiDispensa/rimasto, che
+// alimentano sia Frigo che il "budget_stimato" usato da Andamento) tratta
+// già correttamente questo caso SENZA bisogno di nessuna logica dedicata:
+// un pasto senza ingredienti semplicemente non contribuisce nulla
+// all'aggregazione, per costruzione (vedi investigazione in BACKLOG.md).
+describe("buildGroceryList — pasto 'mangio fuori' (ingredienti: [])", () => {
+  it("un pasto con ingredienti vuoti non aggiunge nulla alla lista della spesa", () => {
+    const giorni = [giornoCon([])];
+    const { groceryList, consumiDispensa } = buildGroceryList(giorni, null);
+
+    expect(groceryList.reparti).toEqual([]);
+    expect(groceryList.totale_stimato).toBe(0);
+    expect(consumiDispensa).toEqual([]);
+  });
+
+  it(
+    "se un ingrediente è condiviso tra un pasto 'mangio fuori' e un pasto vero, resta correttamente " +
+      "nella lista per il fabbisogno del pasto vero (non sparisce, non raddoppia)",
+    () => {
+      const pollo = ingrediente({ nome: "Petto di pollo", quantita: 300, unita: "g", reparto: "Carne e pesce", prezzo_stimato_eur: 3 });
+      const giorni = [giornoCon([]), giornoCon([pollo])];
+
+      const { groceryList } = buildGroceryList(giorni, null);
+      const items = groceryList.reparti.flatMap((r) => r.items);
+
+      expect(items.filter((i) => i.nome === "Petto di pollo")).toHaveLength(1);
+      expect(items.find((i) => i.nome === "Petto di pollo")?.quantitaNecessaria).toBe(300);
+    },
+  );
+
+  it(
+    "il totale stimato di un piano con un pasto 'mangio fuori' è più basso dello stesso piano con quel " +
+      "pasto cucinato — riflette correttamente che non serve comprare nulla per quel pasto, non un " +
+      "risparmio fittizio né un doppio conteggio",
+    () => {
+      const pastoCucinato = ingrediente({ nome: "Salmone", quantita: 200, unita: "g", reparto: "Carne e pesce", prezzo_stimato_eur: 5 });
+      const pianoConMangioFuori = [giornoCon([]), giornoCon([pastoCucinato])];
+      const pianoSenzaMangioFuori = [giornoCon([pastoCucinato]), giornoCon([pastoCucinato])];
+
+      const conMangioFuori = buildGroceryList(pianoConMangioFuori, null).groceryList.totale_stimato;
+      const senzaMangioFuori = buildGroceryList(pianoSenzaMangioFuori, null).groceryList.totale_stimato;
+
+      expect(conMangioFuori).toBeLessThan(senzaMangioFuori);
+    },
+  );
+});
