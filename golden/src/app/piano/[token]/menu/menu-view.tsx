@@ -189,6 +189,14 @@ export function MenuView({
   const [preferiti, setPreferiti] = useState<Set<string>>(
     () => new Set(preferitiIniziali.map((n) => n.trim().toLowerCase())),
   );
+  // Chiavi (nome pasto normalizzato) con una scrittura preferiti in volo —
+  // blocca un secondo tap sullo STESSO cuore finché il primo non ha finito
+  // (altre card restano tappabili). Senza questo, due tap ravvicinati sullo
+  // stesso cuore inviano due scritture concorrenti senza ordine garantito
+  // (es. "aggiungi" lento e "rimuovi" veloce in corsa) — lo stato ottimistico
+  // finale in UI può non corrispondere a quello salvato davvero su Supabase.
+  const [preferitiInCorso, setPreferitiInCorso] = useState<Set<string>>(new Set());
+  const [erroreFavorito, setErroreFavorito] = useState<string | null>(null);
   const [settimana, setSettimana] = useState(initialSettimana);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -523,6 +531,10 @@ export function MenuView({
   // nella lista della spesa.
   async function handleToggleFavorito(pasto: Pasto) {
     const chiave = pasto.nome.trim().toLowerCase();
+    if (preferitiInCorso.has(chiave)) return; // già una richiesta in volo per questo pasto, ignora il tap
+
+    setErroreFavorito(null);
+    setPreferitiInCorso((prev) => new Set(prev).add(chiave));
     const eraPreferito = preferiti.has(chiave);
 
     setPreferiti((prev) => {
@@ -532,15 +544,32 @@ export function MenuView({
       return next;
     });
 
-    const result = eraPreferito
-      ? await rimuoviPreferito(token, pasto.nome)
-      : await aggiungiPreferito(token, pasto);
+    try {
+      const result = eraPreferito
+        ? await rimuoviPreferito(token, pasto.nome)
+        : await aggiungiPreferito(token, pasto);
 
-    if ("error" in result) {
+      if ("error" in result) {
+        setPreferiti((prev) => {
+          const next = new Set(prev);
+          if (eraPreferito) next.add(chiave);
+          else next.delete(chiave);
+          return next;
+        });
+        setErroreFavorito("Non sono riuscito a salvare il preferito. Riprova.");
+      }
+    } catch {
       setPreferiti((prev) => {
         const next = new Set(prev);
         if (eraPreferito) next.add(chiave);
         else next.delete(chiave);
+        return next;
+      });
+      setErroreFavorito("Non sono riuscito a salvare il preferito. Riprova.");
+    } finally {
+      setPreferitiInCorso((prev) => {
+        const next = new Set(prev);
+        next.delete(chiave);
         return next;
       });
     }
@@ -763,6 +792,7 @@ export function MenuView({
               </div>
             )}
             {erroreScambio && <p className="text-sm text-error">{erroreScambio}</p>}
+            {erroreFavorito && <p className="text-sm text-error">{erroreFavorito}</p>}
 
             <div className="flex flex-col gap-4">
               <div>
@@ -820,7 +850,9 @@ export function MenuView({
                       const selezionatoPerScambio =
                         (pastoSelezionato?.giorno === giorno.giorno && pastoSelezionato?.indice === i) ||
                         (pastoProposto?.giorno === giorno.giorno && pastoProposto?.indice === i);
-                      const preferito = preferiti.has(pasto.nome.trim().toLowerCase());
+                      const chiaveFavorito = pasto.nome.trim().toLowerCase();
+                      const preferito = preferiti.has(chiaveFavorito);
+                      const favoritoInCorso = preferitiInCorso.has(chiaveFavorito);
                       return (
                         <div key={i} className="flex flex-col gap-2">
                           <div className="flex items-stretch gap-2">
@@ -860,11 +892,12 @@ export function MenuView({
                               <button
                                 type="button"
                                 onClick={() => handleToggleFavorito(pasto)}
+                                disabled={favoritoInCorso}
                                 aria-label={
                                   preferito ? `Rimuovi ${pasto.nome} dai preferiti` : `Aggiungi ${pasto.nome} ai preferiti`
                                 }
                                 aria-pressed={preferito}
-                                className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center ${
+                                className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center disabled:opacity-40 ${
                                   preferito ? "text-dark" : "text-ink/35"
                                 }`}
                               >

@@ -40,7 +40,7 @@ function Sezione({ titolo, righe }: { titolo: string; righe: Rimanenza[] }) {
                 />
                 <span className="text-[15px] text-ink">{r.ingrediente}</span>
               </div>
-              <div className="mt-0.5 text-xs text-ink/55">
+              <div className="mt-0.5 text-[13px] text-ink/65">
                 {conservazioneTipica(r.ingrediente)}
                 {r.scadenza && ` · scade circa il ${formattaData(r.scadenza)}`}
               </div>

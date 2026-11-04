@@ -1039,6 +1039,54 @@ Questa sessione (dalla PR #32 in poi), in ordine:
       regressione in `grocery.test.ts` per blindare questo comportamento esplicitamente.
     - 268 test (258 + 10 nuovi: 7 in `settimana.test.ts`, 3 in `grocery.test.ts`), lint e build
       puliti.
+37. **(questa sessione)**: 4 bug segnalati dal vivo dal founder, trattati separatamente.
+    - **Bug A — Cuore Preferiti intermittente (CORRETTO)**: investigato in `menu-view.tsx`.
+      L'aggiornamento ottimistico AVEVA già un rollback in caso di errore esplicito dalla server
+      action — non era quello il problema. Trovate 2 cause reali: (1) il rollback era silenzioso,
+      nessun messaggio mostrato all'utente, e nessun `try/catch` attorno alla chiamata (un'eccezione
+      di rete, non solo un `{ error }` esplicito, passava inosservata); (2) **race condition vera**:
+      nessun guard contro tap ripetuti sullo stesso cuore — due tap ravvicinati inviano due
+      scritture concorrenti (es. "aggiungi" lento e "rimuovi" veloce) senza alcun ordine garantito,
+      lo stato ottimistico finale in UI può non corrispondere a quanto salvato davvero su Supabase.
+      **Fix**: nuovo `Set<string>` `preferitiInCorso` (chiavi = nome pasto normalizzato) che blocca
+      un secondo tap sullo STESSO cuore finché il primo non ha finito (altri cuori restano
+      tappabili); `try/catch` aggiunto; nuovo `erroreFavorito` mostrato in UI invece del rollback
+      silenzioso.
+    - **Bug B — scambio colazione↔pranzo (NESSUN BUG TROVATO)**: investigato
+      `handleTapScambia`/`scambiaPasti` (route)/`conflittiDopoScambio` (`varieta-giorno.ts`) — lo
+      scambio è interamente basato sulla POSIZIONE (indice 0/1/2), mai su `pasto.tipo`: nessun
+      vincolo di tipo esiste in nessun punto della catena. L'unico codice "type-aware" è
+      `suggerisciGiornoAlternativo` (stesso indice/tipo), ma è solo la proposta ALTERNATIVA
+      mostrata quando c'è un conflitto di varietà — non blocca lo scambio cross-tipo, che resta
+      comunque disponibile via "Scambia comunque". **Verificato empiricamente** (pagina di preview
+      temporanea con un piano a 3 pasti/giorno): armato lo scambio su una colazione, cambiato
+      giorno col selettore, toccato un pranzo di un altro giorno — il flusso di conferma/conflitto
+      è partito normalmente, nessun blocco. Nessuna modifica fatta: il founder probabilmente ha
+      interpretato come "bloccato" la necessità di cambiare giorno col nuovo selettore (vedi entry
+      #36) per raggiungere un pasto di tipo diverso in un altro giorno — un problema di
+      scopribilità eventuale, non un bug di logica.
+    - **Bug C — leggibilità periodo di conservazione nel Frigo (CORRETTO)**: il testo
+      (`conservazioneTipica` + data scadenza stimata) usava `text-xs text-ink/55` (12px, 55%
+      opacità) — più piccolo e con meno contrasto del testo secondario equivalente usato altrove
+      nell'app (es. `text-[13px] text-ink/65` per il sottotitolo degli ingredienti nel Menu).
+      **Fix**: allineato a `text-[13px] text-ink/65`, stessi token di colore/font già in uso,
+      nessun pattern nuovo introdotto. Verificato visivamente con una pagina di preview temporanea.
+    - **Bug/domanda D — soglia pallino rosso (SOLO INVESTIGAZIONE, nessuna modifica)**: soglie
+      esatte in `scadenza-frigo.ts` — rosso se restano ≤1 giorno, arancione se ≤3 giorni, altrimenti
+      verde (valori ASSOLUTI, non relativi al periodo di conservazione del prodotto). Con l'esempio
+      del founder (ceci aperti lunedì, controllati martedì): **in nessuna categoria di conservazione
+      esistente (fresco 4gg, frigo_aperto 7gg) il codice attuale produce rosso un giorno dopo
+      l'acquisto** — il caso più vicino è arancione (categoria "fresco", 3 giorni rimanenti).
+      Discrepanza non spiegata dalla sola lettura del codice: possibili cause riportate al founder
+      in `BACKLOG.md` (la data usata è il lunedì di generazione della lista spesa, non
+      necessariamente il giorno reale di acquisto; possibile lettura visiva arancione/rosso; il
+      testo per `frigo_aperto` dice "5-7 giorni" ma il calcolo usa sempre 7, non 5). Decisione sulla
+      soglia rimandata al founder.
+    - Pagine di preview temporanee (`preview-menu-tmp`, `preview-frigo-tmp`) create e cancellate
+      per ogni verifica visiva, nessuna traccia nel diff finale.
+    - 268 test invariati (nessun nuovo test automatico per Bug A: è uno stato di UI/race
+      condition, non una funzione pura — coerente con la filosofia di test già in uso nel repo,
+      che copre solo funzioni pure/helper, non interazioni di componenti), lint e build puliti.
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —
