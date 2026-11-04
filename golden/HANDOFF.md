@@ -1257,6 +1257,36 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     - **Nessun fix applicato in questo giro**: la scelta tra le 3 direzioni possibili (restringere
       `modificaPiano` al pasto toccato, ridurre la frequenza di `adattaBudget`, o un refactoring più
       grande verso job in background) resta da fare con il founder nella prossima sessione.
+43. **(questa sessione, subito dopo l'entry #42)**: il founder ha scelto la direzione (a) —
+    restringere `modificaPiano` ai soli pasti toccati. Implementato e verificato dal vivo.
+    - **`src/lib/claude.ts`**: `ModificaOutputSchema` non chiede più l'intero piano (`giorni: 7
+      giorni completi`, come prima) ma `pasti_modificati: {giorno, pasto}[]` — un elemento per
+      ciascun pasto EFFETTIVAMENTE cambiato, non tutti e 21. `modificaPiano` ricompone il piano
+      completo internamente (merge sui `giorniAttuali` ricevuti in input: sostituisce solo le
+      coppie giorno+tipo presenti in `pasti_modificati`, il resto resta esattamente quello passato
+      in input, mai ripassato dall'AI). Il contratto PUBBLICO di `modificaPiano` non cambia
+      (restituisce ancora `giorni: Giorno[]` completo di 7 giorni) — zero modifiche necessarie in
+      `/api/piano/modifica/route.ts` o in qualunque altro chiamante. Prompt aggiornato di
+      conseguenza (sia nel system sia nel messaggio finale) per chiedere esplicitamente solo i
+      pasti cambiati.
+    - **Verificato dal vivo con lo STESSO scenario del profiling precedente** (stesso messaggio
+      "mercoledì mangio fuori", stesso profilo, stesso budget €50): `modificaPiano` **32.9s → 5.5s
+      (~6x più veloce)** — conferma che il costo era quasi tutto output token sprecati a
+      ridescrivere pasti rimasti identici. **Tempo totale percepito: 73.6s → 48.8s (-34%)**.
+      Verificata anche la correttezza: gli altri 6 giorni risultano byte-per-byte identici al piano
+      di partenza, Mercoledì riflette correttamente "fuori casa" su colazione/pranzo/cena. Costo di
+      questa verifica: altre 3 chiamate AI reali, ~$0.30 (totale sessione per Bug E + questo fix:
+      ~$1.20 circa, su più round di profiling approvati singolarmente dal founder).
+    - **Margine NON affrontato in questo giro**: i restanti ~43s sono quasi tutti `adattaBudget`
+      (budget ancora superato nel test, €55.15 contro €50) — stessa dinamica di Bug E, causa (b)
+      del triage, non scelta oggi. Resta in `BACKLOG.md` se la lentezza residua resta un problema.
+    - **Test aggiornati**: `src/lib/claude.test.ts`, tutti i mock della describe
+      "modificaPiano — risposta AI simulata" (12 test) convertiti dal vecchio formato
+      (`giorni: creaPianoEsempio()`) al nuovo (`pasti_modificati: [...]`) — incluse le due prove
+      sul ricalcolo della lista della spesa (ingrediente condiviso tra un pasto toccato e uno no),
+      ora più naturali: prima dovevano simulare "a mano" che l'AI riecheggiasse il pasto invariato,
+      ora basta ometterlo da `pasti_modificati` e il merge lo preserva da sé. 268 test (stesso
+      conteggio di prima, solo mock riscritti), build e lint puliti.
 
 ## Prima di chiudere questa sessione
 

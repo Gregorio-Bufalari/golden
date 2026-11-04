@@ -191,7 +191,13 @@ describe("generateMealPlan — risposta AI simulata", () => {
 describe("modificaPiano — risposta AI simulata", () => {
   it("applica la modifica quando l'AI la accetta", async () => {
     mockParse.mockResolvedValueOnce({
-      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      // Solo il pasto toccato, non l'intero piano (vedi ModificaOutputSchema
+      // in claude.ts) — modificaPiano ricompone da sé il piano completo.
+      parsed_output: {
+        modifica_applicata: true,
+        motivo_rifiuto: null,
+        pasti_modificati: [{ giorno: "Lunedì", pasto: pasto({ tipo: "pranzo", nome: "Riso al pollo", ingredienti: [] }) }],
+      },
       usage: { input_tokens: 1000, output_tokens: 500 },
     });
 
@@ -208,7 +214,7 @@ describe("modificaPiano — risposta AI simulata", () => {
       parsed_output: {
         modifica_applicata: false,
         motivo_rifiuto: "Non posso aggiungere pasta di grano: contiene glutine.",
-        giorni: creaPianoEsempio(),
+        pasti_modificati: [],
       },
       usage: { input_tokens: 1000, output_tokens: 500 },
     });
@@ -217,6 +223,8 @@ describe("modificaPiano — risposta AI simulata", () => {
 
     expect(risultato.modificaApplicata).toBe(false);
     expect(risultato.motivoRifiuto).toMatch(/glutine/i);
+    // Nessun pasto nel piano cambia quando la modifica è rifiutata.
+    expect(risultato.giorni).toEqual(creaPianoEsempio());
   });
 
   it("lancia un errore chiaro se il parsing dell'output fallisce", async () => {
@@ -229,7 +237,7 @@ describe("modificaPiano — risposta AI simulata", () => {
 
   it("include anche qui il criterio di stagionalità nel prompt", async () => {
     mockParse.mockResolvedValueOnce({
-      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, pasti_modificati: [] },
       usage: { input_tokens: 1000, output_tokens: 500 },
     });
 
@@ -241,7 +249,7 @@ describe("modificaPiano — risposta AI simulata", () => {
 
   it("include anche qui il vincolo di varietà, per non reintrodurre un doppione modificando un pasto", async () => {
     mockParse.mockResolvedValueOnce({
-      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, pasti_modificati: [] },
       usage: { input_tokens: 1000, output_tokens: 500 },
     });
 
@@ -253,7 +261,7 @@ describe("modificaPiano — risposta AI simulata", () => {
 
   it("include anche qui l'istruzione specifica per la colazione e il vincolo di 21 pasti fissi", async () => {
     mockParse.mockResolvedValueOnce({
-      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, pasti_modificati: [] },
       usage: { input_tokens: 1000, output_tokens: 500 },
     });
 
@@ -266,7 +274,7 @@ describe("modificaPiano — risposta AI simulata", () => {
 
   it("include anche qui gli ingredienti avanzati in dispensa, quando passati (es. pulsante \"Proponine un altro\")", async () => {
     mockParse.mockResolvedValueOnce({
-      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, pasti_modificati: [] },
       usage: { input_tokens: 1000, output_tokens: 500 },
     });
 
@@ -279,7 +287,7 @@ describe("modificaPiano — risposta AI simulata", () => {
 
   it("senza cronologia passata, non menziona richieste precedenti nel messaggio", async () => {
     mockParse.mockResolvedValueOnce({
-      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, pasti_modificati: [] },
       usage: { input_tokens: 1000, output_tokens: 500 },
     });
 
@@ -292,7 +300,7 @@ describe("modificaPiano — risposta AI simulata", () => {
 
   it("con una cronologia passata, include le richieste precedenti e il loro esito nel messaggio", async () => {
     mockParse.mockResolvedValueOnce({
-      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, pasti_modificati: [] },
       usage: { input_tokens: 1000, output_tokens: 500 },
     });
 
@@ -309,7 +317,7 @@ describe("modificaPiano — risposta AI simulata", () => {
 
   it("restituisce i token usati e il costo stimato della chiamata", async () => {
     mockParse.mockResolvedValueOnce({
-      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: creaPianoEsempio() },
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, pasti_modificati: [] },
       usage: { input_tokens: 2000, output_tokens: 1000 },
     });
 
@@ -353,26 +361,26 @@ describe("modificaPiano — risposta AI simulata", () => {
     ];
 
     // Risposta AI simulata plausibile: modifica SOLO il piatto di lunedì
-    // (quello più "ovvio" nel contesto della richiesta), lascia intatto
-    // mercoledì — il prompt chiede di limitare la modifica al minimo
-    // necessario, senza istruzione esplicita a cercare l'ingrediente in
-    // TUTTI i pasti della settimana.
-    const giorniDopo: Giorno[] = [
-      {
-        giorno: "Lunedì",
-        pasti: [
-          pasto({
-            tipo: "pranzo",
-            nome: "Tofu saltato",
-            ingredienti: [ingrediente({ nome: "Tofu", quantita: 300, unita: "g", reparto: "Dispensa", prezzo_stimato_eur: 2 })],
-          }),
+    // (quello più "ovvio" nel contesto della richiesta), lascia mercoledì
+    // fuori da pasti_modificati — il prompt chiede di restituire solo i
+    // pasti davvero cambiati, senza istruzione esplicita a cercare
+    // l'ingrediente in TUTTI i pasti della settimana. modificaPiano ricompone
+    // da sé il piano completo, tenendo mercoledì invariato da giorniPrima.
+    mockParse.mockResolvedValueOnce({
+      parsed_output: {
+        modifica_applicata: true,
+        motivo_rifiuto: null,
+        pasti_modificati: [
+          {
+            giorno: "Lunedì",
+            pasto: pasto({
+              tipo: "pranzo",
+              nome: "Tofu saltato",
+              ingredienti: [ingrediente({ nome: "Tofu", quantita: 300, unita: "g", reparto: "Dispensa", prezzo_stimato_eur: 2 })],
+            }),
+          },
         ],
       },
-      giorniPrima[1],
-    ];
-
-    mockParse.mockResolvedValueOnce({
-      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: giorniDopo },
       usage: { input_tokens: 1000, output_tokens: 500 },
     });
 
@@ -414,31 +422,29 @@ describe("modificaPiano — risposta AI simulata", () => {
       },
     ];
 
-    const giorniDopo: Giorno[] = [
-      {
-        giorno: "Lunedì",
-        pasti: [
-          pasto({
-            tipo: "pranzo",
-            nome: "Tofu saltato",
-            ingredienti: [ingrediente({ nome: "Tofu", quantita: 300, unita: "g", reparto: "Dispensa", prezzo_stimato_eur: 2 })],
-          }),
-        ],
-      },
-      {
-        giorno: "Mercoledì",
-        pasti: [
-          pasto({
-            tipo: "cena",
-            nome: "Tempeh alla griglia",
-            ingredienti: [ingrediente({ nome: "Tempeh", quantita: 400, unita: "g", reparto: "Dispensa", prezzo_stimato_eur: 3 })],
-          }),
-        ],
-      },
-    ];
-
     mockParse.mockResolvedValueOnce({
-      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, giorni: giorniDopo },
+      parsed_output: {
+        modifica_applicata: true,
+        motivo_rifiuto: null,
+        pasti_modificati: [
+          {
+            giorno: "Lunedì",
+            pasto: pasto({
+              tipo: "pranzo",
+              nome: "Tofu saltato",
+              ingredienti: [ingrediente({ nome: "Tofu", quantita: 300, unita: "g", reparto: "Dispensa", prezzo_stimato_eur: 2 })],
+            }),
+          },
+          {
+            giorno: "Mercoledì",
+            pasto: pasto({
+              tipo: "cena",
+              nome: "Tempeh alla griglia",
+              ingredienti: [ingrediente({ nome: "Tempeh", quantita: 400, unita: "g", reparto: "Dispensa", prezzo_stimato_eur: 3 })],
+            }),
+          },
+        ],
+      },
       usage: { input_tokens: 1000, output_tokens: 500 },
     });
 

@@ -366,10 +366,26 @@ export async function generateMealPlan(
   return response.parsed_output;
 }
 
+// Un pasto cambiato, con il giorno a cui appartiene — il "tipo" dentro
+// `pasto` dice già a QUALE pasto di quel giorno si riferisce, non serve un
+// campo separato. Vedi il commento su ModificaOutputSchema per il perché.
+const PastoModificatoSchema = z.object({
+  giorno: GiornoSchema.shape.giorno,
+  pasto: PastoSchema,
+});
+
+// SOLO i pasti effettivamente cambiati, non l'intero piano di 21 pasti:
+// prima lo schema richiedeva sempre tutti i 7 giorni completi in output,
+// anche per una modifica a un solo pasto (es. "mercoledì mangio fuori") —
+// misurato dal vivo a 32.9s per modificaPiano da solo, causa principale
+// probabile i token di output sprecati a ridescrivere ingredienti/
+// nutrizione/preparazione di 20 pasti rimasti identici. Il piano "prima"
+// resta comunque nel messaggio inviato all'AI (così può ancora ragionare
+// su varietà/ingredienti esistenti), cambia solo cosa deve RESTITUIRE.
 const ModificaOutputSchema = z.object({
   modifica_applicata: z.boolean(),
   motivo_rifiuto: z.string().nullable(),
-  giorni: z.array(GiornoSchema).length(7),
+  pasti_modificati: z.array(PastoModificatoSchema),
 });
 
 export type RisultatoModifica = {
@@ -417,8 +433,12 @@ export async function modificaPiano(
       "il resto del piano quando possibile. Le restrizioni alimentari restano un vincolo rigido e non negoziabile: " +
       "se la richiesta dell'utente include un ingrediente o un pasto incompatibile con le restrizioni, NON applicarla. " +
       "In quel caso imposta modifica_applicata a false, spiega brevemente il motivo in motivo_rifiuto (in italiano, " +
-      "rivolgendoti direttamente all'utente) e restituisci il piano INVARIATO. Se invece la richiesta è compatibile, " +
-      "applicala, imposta modifica_applicata a true e motivo_rifiuto a null. " +
+      "rivolgendoti direttamente all'utente) e lascia pasti_modificati vuoto (il piano resta quello attuale, invariato). " +
+      "Se invece la richiesta è compatibile, applicala, imposta modifica_applicata a true e motivo_rifiuto a null. " +
+      "IMPORTANTE: in pasti_modificati restituisci SOLO i pasti che hai davvero cambiato rispetto al piano attuale " +
+      "fornito sotto, mai l'intero piano — per ciascun pasto toccato un elemento con il giorno e il pasto aggiornato " +
+      "per intero (tutti i campi dello schema, non solo quelli cambiati). Ometti ogni pasto rimasto identico: resta " +
+      "comunque nel piano finale, semplicemente non lo rimandi indietro. " +
       "Il piano ha sempre esattamente 21 pasti fissi (7 giorni, colazione pranzo e cena): non puoi aggiungere o togliere " +
       "pasti, ma puoi cambiarne liberamente la composizione. Se la richiesta dice che l'utente mangerà fuori, salterà " +
       "un pasto o non ha bisogno di cucinare per uno specifico pasto (es. 'giovedì mangio fuori', 'salta il pranzo di " +
@@ -453,7 +473,9 @@ export async function modificaPiano(
           testoCronologia(cronologia) +
           `Piano attuale (JSON):\n${JSON.stringify({ giorni: giorniAttuali })}\n\n` +
           `Richiesta dell'utente: "${messaggioUtente}"\n\n` +
-          "Restituisci il piano completo (tutti i 7 giorni): aggiornato se la richiesta è compatibile con le restrizioni, invariato altrimenti.",
+          "Restituisci SOLO i pasti modificati (vedi istruzioni sopra), non l'intero piano: se la richiesta è " +
+          "compatibile con le restrizioni, un elemento in pasti_modificati per ciascun pasto cambiato; se non è " +
+          "applicabile, pasti_modificati vuoto.",
       },
     ],
     output_config: {
@@ -476,10 +498,27 @@ export async function modificaPiano(
     `modificaPiano: ~$${costoStimatoUsd.toFixed(5)} (${response.usage.input_tokens} input, ${response.usage.output_tokens} output token)`,
   );
 
+  // L'AI restituisce solo i pasti cambiati (vedi ModificaOutputSchema):
+  // ricompone qui il piano completo, sostituendo nel piano attuale solo i
+  // pasti presenti in pasti_modificati — il resto resta esattamente quello
+  // fornito in input, non ripassato dall'AI. Ogni chiamante di
+  // modificaPiano continua a ricevere il piano completo (7 giorni), come
+  // prima: questo è un dettaglio interno della chiamata AI, non un cambio
+  // di contratto verso l'esterno.
+  const pastiModificati = response.parsed_output.pasti_modificati;
+  const giorni: Giorno[] = giorniAttuali.map((g) => {
+    const sostituti = pastiModificati.filter((m) => m.giorno === g.giorno);
+    if (sostituti.length === 0) return g;
+    return {
+      ...g,
+      pasti: g.pasti.map((p) => sostituti.find((m) => m.pasto.tipo === p.tipo)?.pasto ?? p),
+    };
+  });
+
   return {
     modificaApplicata: response.parsed_output.modifica_applicata,
     motivoRifiuto: response.parsed_output.motivo_rifiuto,
-    giorni: response.parsed_output.giorni,
+    giorni,
     usage: response.usage,
     costoStimatoUsd,
   };
