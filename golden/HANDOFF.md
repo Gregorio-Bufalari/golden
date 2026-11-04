@@ -1191,6 +1191,58 @@ Questa sessione (dalla PR #32 in poi), in ordine:
 - Non esiste ancora un controllo statico analogo al glutine per le altre restrizioni (lattosio,
   vegano, ecc.) — si affidano solo al prompt dell'AI, nessuna validazione post-generazione.
 
+41. **(questa sessione, feedback dal vivo del founder dopo il deploy di Bug E)**: 9 segnalazioni in
+    un colpo solo, dalla pagina di uso reale. Triage:
+    - **Frigo — pallini colore non distinguibili (CORRETTO)**: "verde" usava `bg-accent`, quasi
+      identico visivamente a `bg-honey` ("arancione") — nessuno dei due è davvero verde nella
+      palette navy/terracotta esistente. Aggiunto `--sage` (verde vero), SOLO per questo pallino.
+      Dettagli in PR #75.
+    - **Frigo — durata non evidenziata (CORRETTO)**: aggiunto testo esplicito "Scade tra N
+      giorni"/"Scade oggi"/"Scade domani"/"Scaduto da N giorni", colorato per rosso/arancione.
+    - **Frigo — decremento di 1 giorno al giorno (VERIFICATO, nessun bug)**: simulato con uno
+      script su 7 giorni consecutivi (acquisto con scadenza stimata a 5 giorni): la sequenza è
+      esattamente 5→4→3→2→1→0→-1, un giorno alla volta, nessun off-by-one. Se il founder rivede il
+      comportamento sbagliato dal vivo, non è nella funzione `giorniAllaScadenza` — da
+      indagare altrove (dato stale, cache, fuso orario del device) con un caso concreto.
+    - **Badge percentuale scenari (SOLO INVESTIGAZIONE, nessuna modifica)**: il founder ha
+      segnalato "+53% su €57" con budget dichiarato €50 come implausibile. Il calcolo
+      (`percentualeSuBase` in `menu-view.tsx`) è matematicamente corretto ma usa come base il
+      costo REALE di Equilibrato (€37.59 in quel caso), non il budget dichiarato (€50) né il
+      ±20% nominale (`DELTA_RISPARMIO`/`DELTA_ABBONDANTE` in `piano-scenario.ts`) usato solo per
+      calcolare i TARGET di generazione. Quando Equilibrato realizza un costo ben sotto il proprio
+      target (qui: €37.59 contro €50), lo scarto percentuale rispetto agli altri scenari si
+      allontana molto dal ±20% nominale, pur essendo ciascuno scenario entro il proprio target
+      individuale — risultato tecnicamente corretto ma percepito come "impossibile". Decisione
+      sulla base di calcolo (Equilibrato reale, vs budget dichiarato, vs target nominale di quello
+      scenario) rimandata al founder — vedi `BACKLOG.md`.
+    - **4 segnalazioni di lentezza (generazione piano ancora lenta anche con Opzione C, cambio
+      valori nutrizionali, chat "mangio fuori", "Non l'ho trovato" in Spesa, click "Scoperta") —
+      SOLO INVESTIGAZIONE, nessuna modifica**: causa comune identificata per lettura del codice
+      (nessun nuovo profiling reale a pagamento in questo giro). Tutte e 4 le azioni, più lo switch
+      a "Scoperta", passano per `/api/piano/generate` o `/api/piano/modifica`, che eseguono 1-3
+      chiamate AI REALI IN SEQUENZA: la chiamata principale (`generateMealPlan`/`modificaPiano`,
+      quest'ultima rielabora l'INTERA settimana anche per modificare un solo pasto) + eventuale
+      `regeneratePasto` (se un pasto viene segnalato per allergeni) + eventuale `adattaBudget` (se
+      il piano risultante supera il budget — con un budget stretto come €50 questo scatta quasi
+      sempre, vedi entry #39/#40). Il progressive loading (Opzione C, entry #40) migliora SOLO la
+      latenza percepita della schermata dei 3 scenari iniziali: non tocca `/api/piano/modifica`
+      (nutrizione, mangio fuori, non trovato), che resta un'unica richiesta bloccante con 1-2
+      chiamate AI sequenziali e uno spinner generico (già presente, non è un problema di feedback
+      mancante — verificato in `menu-view.tsx`: spinner già renderizzato per `modificando`,
+      `nutrienteInCorso`, `pastoInCorso`). Nessun fix applicato: le vie percorribili (ridurre
+      `modificaPiano` al singolo pasto invece dell'intera settimana, saltare `adattaBudget` più
+      spesso, un refactoring verso job in background + polling) sono scelte di design/costo,
+      rimandate al founder — vedi `BACKLOG.md`.
+    - **"Sprechi evitati" e "Spesa stimata vs reale" — SOLO SPIEGAZIONE, nessuna modifica**: già
+      documentato chiaramente sia nel codice (`src/lib/sprechi-evitati.ts`) sia nell'UI stessa
+      (`andamento/page.tsx` mostra già la scomposizione sotto il numero). "Spesa stimata vs reale"
+      per settimana: stimato = `grocery_list.totale_stimato` salvato quando il piano di quella
+      settimana fu generato/modificato l'ultima volta; reale = quanto l'utente ha dichiarato di
+      aver speso nel check-in di quella settimana. "Sprechi evitati" = valore stimato del cibo
+      ancora nel Frigo (quantità × prezzo medio indicativo per categoria, non il prezzo reale
+      stimato dall'AI) + (settimane con check-in "nessuno spreco" × €8 di riferimento forfettario
+      a settimana). Entrambi sono stime indicative dichiarate come tali in UI, non misure esatte.
+
 ## Prima di chiudere questa sessione
 
 Se stai per esaurire lo spazio di contesto: aggiorna questo file con quello che hai fatto in più
