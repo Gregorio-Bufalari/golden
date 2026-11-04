@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { dataDelGiorno, etichettaGiorno, formattaData } from "./settimana";
+import { dataDelGiorno, etichettaGiorno, formattaData, giornoAbbreviato, numeroGiorno, rangeSettimana } from "./settimana";
 
 describe("formattaData", () => {
   it("formatta una data come 'giorno mese'", () => {
@@ -47,5 +47,44 @@ describe("etichettaGiorno", () => {
 
   it("torna al nome completo del giorno se la data non è calcolabile", () => {
     expect(etichettaGiorno("Lunedì", "")).toBe("Lunedì");
+  });
+});
+
+describe("giornoAbbreviato", () => {
+  it("abbrevia ogni giorno della settimana", () => {
+    expect(giornoAbbreviato("Lunedì")).toBe("Lun");
+    expect(giornoAbbreviato("Giovedì")).toBe("Gio");
+    expect(giornoAbbreviato("Domenica")).toBe("Dom");
+  });
+
+  it("torna il nome originale se non riconosciuto", () => {
+    expect(giornoAbbreviato("Lundì")).toBe("Lundì");
+  });
+});
+
+describe("numeroGiorno", () => {
+  it("restituisce solo il numero del giorno nel mese", () => {
+    expect(numeroGiorno("Lunedì", "2026-10-05")).toBe(5);
+    expect(numeroGiorno("Domenica", "2026-10-05")).toBe(11);
+  });
+
+  it("restituisce null per input non validi", () => {
+    expect(numeroGiorno("Lundì", "2026-10-05")).toBeNull();
+    expect(numeroGiorno("Lunedì", "")).toBeNull();
+  });
+});
+
+describe("rangeSettimana", () => {
+  it("formatta l'intervallo quando lunedì e domenica sono nello stesso mese", () => {
+    expect(rangeSettimana("2026-10-12")).toBe("12–18 ottobre");
+  });
+
+  it("formatta l'intervallo a cavallo di due mesi", () => {
+    // 2026-10-26 è un lunedì; la domenica successiva cade a novembre.
+    expect(rangeSettimana("2026-10-26")).toBe("26 ottobre – 1 novembre");
+  });
+
+  it("torna la stringa originale se la settimana non è valida", () => {
+    expect(rangeSettimana("non-una-data")).toBe("non-una-data");
   });
 });

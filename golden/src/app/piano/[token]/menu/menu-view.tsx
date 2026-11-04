@@ -5,7 +5,7 @@ import { ModalitaToggle } from "../modalita-toggle";
 import { PageHeader } from "../page-header";
 import { setModalita, scambiaPasti } from "../actions";
 import { aggiungiPreferito, rimuoviPreferito } from "../preferiti-actions";
-import { etichettaGiorno } from "@/lib/settimana";
+import { etichettaGiorno, giornoAbbreviato, numeroGiorno, rangeSettimana } from "@/lib/settimana";
 import { CITAZIONE_CREA } from "@/lib/nutrizione-crea";
 import { conflittiDopoScambio, suggerisciGiornoAlternativo } from "@/lib/varieta-giorno";
 import { formattaQuantita } from "@/lib/quantita";
@@ -126,6 +126,33 @@ function SwapIcon() {
   );
 }
 
+function ForchettaIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 2v7a2 2 0 0 0 4 0V2" />
+      <path d="M9 2v20" />
+      <path d="M16 2c-1.4 0-2.5 2.2-2.5 5s1.1 5 2.5 5v9" />
+    </svg>
+  );
+}
+
+/**
+ * Giorno mostrato di default nel selettore del Menu: oggi, se cade in
+ * questa settimana (`settimana` = lunedì della settimana mostrata), altrimenti
+ * il primo giorno del piano (es. per una settimana futura/passata, dove
+ * "oggi" non ha senso come selezione iniziale).
+ */
+function giornoDiDefault(giorni: Giorno[], settimana: string): string {
+  const lunedi = new Date(`${settimana}T00:00:00`);
+  if (!Number.isNaN(lunedi.getTime())) {
+    const oggi = new Date();
+    oggi.setHours(0, 0, 0, 0);
+    const offset = Math.round((oggi.getTime() - lunedi.getTime()) / 86_400_000);
+    if (offset >= 0 && offset <= 6 && giorni[offset]) return giorni[offset].giorno;
+  }
+  return giorni[0]?.giorno ?? "Lunedì";
+}
+
 export function MenuView({
   token,
   nome,
@@ -152,6 +179,13 @@ export function MenuView({
   const [modalita, setModalitaState] = useState(initialModalita);
   const [cambiandoModalita, setCambiandoModalita] = useState(false);
   const [giorni, setGiorni] = useState<Giorno[] | null>(initialGiorni);
+  // Giorno mostrato nel selettore orizzontale del Menu. Resta `null` finché
+  // l'utente non tocca esplicitamente un giorno diverso: il default (oggi se
+  // cade in questa settimana, altrimenti lunedì) è calcolato al volo in
+  // `giornoCorrente` più sotto, non con un effect — così sopravvive a
+  // rigenerazioni/scambi/modifiche del piano senza bisogno di un "flag
+  // già impostato una volta" (i nomi dei 7 giorni restano sempre gli stessi).
+  const [giornoSelezionato, setGiornoSelezionato] = useState<string | null>(null);
   const [preferiti, setPreferiti] = useState<Set<string>>(
     () => new Set(preferitiIniziali.map((n) => n.trim().toLowerCase())),
   );
@@ -184,6 +218,7 @@ export function MenuView({
   const [nutrienteInCorso, setNutrienteInCorso] = useState<string | null>(null);
   const [pastoInCorso, setPastoInCorso] = useState<string | null>(null);
   const [scambioInCorso, setScambioInCorso] = useState(false);
+  const [giornoMangioFuoriInCorso, setGiornoMangioFuoriInCorso] = useState<string | null>(null);
 
   const [pastoEspanso, setPastoEspanso] = useState<string | null>(null);
   type SelezionePasto = { giorno: string; indice: number; nome: string };
@@ -204,7 +239,12 @@ export function MenuView({
   const scambioInAttesaConferma = Boolean(pastoSelezionato) && Boolean(pastoProposto);
 
   const azioneInCorso =
-    Boolean(nutrienteInCorso) || Boolean(pastoInCorso) || modificando || scambioInCorso || scambioInAttesaConferma;
+    Boolean(nutrienteInCorso) ||
+    Boolean(pastoInCorso) ||
+    Boolean(giornoMangioFuoriInCorso) ||
+    modificando ||
+    scambioInCorso ||
+    scambioInAttesaConferma;
 
   const confrontoLARN = useMemo(() => {
     if (!giorni || !datiBiometrici) return null;
@@ -381,6 +421,18 @@ export function MenuView({
     setPastoInCorso(null);
   }
 
+  // Azione "mangio fuori" visibile per il giorno selezionato (prima
+  // raggiungibile solo scrivendola in chat): riusa lo stesso motore di
+  // modifica in linguaggio naturale, nessun percorso parallelo — il prompt
+  // di modificaPiano riconosce già questa frase e produce lo slot vuoto
+  // (ingredienti: [], esentato dal controllo varietà, vedi claude.ts).
+  async function handleMangioFuori(giorno: Giorno) {
+    if (azioneInCorso) return;
+    setGiornoMangioFuoriInCorso(giorno.giorno);
+    await applicaModifica(`${giorno.giorno} mangio fuori, non serve cucinare per nessun pasto di quel giorno.`);
+    setGiornoMangioFuoriInCorso(null);
+  }
+
   // Scambio tra due pasti di giorni diversi: puro riordino dei dati già nel
   // piano (stessi pasti, stesso totale ingredienti), nessuna chiamata AI.
   // Tre tocchi: il primo arma la "modalità scambio" (card evidenziata,
@@ -494,6 +546,13 @@ export function MenuView({
     }
   }
 
+  // Giorno mostrato sotto il selettore: quello scelto dall'utente se c'è,
+  // altrimenti il default (vedi giornoDiDefault) calcolato al volo — non
+  // c'è bisogno di un effect per "inizializzarlo una volta sola".
+  const giornoCorrente = giorni
+    ? (giorni.find((g) => g.giorno === giornoSelezionato) ?? giorni.find((g) => g.giorno === giornoDiDefault(giorni, settimana)) ?? null)
+    : null;
+
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
@@ -503,7 +562,9 @@ export function MenuView({
           scenari
             ? undefined
             : giorni
-              ? `Ciao ${nome} · Settimana del ${settimana}${loading ? " · genero il nuovo piano..." : ""}`
+              ? // Settimana non ripetuta qui: compare già, formattata come intervallo
+                // di date (es. "2–8 novembre"), sopra il selettore giorni più sotto.
+                `Ciao ${nome}${loading ? " · genero il nuovo piano..." : ""}`
               : `Ciao ${nome}`
         }
       />
@@ -703,14 +764,55 @@ export function MenuView({
             )}
             {erroreScambio && <p className="text-sm text-error">{erroreScambio}</p>}
 
-            <div className="flex flex-col gap-7">
-              {giorni.map((giorno) => (
-                <div key={giorno.giorno}>
-                  <h3 className="mb-2.5 text-[15px] font-semibold text-ink">
-                    {etichettaGiorno(giorno.giorno, settimana)}
-                  </h3>
-                  <div className="flex flex-col gap-3">
-                    {giorno.pasti.map((pasto, i) => {
+            <div className="flex flex-col gap-4">
+              <div>
+                <p className="mb-2 text-sm text-ink/60">Settimana del {rangeSettimana(settimana)}</p>
+                <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
+                  {giorni.map((g) => {
+                    const selezionato = g.giorno === giornoSelezionato;
+                    return (
+                      <button
+                        key={g.giorno}
+                        type="button"
+                        onClick={() => setGiornoSelezionato(g.giorno)}
+                        aria-pressed={selezionato}
+                        className={`flex shrink-0 flex-col items-center gap-0.5 rounded-[14px] px-3.5 py-2 ${
+                          selezionato ? "bg-dark text-dark-fill-text" : "bg-paper text-ink"
+                        }`}
+                      >
+                        <span className="text-[11px] font-medium uppercase opacity-70">
+                          {giornoAbbreviato(g.giorno)}
+                        </span>
+                        <span className="text-base font-semibold">{numeroGiorno(g.giorno, settimana) ?? "–"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {giornoCorrente && (
+                <button
+                  type="button"
+                  onClick={() => handleMangioFuori(giornoCorrente)}
+                  disabled={azioneInCorso}
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-[14px] border-2 border-dashed border-accent px-4 py-2.5 text-sm font-semibold text-accent disabled:opacity-50"
+                >
+                  {giornoMangioFuoriInCorso === giornoCorrente.giorno ? (
+                    <Spinner className="h-4 w-4" />
+                  ) : (
+                    <ForchettaIcon />
+                  )}
+                  {giornoMangioFuoriInCorso === giornoCorrente.giorno
+                    ? "Applico la modifica..."
+                    : `${etichettaGiorno(giornoCorrente.giorno, settimana)}: mangio fuori`}
+                </button>
+              )}
+
+              {giornoCorrente && (
+                <div key={giornoCorrente.giorno} className="flex flex-col gap-3">
+                  {(() => {
+                    const giorno = giornoCorrente;
+                    return giorno.pasti.map((pasto, i) => {
                       const chiave = `${giorno.giorno}-${i}`;
                       const espanso = pastoEspanso === chiave;
                       const haPreparazione = Boolean(pasto.preparazione?.length);
@@ -848,10 +950,10 @@ export function MenuView({
                           )}
                         </div>
                       );
-                    })}
-                  </div>
+                    });
+                  })()}
                 </div>
-              ))}
+              )}
             </div>
 
             {!confrontoLARN && (

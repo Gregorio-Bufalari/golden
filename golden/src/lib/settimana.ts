@@ -46,6 +46,11 @@ export function formattaData(data: Date): string {
   return `${data.getDate()} ${MESI[data.getMonth()]}`;
 }
 
+/** Es. "Lun" — solo l'abbreviazione, senza data (per il selettore giorni del Menu). */
+export function giornoAbbreviato(nomeGiorno: string): string {
+  return GIORNI_ABBREV[nomeGiorno] ?? nomeGiorno;
+}
+
 /** Es. "6 ott". */
 function formattaDataBreve(data: Date): string {
   return `${data.getDate()} ${MESI_ABBREV[data.getMonth()]}`;
@@ -78,6 +83,30 @@ function dataOggettoDelGiorno(nomeGiorno: string, settimana: string): Date | nul
 export function dataDelGiorno(nomeGiorno: string, settimana: string): string | null {
   const data = dataOggettoDelGiorno(nomeGiorno, settimana);
   return data ? formattaData(data) : null;
+}
+
+/** Solo il numero del giorno nel mese (es. 6), per il selettore giorni del Menu. */
+export function numeroGiorno(nomeGiorno: string, settimana: string): number | null {
+  const data = dataOggettoDelGiorno(nomeGiorno, settimana);
+  return data ? data.getDate() : null;
+}
+
+/**
+ * Es. "12–18 ottobre" (stesso mese) o "28 ottobre – 3 novembre" (a cavallo
+ * di due mesi) — intestazione della settimana mostrata sopra il selettore
+ * giorni del Menu. `settimana` è il lunedì della settimana, la domenica è
+ * sempre +6 giorni da lì.
+ */
+export function rangeSettimana(settimana: string): string {
+  const lunedi = new Date(`${settimana}T00:00:00`);
+  if (Number.isNaN(lunedi.getTime())) return settimana;
+  const domenica = new Date(lunedi);
+  domenica.setDate(lunedi.getDate() + 6);
+
+  if (lunedi.getMonth() === domenica.getMonth()) {
+    return `${lunedi.getDate()}–${domenica.getDate()} ${MESI[lunedi.getMonth()]}`;
+  }
+  return `${formattaData(lunedi)} – ${formattaData(domenica)}`;
 }
 
 /**
