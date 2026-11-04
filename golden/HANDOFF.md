@@ -1104,6 +1104,25 @@ Questa sessione (dalla PR #32 in poi), in ordine:
       l'ambiguità del bottone a livello giorno. Rimossi `handleMangioFuori`,
       `giornoMangioFuoriInCorso`, `ForchettaIcon` (tutti introdotti nell'entry #36, ora morti).
     - 268 test, lint, build puliti (nessuna logica toccata, solo riposizionamento JSX + CSS).
+39. **(questa sessione, Bug E — "ancora lento" riaperto dal founder dopo conferma nell'uso reale)**:
+    profiling vero con una generazione reale (non solo lettura del codice come il 28/10), stesso
+    percorso della route di produzione (3 scenari paralleli, profilo celiaco, budget 70€). Dettagli
+    numerici completi in `BACKLOG.md`. In sintesi: **confermato che il parallelismo reale funziona**
+    (i 3 `generateMealPlan` partono insieme, 65-81s ciascuno) — la causa vera è che **tutti e 3 gli
+    scenari hanno superato il budget alla prima generazione**, facendo scattare `adattaBudget` (1
+    chiamata AI in più per scenario, 34.5-49.5s) che di fatto raddoppia il tempo di ogni scenario.
+    Tempo totale wall-clock: 130.5s. Nessun fix applicato: la causa è una scelta di design (quanto
+    irrigidire il prompt sul budget, se saltare la correzione per gli scenari di confronto,
+    se cambiare strategia di risposta a progressive loading) — tre opzioni presentate al founder,
+    in attesa di decisione.
+    - **Nota per profiling futuri**: `adattaBudget` (a differenza di `modificaPiano`/
+      `confrontaScontrino`) non restituisce `usage`/costo — il costo di questo profiling (6
+      chiamate reali: 3× `generateMealPlan` + 3× `adattaBudget`) è stato stimato (~$0.60) non
+      misurato con precisione. Se si ripete un profiling simile, valutare se vale la pena
+      aggiungere quel tracking anche lì.
+    - Smoke test temporaneo (`__profiling-genera-piano.smoke.test.ts`) scritto, eseguito,
+      cancellato prima del commit — nessuna traccia nel diff, nessuna modifica al codice di
+      produzione in questo giro.
 
 - Gli smoke test in `claude.smoke.test.ts` con un terzo argomento `30_000` **timeoutano spesso
   esattamente a 30s** in questo sandbox per latenza di rete verso l'API reale, non per un bug —
