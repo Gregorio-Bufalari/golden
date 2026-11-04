@@ -806,7 +806,7 @@ export function MenuView({
                         type="button"
                         onClick={() => setGiornoSelezionato(g.giorno)}
                         aria-pressed={selezionato}
-                        className={`flex shrink-0 flex-col items-center gap-0.5 rounded-[14px] px-3.5 py-2 ${
+                        className={`flex min-w-11 flex-1 flex-col items-center gap-0.5 rounded-[14px] px-2 py-2 ${
                           selezionato ? "bg-dark text-dark-fill-text" : "bg-paper text-ink"
                         }`}
                       >
