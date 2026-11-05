@@ -77,6 +77,35 @@ describe("generateMealPlan — risposta AI simulata", () => {
     expect(richiesta.system).not.toContain("modalità 'Scoperta'");
   });
 
+  it("in modalità Scoperta, con piatti recenti passati, chiede di evitarli", async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: { giorni: creaPianoEsempio() } });
+
+    await generateMealPlan(profiloBase, "scoperta", new Map(), ["Pollo al forno", "Riso al salmone"]);
+
+    const richiesta = mockParse.mock.calls[0][0];
+    expect(richiesta.system).toContain("Pollo al forno");
+    expect(richiesta.system).toContain("Riso al salmone");
+    expect(richiesta.system).toMatch(/settimane recenti/i);
+  });
+
+  it("in modalità Routine, anche con piatti recenti passati, NON li menziona (Routine ripete apposta)", async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: { giorni: creaPianoEsempio() } });
+
+    await generateMealPlan(profiloBase, "routine", new Map(), ["Pollo al forno"]);
+
+    const richiesta = mockParse.mock.calls[0][0];
+    expect(richiesta.system).not.toContain("Pollo al forno");
+  });
+
+  it("in modalità Scoperta, senza piatti recenti (prima generazione), non menziona lo storico", async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: { giorni: creaPianoEsempio() } });
+
+    await generateMealPlan(profiloBase, "scoperta");
+
+    const richiesta = mockParse.mock.calls[0][0];
+    expect(richiesta.system).not.toMatch(/settimane recenti/i);
+  });
+
   it("include sempre le restrizioni del profilo nel messaggio inviato all'AI", async () => {
     mockParse.mockResolvedValueOnce({ parsed_output: { giorni: creaPianoEsempio() } });
 

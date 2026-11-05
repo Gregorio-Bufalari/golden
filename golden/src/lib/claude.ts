@@ -282,6 +282,23 @@ const ISTRUZIONE_SCOPERTA =
   "di default per questo profilo — più varietà rispetto a un piano standard — sempre nel rispetto di restrizioni, " +
   "preferenze e budget. Evita i piatti più ovvi e ripetitivi per questo tipo di richiesta.";
 
+// Estensione di ISTRUZIONE_SCOPERTA oltre la singola settimana: senza
+// questa lista, ogni generazione riparte da zero senza alcuna memoria di
+// cosa è già stato proposto — in modalità Scoperta (il cui scopo è
+// esplicitamente "provare cose diverse dal solito") questo significa poter
+// riproporre lo stesso piatto settimana dopo settimana. SOLO qui, non in
+// Routine: lì lo scopo è l'opposto (ripetere apposta gli stessi piatti),
+// quindi questa istruzione va aggiunta solo se modalita === "scoperta" —
+// vedi la chiamata in generateMealPlan più sotto.
+function istruzioneStoricoRecente(nomiRecenti: string[]): string {
+  if (nomiRecenti.length === 0) return "";
+  return (
+    "Piatti già proposti nelle settimane recenti per questo profilo, da evitare per non riproporli identici in " +
+    "questo nuovo piano (va bene riusare gli stessi ingredienti di base, ma la ricetta/il piatto dev'essere " +
+    `diverso): ${nomiRecenti.join(", ")}.`
+  );
+}
+
 /**
  * Unisce i moduli di istruzioni applicabili a una chiamata, saltando quelli
  * assenti (es. ISTRUZIONE_SCOPERTA solo in modalità Scoperta, o una
@@ -312,6 +329,11 @@ export async function generateMealPlan(
   profilo: ProfiloPerPiano,
   modalita: "routine" | "scoperta" = "routine",
   dispensa: Map<string, number> = new Map(),
+  // Piatti già proposti nelle settimane recenti (vedi nomiPastiRecenti in
+  // varieta-storico.ts) — ignorato se modalita non è "scoperta", anche se
+  // il chiamante lo passasse per errore: Routine ripete apposta gli stessi
+  // piatti, non deve mai evitarli.
+  nomiRecentiDaEvitare: string[] = [],
 ): Promise<MealPlan> {
   // client.messages.stream (non .parse) per poter usare MAX_TOKENS_PIANO_COMPLETO
   // in sicurezza: con colazione+pranzo+cena (21 pasti) il modello può
@@ -339,6 +361,7 @@ export async function generateMealPlan(
         ISTRUZIONE_BATCH_COOKING,
         ISTRUZIONI_COLAZIONE,
         modalita === "scoperta" ? ISTRUZIONE_SCOPERTA : null,
+        modalita === "scoperta" ? istruzioneStoricoRecente(nomiRecentiDaEvitare) : null,
         ISTRUZIONI_INGREDIENTI,
         ISTRUZIONI_NUTRIZIONE,
         ISTRUZIONI_PREPARAZIONE,

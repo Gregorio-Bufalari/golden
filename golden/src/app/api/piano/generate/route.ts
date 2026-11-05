@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { ProfiloPerPiano } from "@/lib/claude";
 import { leggiDispensa } from "@/lib/dispensa";
 import { calcolaFattoreCalibrazionePerProfilo } from "@/lib/calibrazione-prezzi";
+import { nomiPastiRecenti } from "@/lib/varieta-storico";
 import { leggiPreferitiPerRotazione, sceglieFavoritoScoperta, type PreferitoPerRotazione } from "@/lib/preferiti-scoperta";
 import { generaScenario, DELTA_RISPARMIO, DELTA_ABBONDANTE, type RisultatoScenario } from "@/lib/piano-scenario";
 import type { GiornoValidato } from "@/lib/piano-validazione";
@@ -158,10 +159,22 @@ export async function POST(request: Request) {
   // in un'unica risposta con tutti e 3 gli scenari già pronti.
   const dispensa = await leggiDispensa(supabase, profileId);
   const fattore = await calcolaFattoreCalibrazionePerProfilo(supabase, profileId, supermercato);
+  // Solo in Scoperta: Routine ripete apposta gli stessi piatti, non deve
+  // evitarli (vedi commento su istruzioneStoricoRecente in claude.ts).
+  const nomiRecenti = modalitaProfilo === "scoperta" ? await nomiPastiRecenti(supabase, profileId) : [];
 
   let equilibrato: RisultatoScenario;
   try {
-    equilibrato = await generaScenario(profiloInput, modalitaProfilo, dispensa, fattore, supermercato, favorito, null);
+    equilibrato = await generaScenario(
+      profiloInput,
+      modalitaProfilo,
+      dispensa,
+      fattore,
+      supermercato,
+      favorito,
+      null,
+      nomiRecenti,
+    );
   } catch (err) {
     console.error("generateMealPlan error (equilibrato):", err);
     return NextResponse.json({ error: "Non sono riuscito a generare il piano. Riprova." }, { status: 502 });
@@ -172,8 +185,8 @@ export async function POST(request: Request) {
   const targetAbbondante = Math.round(baseTotale * DELTA_ABBONDANTE);
 
   const [risparmioEsito, abbondanteEsito] = await Promise.allSettled([
-    generaScenario(profiloInput, modalitaProfilo, dispensa, fattore, supermercato, favorito, targetRisparmio),
-    generaScenario(profiloInput, modalitaProfilo, dispensa, fattore, supermercato, favorito, targetAbbondante),
+    generaScenario(profiloInput, modalitaProfilo, dispensa, fattore, supermercato, favorito, targetRisparmio, nomiRecenti),
+    generaScenario(profiloInput, modalitaProfilo, dispensa, fattore, supermercato, favorito, targetAbbondante, nomiRecenti),
   ]);
 
   if (risparmioEsito.status === "rejected") {

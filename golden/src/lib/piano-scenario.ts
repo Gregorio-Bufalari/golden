@@ -55,9 +55,13 @@ export async function generaScenario(
   supermercato: string | null,
   favorito: PreferitoPerRotazione | null,
   targetBudget: number | null,
+  // Piatti delle settimane recenti da evitare (solo rilevante in modalità
+  // Scoperta — vedi istruzioneStoricoRecente in claude.ts, che la ignora
+  // comunque se modalitaProfilo non è "scoperta").
+  nomiRecentiDaEvitare: string[] = [],
 ): Promise<RisultatoScenario> {
   const profiloScenario: ProfiloPerPiano = { ...profiloInput, budget_settimanale: targetBudget };
-  const plan = await generateMealPlan(profiloScenario, modalitaProfilo, dispensa);
+  const plan = await generateMealPlan(profiloScenario, modalitaProfilo, dispensa, nomiRecentiDaEvitare);
   const giorniBase = await validaGiorni(profiloScenario, plan.giorni, dispensa);
   // adattaEntroBudget applica anche il controllo varietà internamente (sui
   // giorni iniziali e dopo ogni eventuale adattamento budget), non serve

@@ -1332,6 +1332,40 @@ Questa sessione (dalla PR #32 in poi), in ordine:
       Preferito "favorito" di Scoperta, non gli altri 20 pasti. Founder ha scelto di non generare
       una seconda settimana per un esempio concreto (costo non necessario, la risposta dal codice
       è già definitiva).
+45. **(5 novembre 2026, decisioni del founder sui 4 punti dell'entry #44 + nuova feature)**:
+    - **Soglie colore Frigo**: lasciate come sono — nessuna modifica.
+    - **Timeout nutrizione (Bug E)**: rischio accettato per ora — nessuna modifica, resta
+      documentato in `BACKLOG.md` se si ripresenta.
+    - **Bug F ("non salva i piatti")**: confermato dal founder — il piatto fallito era una
+      colazione E compariva il messaggio di errore rosso. Causa confermata: la migration
+      `2026-10-15_add_colazione_tipo_preferiti.sql` non è mai stata eseguita sul Supabase di
+      produzione. **Azione per il founder, non per me** (nessun accesso al Supabase di
+      produzione da questo sandbox): eseguire quel file SQL nel SQL Editor di Supabase. Nessun
+      cambio di codice necessario.
+    - **Memoria anti-ripetizione tra settimane (Bug G, parte 2) — COSTRUITA**: il founder ha
+      chiesto di implementarla dopo che gli ho spiegato cosa significherebbe. Nuovo
+      `src/lib/varieta-storico.ts`: `nomiPastiRecenti(supabase, profileId, numSettimane=3)`
+      legge i nomi distinti dei piatti dalle ultime 3 settimane salvate (`weekly_plans`),
+      esclusi i pasti "mangio fuori". `generateMealPlan` (`claude.ts`) accetta un nuovo
+      parametro `nomiRecentiDaEvitare: string[]` e, **SOLO in modalità Scoperta**, aggiunge
+      un'istruzione al prompt per evitarli — stesso principio di `assicuraVarieta` (doppioni
+      nella stessa settimana), esteso nel tempo. Gate dentro `generateMealPlan` stessa (non solo
+      nel chiamante): anche se qualcuno passasse la lista per errore in modalità Routine (il cui
+      scopo è l'OPPOSTO: ripetere apposta gli stessi piatti), viene ignorata. Threaded attraverso
+      `generaScenario` (`piano-scenario.ts`) e le due route di generazione, ricalcolato
+      indipendentemente in ciascuna (stesso pattern già usato per dispensa/fattore di
+      calibrazione — deterministico, economico, non serve farlo viaggiare dal client).
+      **Deliberatamente solo un'istruzione nel prompt, NESSUN controllo deterministico con
+      rigenerazione dopo**: un controllo post-generazione come `assicuraVarieta` avrebbe
+      richiesto chiamate AI aggiuntive, in tensione diretta con il lavoro di oggi sulla lentezza
+      (Bug E) — un trade-off esplicito, non un oversight. **Non verificato con una generazione
+      reale**: il founder ha scelto di consegnare senza spendere altro credito AI in questa
+      sessione, fidandosi dei test automatici (il meccanismo del prompt è identico a quello già
+      in produzione altrove, es. `istruzioneDispensa`/`nomiDaEvitare` in `regeneratePasto`). Se
+      la ripetizione tra settimane continua a presentarsi dopo questo fix, utile un profiling
+      reale dal vivo la prossima volta (genera 2 settimane consecutive e confronta). Nuovi test:
+      `varieta-storico.test.ts` (4 test, Supabase finto) + 3 test in `claude.test.ts` per il gate
+      Scoperta/Routine. 275 test totali (268 + 7 nuovi), build e lint puliti.
 
 ## Prima di chiudere questa sessione
 

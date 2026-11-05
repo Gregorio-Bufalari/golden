@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { ProfiloPerPiano } from "@/lib/claude";
 import { leggiDispensa } from "@/lib/dispensa";
 import { calcolaFattoreCalibrazionePerProfilo } from "@/lib/calibrazione-prezzi";
+import { nomiPastiRecenti } from "@/lib/varieta-storico";
 import type { PreferitoPerRotazione } from "@/lib/preferiti-scoperta";
 import { generaScenario, targetBudgetScenario, ETICHETTA_SCENARIO, type ChiaveScenario } from "@/lib/piano-scenario";
 
@@ -81,6 +82,10 @@ export async function POST(request: Request) {
   // ogni altro pasto del piano.
   const dispensa = await leggiDispensa(supabase, profileId);
   const fattore = await calcolaFattoreCalibrazionePerProfilo(supabase, profileId, supermercato);
+  // Solo in Scoperta, stesso motivo di /api/piano/generate: deterministico,
+  // sicuro da ricalcolare indipendentemente in ciascuna delle 3 chiamate
+  // parallele (stesso ragionamento già fatto sopra per dispensa/fattore).
+  const nomiRecenti = modalitaProfilo === "scoperta" ? await nomiPastiRecenti(supabase, profileId) : [];
   const chiaveScenario = chiave as ChiaveScenario;
   const targetBudget = targetBudgetScenario(profile.budget_settimanale, chiaveScenario);
 
@@ -93,6 +98,7 @@ export async function POST(request: Request) {
       supermercato,
       (favorito as PreferitoPerRotazione | null) ?? null,
       targetBudget,
+      nomiRecenti,
     );
 
     return NextResponse.json({
