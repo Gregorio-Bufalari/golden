@@ -1287,6 +1287,51 @@ Questa sessione (dalla PR #32 in poi), in ordine:
       ora più naturali: prima dovevano simulare "a mano" che l'AI riecheggiasse il pasto invariato,
       ora basta ometterlo da `pasti_modificati` e il merge lo preserva da sé. 268 test (stesso
       conteggio di prima, solo mock riscritti), build e lint puliti.
+44. **(5 novembre 2026, nuovo giro di segnalazioni dal vivo)**: 5 punti, solo investigazione/
+    spiegazione — nessuna modifica al codice in questa entry.
+    - **Bug D (aggiornato) — "pallini rossi ovunque", audit quantitativo**: simulato con le
+      funzioni reali (`giorniAllaScadenza`/`coloreUrgenza`) la % di vita di un prodotto trascorsa
+      in ciascun colore, per durate totali di 2/4/5/7/14/21/30 giorni. Confermata l'asimmetria
+      sospettata dal founder: soglie assolute (1gg rosso, 3gg arancione) consumano l'80% della vita
+      di un prodotto da 4 giorni (categoria `fresco`, LA PIÙ COMUNE nel Frigo) in arancione/rosso,
+      contro il 13-18% di un prodotto da 14-30 giorni. Le uniche 2 categorie con una scadenza
+      stimata oggi (`fresco` 4gg, `frigo_aperto` 7gg) sono ENTRAMBE a vita breve — ogni voce
+      colorata nel Frigo appartiene per costruzione a una fascia dove arancione/rosso sono la
+      norma, non l'eccezione. Tabella completa in `BACKLOG.md`. Decisione sulla soglia rimandata.
+    - **Bug E (continuazione) — target nutrizionali alti ~3x più lenti, rischio timeout reale**:
+      profiling mirato (stesso profilo/budget €50, ma con `obiettivi_nutrizionali` alti impostati
+      per la prima volta in questi test). `generateMealPlan`: 223.9s (contro 65-81s senza target
+      nutrizionali) — **~3x più lento**. Con `adattaEntroBudget` (63.1s), **totale 287.0s, a 13s dal
+      timeout Vercel di 300s**. Causa probabile: più "pensiero" richiesto per soddisfare vincoli
+      numerici precisi insieme a tutti gli altri — diverso dal collo di bottiglia di ieri (quello
+      era output sprecato, risolto restringendo `modificaPiano`). Nessun fix applicato: causa
+      diversa da ieri, serve una decisione del founder prima di agire (come esplicitamente
+      richiesto). Costo: ~$0.15-0.20, 1 generazione.
+    - **Domanda — formule di Andamento**: risposta diretta in chat (già tutto documentato in
+      codice/UI, nessuna nuova investigazione necessaria): "Risparmiato vs budget" = somma di
+      (`budget_stimato` del piano di quella settimana − `spesa_reale` dichiarata nel check-in di
+      quella settimana), per ogni settimana con entrambi i valori. "% settimane senza sprechi" =
+      check-in con `spreco: false` ÷ check-in con una risposta sì/no data. "€ sprechi evitati" =
+      (valore stimato del cibo ancora nel Frigo, quantità × prezzo medio indicativo per categoria —
+      vedi `sprechi-evitati.ts`) + (settimane con check-in "nessuno spreco" × €8 di riferimento
+      forfettario a settimana). Nessun calcolo nuovo rispetto a quanto già scritto nei commenti del
+      codice e mostrato nell'UI stessa sotto ogni numero.
+    - **Bug F — "non salva i piatti", nessuna modifica, serve conferma**: confermato che esiste UN
+      SOLO meccanismo di salvataggio in tutta l'app (il cuore nel Menu) — quindi è necessariamente
+      lo stesso codice di Bug A, già corretto (guard + errore visibile). Ipotesi principale per un
+      fallimento residuo: la migration colazione del 15 ottobre (`2026-10-15_add_
+      colazione_tipo_preferiti.sql`), mai confermata eseguita su Supabase produzione — se manca,
+      salvare un pasto di COLAZIONE specificamente fallisce (vincolo CHECK ancora solo pranzo/cena).
+      Non verificabile da questo sandbox (nessun accesso a Supabase produzione). Chiesto al founder
+      se il piatto fallito era una colazione e se è comparso un errore visibile.
+    - **Bug G — ripetizione ricette**: NESSUNA regressione nel controllo intra-settimana (0
+      doppioni nel campione generato per Bug E, logica invariata dal 14 ottobre) — limite onesto
+      però: il confronto è per nome ESATTO, non cattura varianti cosmetiche dello stesso piatto.
+      CONFERMATO che non esiste (mai esistita) una memoria anti-ripetizione TRA generazioni/
+      settimane diverse — `ultima_proposta` in `preferiti-scoperta.ts` serve solo a ruotare il
+      Preferito "favorito" di Scoperta, non gli altri 20 pasti. Founder ha scelto di non generare
+      una seconda settimana per un esempio concreto (costo non necessario, la risposta dal codice
+      è già definitiva).
 
 ## Prima di chiudere questa sessione
 
