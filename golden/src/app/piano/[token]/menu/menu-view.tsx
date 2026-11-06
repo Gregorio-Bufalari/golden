@@ -719,11 +719,13 @@ export function MenuView({
                         €{scenario.grocery_list.totale_stimato.toFixed(2)}
                       </span>
                     </div>
-                    {scenario.chiave === "equilibrato" &&
-                      budgetSettimanale &&
-                      scenario.grocery_list.totale_stimato > budgetSettimanale && (
-                        <p className="mt-1 text-xs text-honey">Supera il budget di €{budgetSettimanale} fissato in Profilo</p>
-                      )}
+                    {scenario.budget_superato && scenario.budget_target != null && (
+                      <p className="mt-1 text-xs text-honey">
+                        {scenario.chiave === "equilibrato"
+                          ? `Supera il budget di €${scenario.budget_target} fissato in Profilo`
+                          : `Supera il target di questo scenario (€${scenario.budget_target})`}
+                      </p>
+                    )}
                     <p className="mt-2 text-[13px] text-ink/65">{anteprimaPiatti(scenario.giorni)}</p>
                     <button
                       onClick={() => handleConfermaScenario(scenario)}

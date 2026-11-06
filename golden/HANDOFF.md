@@ -1366,6 +1366,29 @@ Questa sessione (dalla PR #32 in poi), in ordine:
       reale dal vivo la prossima volta (genera 2 settimane consecutive e confronta). Nuovi test:
       `varieta-storico.test.ts` (4 test, Supabase finto) + 3 test in `claude.test.ts` per il gate
       Scoperta/Routine. 275 test totali (268 + 7 nuovi), build e lint puliti.
+46. **(6 novembre 2026, 2 bug segnalati dal vivo dopo PR #77)**:
+    - **"Supera il budget" mancante su Risparmio/Abbondante (CORRETTO)**: screenshot del founder
+      (budget €50) mostrava tutti e 3 gli scenari sopra i €50 ma l'avviso solo su Equilibrato.
+      Causa: controllo hardcoded `chiave === "equilibrato"` in `menu-view.tsx`, che ignorava
+      `budget_target`/`budget_superato` già calcolati correttamente dal backend PER OGNI scenario
+      (80%/100%/120% del budget). Fix: usa quei campi per tutti e 3, testo diverso per Equilibrato
+      ("budget... fissato in Profilo") vs gli altri ("target di questo scenario"). Confermato col
+      founder che Abbondante non deve avvisare se resta sotto il SUO target (+20%), anche se sopra
+      il budget secco — comportamento voluto, non un secondo bug. Verificato visivamente con una
+      preview temporanea che replica esattamente i numeri dello screenshot (cancellata prima del
+      commit) — screenshot Playwright conferma i 3 testi corretti.
+    - **"Passata di pomodoro" classificata "fresco" invece di "dispensa" (CORRETTO)**: in
+      `conservazione.ts`, la keyword generica `"pomodor"` (categoria fresco) veniva controllata
+      PRIMA della categoria dispensa, che elenca esplicitamente `"passata"`/`"pomodori pelati"`/
+      `"polpa di pomodoro"` — ma questi nomi CONTENGONO "pomodor", quindi `.find()` si fermava
+      sempre al match fresco, rendendo quelle 3 voci dispensa irraggiungibili. Fix: dispensa ora
+      controllata per prima (le sue keyword sono specifiche, non sottostringhe generiche — un
+      pomodoro fresco vero resta su "fresco"). Effetto collaterale positivo: questi 3 ingredienti
+      ora finiscono anche in "può aspettare" invece di "da comprare subito" nella Spesa (stessa
+      funzione riusata). Nuovi test di regressione in `conservazione.test.ts`.
+    - Dettagli completi, numeri esatti e rationale in `BACKLOG.md`. 276 test totali, build e lint
+      puliti. Nessuna chiamata AI necessaria per questi due fix (bug di logica/UI deterministica,
+      non di generazione).
 
 ## Prima di chiudere questa sessione
 
