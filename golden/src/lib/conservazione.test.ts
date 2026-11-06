@@ -52,6 +52,20 @@ describe("conservazioneTipica", () => {
     expect(conservazioneTipica("Zucchine")).toMatch(/fresco deperibile/i);
     expect(conservazioneTipica("Insalata mista")).toMatch(/fresco deperibile/i);
   });
+
+  it('i derivati del pomodoro da dispensa vincono su "pomodor" (bug reale corretto, 5 novembre 2026)', () => {
+    // "pomodor" (keyword della frutta/verdura fresca) è una sottostringa di
+    // tutti e tre questi nomi — prima la categoria dispensa, elencata dopo
+    // quella fresca, non veniva mai raggiunta per questi 3 ingredienti.
+    expect(conservazioneTipica("Passata di pomodoro")).toMatch(/dispensa secca/i);
+    expect(conservazioneTipica("Pomodori pelati")).toMatch(/dispensa secca/i);
+    expect(conservazioneTipica("Polpa di pomodoro")).toMatch(/dispensa secca/i);
+
+    // Un pomodoro fresco vero deve restare "fresco": le keyword dispensa
+    // sono parole/frasi specifiche, non intercettano un "Pomodori" generico.
+    expect(conservazioneTipica("Pomodori")).toMatch(/fresco deperibile/i);
+    expect(conservazioneTipica("Pomodorini")).toMatch(/fresco deperibile/i);
+  });
 });
 
 describe("categoriaConservazione", () => {
