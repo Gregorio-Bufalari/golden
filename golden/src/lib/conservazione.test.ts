@@ -66,6 +66,25 @@ describe("conservazioneTipica", () => {
     expect(conservazioneTipica("Pomodori")).toMatch(/fresco deperibile/i);
     expect(conservazioneTipica("Pomodorini")).toMatch(/fresco deperibile/i);
   });
+
+  it('i fagiolini surgelati vincono su "fagioli" da dispensa (bug introdotto e corretto nella stessa verifica, 6 novembre 2026)', () => {
+    // "fagioli" (dispensa, legumi secchi) è una sottostringa di "fagiolini"
+    // (surgelato, fagiolini verdi) — il meccanismo "keyword più lunga vince"
+    // deve far prevalere "fagiolini" (9 lettere) su "fagioli" (7 lettere).
+    expect(conservazioneTipica("Fagiolini")).toMatch(/surgelato/i);
+    expect(conservazioneTipica("Fagiolini surgelati")).toMatch(/surgelato/i);
+
+    // I fagioli secchi veri restano "dispensa secca".
+    expect(conservazioneTipica("Fagioli")).toMatch(/dispensa secca/i);
+    expect(conservazioneTipica("Fagioli cannellini")).toMatch(/dispensa secca/i);
+  });
+
+  it("a parità di lunghezza tra keyword di categorie diverse, vince la prima nell'ordine della lista", () => {
+    // "passata" (dispensa, 7 lettere) e "pomodor" (fresco, 7 lettere) sono
+    // entrambe sottostringhe di "Passata di pomodoro" e hanno la STESSA
+    // lunghezza — deve vincere "passata" (dispensa), elencata per prima.
+    expect(conservazioneTipica("Passata di pomodoro")).toMatch(/dispensa secca/i);
+  });
 });
 
 describe("categoriaConservazione", () => {
