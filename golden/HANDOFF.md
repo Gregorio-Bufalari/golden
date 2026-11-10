@@ -1389,6 +1389,32 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     - Dettagli completi, numeri esatti e rationale in `BACKLOG.md`. 276 test totali, build e lint
       puliti. Nessuna chiamata AI necessaria per questi due fix (bug di logica/UI deterministica,
       non di generazione).
+47. **(6 novembre 2026, verifica sistematica richiesta esplicitamente dal founder: "corretto
+    funzionamento adottato ad oggi", senza chiamate AI, dati sintetici dove servivano)**:
+    - **Scoperto e quantificato (nessun fix)**: l'ordine prezzi tra i 3 scenari (Risparmio ≤
+      Equilibrato ≤ Abbondante) NON è garantito da nessuna parte del codice — simulazione su 4096
+      combinazioni di overshoot indipendente mostra che il **57.4%** produce un ordine finale
+      invertito. Spiega lo screenshot del founder (Equilibrato €103 più caro di Abbondante €76).
+      Causa: 3 generazioni AI indipendenti, nessun controllo incrociato sui risultati finali.
+      Scelta di design, non un bug isolato — rimandata al founder.
+    - **Trovata e corretta una regressione nel mio stesso fix di ieri**: riordinare "dispensa"
+      prima di "fresco" in `conservazione.ts` (per il bug pomodoro) aveva rotto "Fagiolini"
+      (ora finiva su dispensa invece di surgelato, stessa famiglia di bug al contrario — "fagioli"
+      è sottostringa di "fagiolini"). Il test automatico esistente l'ha intercettata PRIMA del
+      commit. Fix definitivo: `categoriaConservazione` non dipende più dall'ordine dell'array per
+      le categorie base — vince la keyword più LUNGA tra quelle che matchano (più specifica, quasi
+      sempre più corretta), con l'ordine come tie-break solo a parità di lunghezza. Il livello
+      "stato" (surgelato/cotto) resta a priorità fissa come prima — applicare lo stesso meccanismo
+      anche lì aveva rotto un test esistente ("Filetti di merluzzo surgelati al naturale" deve
+      restare surgelato), corretto prima del commit. Audit sistematico di tutte le coppie di
+      keyword tra categorie: solo queste 2 collisioni esistono (pomodoro, fagiolini), nessun'altra.
+    - **`modificaPiano` (merge `pasti_modificati`)**: verificato robusto con 3 nuovi test sintetici
+      nei casi limite (tocca esattamente 1 pasto su 14 lasciando gli altri byte-identici, due
+      modifiche per lo stesso slot non crashano, `pasti_modificati` vuoto con `modifica_applicata:
+      true` non crasha) — nessun bug trovato, solo copertura aggiunta.
+    - **`scadenza-frigo.ts`/`varieta-storico.ts`**: riletti, già ben coperti, nessun problema.
+    - 281 test totali (278 + 3 nuovi su `modificaPiano`), build e lint puliti. Nessuna chiamata AI
+      in tutta questa verifica — scenari costruiti a mano o con le funzioni reali su dati finti.
 
 ## Prima di chiudere questa sessione
 

@@ -483,6 +483,71 @@ describe("modificaPiano — risposta AI simulata", () => {
 
     expect(pollo).toBeUndefined();
   });
+
+  // Verifica mirata del merge pasti_modificati -> piano completo (6 novembre
+  // 2026, dopo aver trovato due regressioni reali in conservazione.ts con lo
+  // stesso approccio "ricontrolla i casi limite su dati sintetici").
+  it("un pasto_modificato tocca SOLO il giorno/pasto indicato: tutti gli altri 13 pasti restano byte-per-byte identici", async () => {
+    // creaPianoEsempio() copre tutti e 7 i giorni (14 pasti, pranzo+cena):
+    // un merge corretto deve toccare ESATTAMENTE 1 pasto su 14.
+    mockParse.mockResolvedValueOnce({
+      parsed_output: {
+        modifica_applicata: true,
+        motivo_rifiuto: null,
+        pasti_modificati: [{ giorno: "Venerdì", pasto: pasto({ tipo: "pranzo", nome: "Nuovo piatto di Venerdì", ingredienti: [] }) }],
+      },
+      usage: { input_tokens: 1000, output_tokens: 500 },
+    });
+
+    const pianoOriginale = creaPianoEsempio();
+    const risultato = await modificaPiano(profiloBase, pianoOriginale, "qualsiasi richiesta");
+
+    const venerdì = risultato.giorni.find((g) => g.giorno === "Venerdì");
+    expect(venerdì?.pasti.find((p) => p.tipo === "pranzo")?.nome).toBe("Nuovo piatto di Venerdì");
+
+    const altriGiorniInvariati = risultato.giorni.every((g, i) => {
+      if (g.giorno === "Venerdì") return true;
+      return JSON.stringify(g) === JSON.stringify(pianoOriginale[i]);
+    });
+    const cenaVenerdìInvariata =
+      venerdì?.pasti.find((p) => p.tipo === "cena")?.nome ===
+      pianoOriginale.find((g) => g.giorno === "Venerdì")?.pasti.find((p) => p.tipo === "cena")?.nome;
+    expect(altriGiorniInvariati).toBe(true);
+    expect(cenaVenerdìInvariata).toBe(true);
+  });
+
+  it("due pasti_modificati per lo STESSO giorno+tipo: vince il primo, nessun crash", async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: {
+        modifica_applicata: true,
+        motivo_rifiuto: null,
+        pasti_modificati: [
+          { giorno: "Lunedì", pasto: pasto({ tipo: "pranzo", nome: "Primo candidato", ingredienti: [] }) },
+          { giorno: "Lunedì", pasto: pasto({ tipo: "pranzo", nome: "Secondo candidato", ingredienti: [] }) },
+        ],
+      },
+      usage: { input_tokens: 1000, output_tokens: 500 },
+    });
+
+    const risultato = await modificaPiano(profiloBase, creaPianoEsempio(), "qualsiasi richiesta");
+    const lunedì = risultato.giorni.find((g) => g.giorno === "Lunedì");
+    const pranzo = lunedì?.pasti.find((p) => p.tipo === "pranzo");
+
+    expect(pranzo?.nome).toBe("Primo candidato");
+  });
+
+  it("modifica_applicata true ma pasti_modificati vuoto: il piano resta invariato, nessun crash (anomalia AI, non un errore di merge)", async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { modifica_applicata: true, motivo_rifiuto: null, pasti_modificati: [] },
+      usage: { input_tokens: 1000, output_tokens: 500 },
+    });
+
+    const pianoOriginale = creaPianoEsempio();
+    const risultato = await modificaPiano(profiloBase, pianoOriginale, "qualsiasi richiesta");
+
+    expect(risultato.modificaApplicata).toBe(true);
+    expect(risultato.giorni).toEqual(pianoOriginale);
+  });
 });
 
 describe("confrontaScontrino — risposta AI simulata", () => {
