@@ -25,6 +25,22 @@ const INDICATORI_STATO: { keywords: string[]; categoria: Categoria }[] = [
 
 const CATEGORIE_BASE: { keywords: string[]; categoria: Categoria }[] = [
   {
+    // Controllata PRIMA delle categorie fresche qui sotto, non dopo: le sue
+    // keyword sono parole intere o frasi specifiche ("passata", "pomodori
+    // pelati", "polpa di pomodoro"...), mai una sottostringa generica come
+    // "pomodor" — quindi un pomodoro fresco vero (es. "Pomodori",
+    // "Pomodorini") non la intercetta mai per errore. Se questa categoria
+    // fosse controllata DOPO "fresco" (come accadeva prima), "pomodor" nella
+    // lista fresco qui sotto catturerebbe per primo "Passata di pomodoro"/
+    // "Pomodori pelati"/"Polpa di pomodoro" (tutti contengono "pomodor" come
+    // sottostringa), rendendo questi 3 ingredienti della lista dispensa
+    // sotto irraggiungibili — bug reale riscontrato dal vivo (4 novembre
+    // 2026): "Passata di pomodoro" mostrata come "Fresco deperibile —
+    // consuma entro 2-4 giorni" invece di "Dispensa secca... diversi mesi".
+    keywords: ["pasta", "riso", "farina", "zucchero", "quinoa", "cuscus", "couscous", "olio", "aceto", "passata", "pomodori pelati", "polpa di pomodoro", "tonno", "ceci", "fagioli", "lenticchie"],
+    categoria: "dispensa",
+  },
+  {
     keywords: ["pollo", "tacchino", "macinato", "salsiccia", "hamburger", "carne", "pesce", "merluzzo", "salmone", "pane"],
     categoria: "fresco",
   },
@@ -47,10 +63,6 @@ const CATEGORIE_BASE: { keywords: string[]; categoria: Categoria }[] = [
   {
     keywords: ["latte", "panna", "besciamella", "mozzarella", "parmigiano", "grana", "pecorino", "feta", "gorgonzola", "taleggio", "burro", "uova", "yogurt"],
     categoria: "frigo_aperto",
-  },
-  {
-    keywords: ["pasta", "riso", "farina", "zucchero", "quinoa", "cuscus", "couscous", "olio", "aceto", "passata", "pomodori pelati", "polpa di pomodoro", "tonno", "ceci", "fagioli", "lenticchie"],
-    categoria: "dispensa",
   },
 ];
 
