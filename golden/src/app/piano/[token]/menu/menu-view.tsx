@@ -106,6 +106,54 @@ export function percentualeSuBase(totale: number, base: number): string {
   return delta > 0 ? `+${delta}%` : `${delta}%`;
 }
 
+// Stessi moltiplicatori di DELTA_RISPARMIO/DELTA_ABBONDANTE in
+// piano-scenario.ts, duplicati qui: quel file importa "server-only", non
+// può essere importato da un componente client come questo.
+const MOLTIPLICATORE_RISPARMIO = 0.8;
+const MOLTIPLICATORE_ABBONDANTE = 1.2;
+
+// Rietichetta i 3 scenari per COSTO REALE una volta che tutti e 3 sono
+// arrivati — 3 chiamate AI indipendenti possono sforare il proprio target
+// per quantità molto diverse e imprevedibili (misurato dal vivo: il 57%
+// delle combinazioni plausibili produce un ordine finale invertito, es.
+// Equilibrato più caro di Abbondante — vedi BACKLOG.md, 6-12 novembre
+// 2026), quindi l'etichetta mostrata deve riflettere il costo FINALE, non
+// con quale target è stato generato. Non tocca piatti/lista spesa di
+// ciascuno scenario, solo chiave/etichetta/target/avviso budget — il piano
+// sotto resta lo stesso già generato, cambia solo quale card lo mostra
+// come "Risparmio" invece che "Abbondante". Richiede tutti e 3 gli
+// scenari: con meno di 3 (uno fallito) non c'è abbastanza informazione per
+// un ordine affidabile, resta l'etichettatura originale.
+export function riordinaScenariPerCosto(scenari: Scenario[], budgetSettimanale: number | null): Scenario[] {
+  if (scenari.length !== 3) return scenari;
+
+  const [risparmio, equilibrato, abbondante] = [...scenari].sort(
+    (a, b) => a.grocery_list.totale_stimato - b.grocery_list.totale_stimato,
+  );
+  // Senza un budget dichiarato, il riferimento per i target ±20% resta il
+  // costo reale di quello che finisce nella posizione centrale — stesso
+  // principio già usato lato server quando non c'è un budget da cui
+  // partire (vedi DELTA_RISPARMIO in piano-scenario.ts).
+  const base = budgetSettimanale ?? equilibrato.grocery_list.totale_stimato;
+
+  const assegna = (scenario: Scenario, chiave: Scenario["chiave"], moltiplicatore: number): Scenario => {
+    const target = Math.round(base * moltiplicatore);
+    return {
+      ...scenario,
+      chiave,
+      etichetta: ETICHETTA_SCENARIO_IN_CORSO[chiave],
+      budget_target: target,
+      budget_superato: scenario.grocery_list.totale_stimato > target,
+    };
+  };
+
+  return [
+    assegna(risparmio, "risparmio", MOLTIPLICATORE_RISPARMIO),
+    assegna(equilibrato, "equilibrato", 1),
+    assegna(abbondante, "abbondante", MOLTIPLICATORE_ABBONDANTE),
+  ];
+}
+
 function ChevronIcon({ aperto }: { aperto: boolean }) {
   return (
     <svg
@@ -314,8 +362,9 @@ export function MenuView({
 
       // Nessun budget impostato: tutti e 3 gli scenari arrivano già pronti
       // in un'unica risposta (comportamento originale, invariato — vedi
-      // commento in /api/piano/generate/route.ts sul perché).
-      setScenari(data.scenari || []);
+      // commento in /api/piano/generate/route.ts sul perché). Rietichettati
+      // subito per costo reale, vedi riordinaScenariPerCosto più sopra.
+      setScenari(riordinaScenariPerCosto(data.scenari || [], budgetSettimanale));
       setSettimanaScenari(data.settimana);
       setFavoritoInclusoId(data.favorito_incluso_id ?? null);
     } catch {
@@ -340,7 +389,12 @@ export function MenuView({
       });
       if (res.ok) {
         const scenario: Scenario = await res.json();
-        setScenari((prev) => [...(prev ?? []), scenario]);
+        // Ogni card compare comunque appena pronta (nessuna attesa in più):
+        // la rietichettatura per costo reale scatta qui solo quando questo
+        // è l'ULTIMO dei 3 ad arrivare (length === 3 dentro
+        // riordinaScenariPerCosto), non prima — vedi commento sulla
+        // funzione più sopra.
+        setScenari((prev) => riordinaScenariPerCosto([...(prev ?? []), scenario], budgetSettimanale));
       }
     } catch {
       // Silenzioso, vedi commento sopra.
