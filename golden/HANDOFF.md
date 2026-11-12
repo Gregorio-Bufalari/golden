@@ -1415,6 +1415,26 @@ Questa sessione (dalla PR #32 in poi), in ordine:
     - **`scadenza-frigo.ts`/`varieta-storico.ts`**: riletti, già ben coperti, nessun problema.
     - 281 test totali (278 + 3 nuovi su `modificaPiano`), build e lint puliti. Nessuna chiamata AI
       in tutta questa verifica — scenari costruiti a mano o con le funzioni reali su dati finti.
+48. **(12 novembre 2026)**: chiusi i 2 punti aperti dall'entry #47.
+    - **Migration Supabase colazione Preferiti**: non posso eseguirla (nessuna credenziale
+      Supabase in questo sandbox, nessun CLI installato — verificato esplicitamente). Ridate al
+      founder le istruzioni passo-passo (SQL Editor, SQL esatto da incollare). Stato esecuzione
+      non confermato, resta una sua azione.
+    - **Ordine prezzi scenari — FIX APPLICATO** (il founder ha scelto l'opzione "mostra subito,
+      riordina quando arrivano tutti e 3", preservando il progressive loading di Bug E): nuova
+      `riordinaScenariPerCosto` in `menu-view.tsx`. Una volta che tutti e 3 gli scenari sono
+      arrivati (in qualunque percorso), rietichetta chiave/etichetta/target/avviso budget in base
+      al costo REALE ordinato — il più economico diventa "Risparmio", il mediano "Equilibrato", il
+      più caro "Abbondante", indipendentemente da quale target è stato usato per generarli. Nel
+      percorso progressivo (budget impostato), ogni card appare comunque appena pronta con
+      l'etichetta provvisoria; il riordino scatta SOLO quando arriva la terza — le card possono
+      spostarsi/rietichettarsi in quel momento, comportamento esplicitamente accettato. Con meno
+      di 3 scenari (uno fallito) non riordina. Senza budget dichiarato, il riferimento per i target
+      ±20% diventa il costo reale di chi finisce al centro. Verificato: 4 nuovi test in
+      `menu-view.test.ts` (incluso il caso reale esatto dello screenshot segnalato) + verifica
+      visiva con una preview temporanea che replica il percorso progressivo con arrivo fuori
+      ordine — screenshot Playwright confermano l'ordine corretto solo dopo il terzo arrivo,
+      pagina cancellata prima del commit. 285 test totali, build e lint puliti.
 
 ## Prima di chiudere questa sessione
 

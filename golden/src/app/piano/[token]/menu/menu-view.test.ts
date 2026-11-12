@@ -1,6 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { anteprimaPiatti, percentualeSuBase } from "./menu-view";
+import { anteprimaPiatti, percentualeSuBase, riordinaScenariPerCosto } from "./menu-view";
 import { etichettaGiorno } from "@/lib/settimana";
+
+type ScenarioInput = Parameters<typeof riordinaScenariPerCosto>[0][number];
+
+function scenario(chiave: ScenarioInput["chiave"], totale: number): ScenarioInput {
+  return {
+    chiave,
+    etichetta: chiave,
+    budget_target: null,
+    giorni: [],
+    grocery_list: { totale_stimato: totale },
+    budget_superato: false,
+  };
+}
 
 type GiornoInput = Parameters<typeof anteprimaPiatti>[0][number];
 
@@ -44,6 +57,72 @@ describe("percentualeSuBase", () => {
 
   it("restituisce una stringa vuota se la base non è positiva", () => {
     expect(percentualeSuBase(50, 0)).toBe("");
+  });
+});
+
+describe("riordinaScenariPerCosto", () => {
+  it("rietichetta per costo reale il caso segnalato dal vivo (6 novembre 2026): Equilibrato più caro di Abbondante", () => {
+    // Come generati/nominati originariamente dal server: Risparmio 67.48,
+    // Equilibrato 103.06 (il più caro di tutti!), Abbondante 76.17.
+    const originali = [scenario("risparmio", 67.48), scenario("equilibrato", 103.06), scenario("abbondante", 76.17)];
+
+    const riordinati = riordinaScenariPerCosto(originali, 50);
+
+    const risparmio = riordinati.find((s) => s.chiave === "risparmio")!;
+    const equilibrato = riordinati.find((s) => s.chiave === "equilibrato")!;
+    const abbondante = riordinati.find((s) => s.chiave === "abbondante")!;
+
+    // Ordine per costo reale sempre monotono, indipendentemente da quale
+    // scenario è stato generato per quale target.
+    expect(risparmio.grocery_list.totale_stimato).toBe(67.48);
+    expect(equilibrato.grocery_list.totale_stimato).toBe(76.17);
+    expect(abbondante.grocery_list.totale_stimato).toBe(103.06);
+    expect(risparmio.grocery_list.totale_stimato).toBeLessThanOrEqual(equilibrato.grocery_list.totale_stimato);
+    expect(equilibrato.grocery_list.totale_stimato).toBeLessThanOrEqual(abbondante.grocery_list.totale_stimato);
+
+    // Target ricalcolati sul budget dichiarato (80%/100%/120%), non su
+    // quello con cui ciascuno scenario era stato generato originariamente.
+    expect(risparmio.budget_target).toBe(40);
+    expect(equilibrato.budget_target).toBe(50);
+    expect(abbondante.budget_target).toBe(60);
+  });
+
+  it("senza un budget dichiarato, usa il costo reale dello scenario centrale come base per i target ±20%", () => {
+    const originali = [scenario("risparmio", 90), scenario("equilibrato", 100), scenario("abbondante", 80)];
+
+    const riordinati = riordinaScenariPerCosto(originali, null);
+    const equilibrato = riordinati.find((s) => s.chiave === "equilibrato")!;
+    const risparmio = riordinati.find((s) => s.chiave === "risparmio")!;
+    const abbondante = riordinati.find((s) => s.chiave === "abbondante")!;
+
+    // Ordinati per costo reale: 80 (risparmio), 90 (equilibrato, ora
+    // centrale), 100 (abbondante) — indipendentemente dalla chiave
+    // originale di ciascuno.
+    expect(risparmio.grocery_list.totale_stimato).toBe(80);
+    expect(equilibrato.grocery_list.totale_stimato).toBe(90);
+    expect(abbondante.grocery_list.totale_stimato).toBe(100);
+    expect(equilibrato.budget_target).toBe(90); // base coincide col proprio costo -> mai "superato"
+    expect(equilibrato.budget_superato).toBe(false);
+    expect(risparmio.budget_target).toBe(72); // round(90*0.8)
+    expect(abbondante.budget_target).toBe(108); // round(90*1.2)
+  });
+
+  it("con meno di 3 scenari (uno fallito) non riordina, restituisce l'elenco invariato", () => {
+    const originali = [scenario("risparmio", 50), scenario("equilibrato", 60)];
+    expect(riordinaScenariPerCosto(originali, 50)).toEqual(originali);
+  });
+
+  it("preserva piatti/lista spesa dello scenario, cambia solo chiave/etichetta/target/avviso", () => {
+    const abbondanteEconomico = { ...scenario("abbondante", 30), giorni: [{ giorno: "Lunedì", pasti: [] }] };
+    const originali = [scenario("risparmio", 50), scenario("equilibrato", 40), abbondanteEconomico];
+
+    const riordinati = riordinaScenariPerCosto(originali, 50);
+    const nuovoRisparmio = riordinati.find((s) => s.chiave === "risparmio")!;
+
+    // Il contenuto (giorni) dello scenario originariamente "abbondante" (il
+    // più economico, 30) segue la sua nuova etichetta "risparmio".
+    expect(nuovoRisparmio.grocery_list.totale_stimato).toBe(30);
+    expect(nuovoRisparmio.giorni).toEqual([{ giorno: "Lunedì", pasti: [] }]);
   });
 });
 
